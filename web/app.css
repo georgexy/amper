@@ -470,3 +470,9 @@ nav.tabs .badge[data-n]::after { content: attr(data-n); position: absolute; top:
 /* acces de oriunde */
 .rm-link { display: block; text-align: center; text-decoration: none; margin: 10px 0; }
 .rm-url { word-break: break-all; color: var(--text); }
+
+/* alerte: detaliile apar la atingere */
+#al-active .row:has(.det), #al-hist .row:has(.det) { cursor: pointer; }
+#al-active .row:has(.det) b::after, #al-hist .row:has(.det) b::after { content: " ›"; color: var(--muted); font-weight: 400; }
+#al-active .row.open b::after, #al-hist .row.open b::after { content: " ⌄"; }
+#set-auto #ua-list { margin-top: 14px; }

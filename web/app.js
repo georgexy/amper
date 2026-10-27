@@ -48,10 +48,22 @@ function splitDetail(m) {
   const text = short.join("").replace(/\s{2,}/g, " ").replace(/ :/g, ":").trim();
   return [text || m, det.filter(Boolean).join("; ")];
 }
-function alertText(m) {
+// la Alerte apare doar textul scurt; atingerea unei alerte arată/ascunde detaliile (ținute minte peste redesenări)
+const openAlerts = new Set();
+function alertText(m, key) {
   const [short, det] = splitDetail(m);
-  return `<span><b>${esc(short)}</b>${det ? `<small class="det">${esc(det)}</small>` : ""}</span>`;
+  const open = openAlerts.has(key);
+  return `<span data-ak="${esc(key)}"><b>${esc(short)}</b>${det ? `<small class="det" ${open ? "" : "hidden"}>${esc(det)}</small>` : ""}</span>`;
 }
+document.addEventListener("click", (e) => {
+  const row = e.target.closest("#al-active .row, #al-hist .row");
+  const det = row && $(".det", row);
+  if (!det) return;
+  const k = $("[data-ak]", row).dataset.ak;
+  openAlerts.has(k) ? openAlerts.delete(k) : openAlerts.add(k);
+  det.hidden = !openAlerts.has(k);
+  row.classList.toggle("open", !det.hidden);
+});
 
 const state = { info: null, snap: null, view: "now", hours: 24, lastMsg: 0, ws: null, sheetDev: null, energy: [],
   look: "cadrane", day: null, dayDrawn: null };
@@ -733,7 +745,8 @@ $("#daly-search").onclick = async () => {
 /* meniul setărilor: butoane → secțiuni (Teme, Notificări, Module Daly) */
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "notif", "daly", "info", "update", "security", "remote"]) $("#set-" + k).hidden = k !== name;
+  for (const k of ["teme", "notif", "daly", "info", "update", "security", "remote", "auto"]) $("#set-" + k).hidden = k !== name;
+  if (name === "auto") loadUserAlerts();
   if (name === "remote") renderRemote($("#remote-body"));
   if (name === "security") loadSecurity();
   clearInterval(state.infoTimer);
@@ -1112,7 +1125,7 @@ function show(v) {
   if (v === "settings") { showPanel(null); renderSettingsMenu(); }
   window.scrollTo(0, 0);
   if (v === "hist") loadHistory();
-  if (v === "alerts") { loadAlerts(); markAlertsSeen(); loadUserAlerts(); }
+  if (v === "alerts") { loadAlerts(); markAlertsSeen(); }
 }
 
 /* ------------------------------------------------------------------ ISTORIC */
@@ -1404,7 +1417,7 @@ addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => $$(".
 function renderActiveAlerts() {
   const a = state.snap?.alerts || [];
   $("#al-active").innerHTML = a.length ? a.map((x) => `
-    <div class="row ${x.level}">${alertText(x.message)}<span class="t">de ${x.since ? ago(x.since).replace("acum ", "") : ""}</span></div>`).join("")
+    <div class="row ${x.level} ${openAlerts.has("a" + x.message) ? "open" : ""}">${alertText(x.message, "a" + x.message)}<span class="t">de ${x.since ? ago(x.since).replace("acum ", "") : ""}</span></div>`).join("")
     : `<div class="empty">Nicio alertă. Toate modulele funcționează normal.</div>`;
 }
 async function loadAlerts() {
@@ -1412,7 +1425,7 @@ async function loadAlerts() {
   const r = await api("/api/alerts?limit=60");
   const closed = r.history.filter((x) => x.ts_end);
   $("#al-hist").innerHTML = closed.length ? closed.map((x) => `
-    <div class="row ${x.level} closed">${alertText(x.message)}
+    <div class="row ${x.level} closed ${openAlerts.has("h" + x.id) ? "open" : ""}">${alertText(x.message, "h" + x.id)}
     <span class="t">${dayTime(x.ts_start)} – ${hhmm(x.ts_end)}</span></div>`).join("")
     : `<div class="empty">Nu au fost alerte până acum.</div>`;
 }
@@ -1508,7 +1521,7 @@ async function loadUserAlerts() {
       <small>${esc(mname(r.metric))} ${r.op === "<" ? "<" : ">"} ${num(r.value, r.value % 1 ? 2 : 0)} ${esc(unit(r.metric))}${r.hold_s ? ` · cel puțin ${Math.round(r.hold_s / 60)} min` : ""} · ${LEVELS[r.level] || r.level}${r.notify_clear ? "" : " · fără „Rezolvat”"}</small></span>
       <span class="ua-act"><button class="btn sm" data-tog="${r.id}">${r.enabled ? "Oprește" : "Pornește"}</button>
       <button class="btn sm danger" data-del="${r.id}">Șterge</button></span></div>`).join("")
-    : `<div class="empty">Nicio alertă proprie. Apasă „+ Adaugă alertă”.</div>`;
+    : `<div class="empty">Nicio automatizare încă. Apasă „+ Adaugă automatizare”.</div>`;
   $$("[data-tog]", $("#ua-list")).forEach((b) => (b.onclick = async () => {
     const r = ua.rules.find((x) => x.id === +b.dataset.tog);
     await api(`/api/user-alerts/${r.id}`, jsonPost({ enabled: !r.enabled }));
