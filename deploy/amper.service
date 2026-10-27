@@ -1,0 +1,30 @@
+[Unit]
+Description=amper - monitorizare baterii si invertor
+After=network-online.target bluetooth.service
+Wants=network-online.target bluetooth.service
+
+[Service]
+Type=simple
+User=amper
+Group=amper
+# dialout = porturile seriale; video = vcgencmd (alimentare/subtensiune, în Setări → Info)
+SupplementaryGroups=dialout video
+Environment=PYTHONPATH=/opt/amper
+Environment=PYTHONUNBUFFERED=1
+WorkingDirectory=/var/lib/amper
+# Bluetooth pentru modulele Daly: deblocat și pornit (ca root; „-” = nu e grav dacă nu există adaptor)
+ExecStartPre=+-/bin/sh -c 'rfkill unblock bluetooth; sleep 1; timeout 10 bluetoothctl power on >/dev/null'
+# WiFi deblocat (Pi-ul poate fi mutat într-un loc fără cablu de rețea)
+ExecStartPre=+-/usr/sbin/rfkill unblock wifi
+ExecStart=@EXEC@
+Restart=always
+RestartSec=5
+# protecții: programul nu are nevoie de mai mult
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/amper
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

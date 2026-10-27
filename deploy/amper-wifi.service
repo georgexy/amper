@@ -1,0 +1,19 @@
+[Unit]
+Description=amper - hotspot Amper-Setup pentru configurarea WiFi (doar cand nu e internet)
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+Environment=PYTHONPATH=/opt/amper
+Environment=PYTHONUNBUFFERED=1
+# ca root: lucrează cu NetworkManager și pagina ascultă pe portul 80 al hotspotului
+ExecStart=/usr/bin/python3 -m amper.wifi_setup -c /etc/amper/config.yaml
+Restart=always
+# token pentru API-ul local folosit de Setări → Info (citibil de grupul amper)
+RuntimeDirectory=amper-wifi
+RuntimeDirectoryMode=0750
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

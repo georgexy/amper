@@ -1,0 +1,1385 @@
+/* Aplicația de telefon pentru amper — fără dependențe externe. */
+"use strict";
+
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const nf = (d) => new Intl.NumberFormat("ro-RO", { minimumFractionDigits: d, maximumFractionDigits: d });
+const N0 = nf(0), N1 = nf(1), N2 = nf(2), N3 = nf(3);
+const num = (v, d = 1) => (v == null || isNaN(v) ? "–" : [N0, N1, N2, N3][d].format(v));
+function watts(w, html = true) {
+  if (w == null) return "–";
+  const a = Math.abs(w);
+  const [v, u] = a >= 1000 ? [num(w / 1000, a >= 10000 ? 1 : 2), "kW"] : [num(w, 0), "W"];
+  return html ? `${v}<small>${u}</small>` : `${v} ${u}`;
+}
+function duration(h) {
+  if (h == null || !isFinite(h)) return "";
+  if (h > 72) return `${num(h / 24, 0)} zile`;
+  const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+  return hh ? `${hh} h ${mm ? mm + " min" : ""}`.trim() : `${mm} min`;
+}
+const hhmm = (ts) => new Date(ts * 1000).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
+const dayTime = (ts) => new Date(ts * 1000).toLocaleString("ro-RO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+function ago(ts) {
+  const s = Math.max(0, Date.now() / 1000 - ts);
+  if (s < 60) return `acum ${Math.round(s)} s`;
+  if (s < 3600) return `acum ${Math.round(s / 60)} min`;
+  return `la ${dayTime(ts)}`;
+}
+
+const SERIES = ["#63B7E6", "#4FD1B5", "#B39DF5", "#F48FB1", "#F0A35E", "#9CCC65"];
+const FAULT_RULES = { not_charging: "nu se încarcă", charge_mos_off: "încărcare oprită", discharge_mos_off: "descărcare oprită",
+  comm_lost: "fără date", cell_low: "celulă descărcată", temp_high: "prea cald", temp_low_charge: "prea rece",
+  low_soc: "aproape goală", cell_high: "celulă prea sus", cell_delta: "dezechilibrată", soc_divergence: "rămâne în urmă",
+  bms_alarm: "avertisment BMS", bms_protection: "protecție BMS" };
+
+const state = { info: null, snap: null, view: "now", hours: 24, lastMsg: 0, ws: null, sheetDev: null, energy: [],
+  look: "cadrane", day: null, dayDrawn: null };
+
+/* ------------------------------------------------------------------ pornire */
+async function api(path, opts) {
+  const r = await fetch(path, { credentials: "same-origin", ...opts });
+  if (r.status === 401) { showLogin(); throw new Error("auth"); }
+  return r.json();
+}
+
+async function boot() {
+  const q = new URLSearchParams(location.search).get("tema");   // ecranul HDMI: ?tema=flux
+  if (q && LOOKS[q]) savePref("look", q);
+  setLook(q && LOOKS[q] ? q : loadPref("look", "cadrane"));
+  renderLooks();
+  try {
+    state.info = await api("/api/info");
+  } catch (e) {
+    if (e.message !== "auth") setTimeout(boot, 3000);
+    return;
+  }
+  $("#login").hidden = true;
+  $("#app").hidden = false;
+  $("#simnote").hidden = !state.info.simulated;
+  connect();
+  loadEnergy();
+  setInterval(loadEnergy, 60000);
+  loadDay();
+  setInterval(loadDay, 300000);
+  $("#version").textContent = `Citire la fiecare ${state.info.poll_interval} s.`;
+  setInterval(tickConn, 1000);
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
+function showLogin() {
+  $("#app").hidden = true;
+  $("#login").hidden = false;
+  $("#pw").focus();
+}
+$("#pwgo").onclick = async () => {
+  const r = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password: $("#pw").value }) });
+  if (r.ok) boot(); else $("#pwerr").textContent = "Parola nu e corectă.";
+};
+$("#pw").addEventListener("keydown", (e) => e.key === "Enter" && $("#pwgo").click());
+
+/* ------------------------------------------------------------------ date live */
+function connect() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  let ws;
+  try { ws = new WebSocket(`${proto}://${location.host}/api/ws`); } catch { return poll(); }
+  state.ws = ws;
+  ws.onmessage = (ev) => { state.lastMsg = Date.now(); onSnap(JSON.parse(ev.data)); };
+  ws.onclose = () => { state.ws = null; setTimeout(connect, 3000); };
+  ws.onerror = () => ws.close();
+}
+async function poll() {
+  try { onSnap(await api("/api/live")); state.lastMsg = Date.now(); } catch {}
+  if (!state.ws) setTimeout(poll, 5000);
+}
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && (!state.ws || state.ws.readyState > 1)) connect();
+});
+
+function tickConn() {
+  const el = $("#conn");
+  const age = (Date.now() - state.lastMsg) / 1000;
+  const ok = state.lastMsg && age < 20;
+  el.className = "conn " + (ok ? "ok" : state.lastMsg ? "bad" : "");
+  el.querySelector("span").textContent = !state.lastMsg ? "Se conectează…" : ok ? "Live" : `Fără legătură de ${Math.round(age)} s`;
+}
+
+/* Actualizare automată: când pe Pi apare o versiune nouă a aplicației, pagina se reîncarcă singură
+   (pe toate telefoanele și pe ecranul HDMI). Nu în timpul unei editări; cel mult o dată pe minut. */
+function checkVersion(v) {
+  if (!v) return;
+  if (!state.appVersion) { state.appVersion = v; return; }
+  if (v === state.appVersion || state.reloading) return;
+  if ($("#edit").open || $("#sheet").open || state.view === "bms" || document.activeElement?.matches?.("input, select")) return;
+  let last = 0;
+  try { last = +sessionStorage.getItem("reloadedAt") || 0; } catch {}
+  if (Date.now() - last < 60000) return;
+  state.reloading = true;
+  try { sessionStorage.setItem("reloadedAt", Date.now()); } catch {}
+  const go = () => location.reload();
+  navigator.serviceWorker?.getRegistration?.().then((r) => r?.update()).then(go, go) || go();
+}
+
+function onSnap(s) {
+  checkVersion(s.app_version);
+  state.snap = s;
+  renderNow();
+  renderBadge();
+  if (state.view === "alerts") { renderActiveAlerts(); markAlertsSeen(); }
+  if (state.sheetDev) renderSheet();
+}
+
+/* ------------------------------------------------------------------ ecranul ACUM */
+// doar dispozitivele care au răspuns măcar o dată (cele nelegate nu se afișează)
+const connected = (d) => d.connected !== false;
+// pe ecran apar doar modulele care comunică acum; cele deconectate dau doar notificare (și apar în Alerte)
+function packs() {
+  return Object.values(state.snap?.devices || {}).filter((d) => d.kind === "pack" && connected(d) && !d.stale);
+}
+function inverter() {
+  return Object.values(state.snap?.devices || {}).find((d) => d.kind === "inverter" && connected(d));
+}
+function alertsFor(id) {
+  return (state.snap?.alerts || []).filter((a) => a.device === id);
+}
+
+function packStatus(d) {
+  const r = d.reading;
+  const al = alertsFor(d.id);
+  const crit = al.find((a) => a.level === "critical");
+  const warn = al.find((a) => a.level === "warning");
+  let cls = "idle", tag = "";
+  if (r) {
+    if (r.current > 0.3) cls = "charging";
+    else if (r.current < -0.3) cls = "discharging";
+  }
+  if (d.stale) return { cls: "stale fault", tag: "fără date" };
+  if (crit) return { cls: cls + " fault", tag: FAULT_RULES[crit.rule] || "alarmă" };
+  if (r && r.charge_mos === false) return { cls: cls + " fault", tag: "încărcare oprită" };
+  if (r && r.discharge_mos === false) return { cls: cls + " fault", tag: "descărcare oprită" };
+  if (warn) return { cls: cls + " warn", tag: FAULT_RULES[warn.rule] || "atenție" };
+  if (r?.balancing) tag = "echilibrează";
+  return { cls, tag };
+}
+
+/* Datele comune temelor: banca, invertorul, starea pachetelor. */
+const todayStr = () => new Date().toLocaleDateString("sv-SE");
+function homeData() {
+  const s = state.snap, b = s.bank || {};
+  const inv = inverter();
+  const ir = inv && !inv.stale ? inv.reading : null;
+  const bp = ir && ir.battery_power != null ? ir.battery_power : b.power;   // + = intră în baterie
+  const list = packs().map((d) => ({ d, ...packStatus(d) }));
+  const bad = list.filter((x) => x.cls.includes("fault")), warn = list.filter((x) => x.cls.includes("warn"));
+  const mode = b.current > 0.5 ? "charging" : b.current < -0.5 ? "discharging" : "idle";
+  let health;
+  if (!list.length) health = { cls: "stale", text: "Niciun pachet conectat" };
+  else if (bad.length) health = { cls: "fault", text: bad.length === 1 ? `${bad[0].d.name}: ${bad[0].tag}` : `${bad.length} pachete cu probleme` };
+  else if (warn.length) health = { cls: "warn", text: `${warn[0].d.name}: ${warn[0].tag}` };
+  else health = { cls: "ok", text: list.length === 1 ? "1 pachet OK" : `${list.length} pachete OK` };
+  const modeText = mode === "charging" ? `Se încarcă cu ${watts(bp, false)}` :
+    mode === "discharging" ? `Se descarcă cu ${watts(Math.abs(bp), false)}` : b.packs ? "În repaus" : "Fără date";
+  const eta = !b.hours ? "" : mode === "charging" ? `plină în circa ${duration(b.hours)}` :
+    mode === "discharging" ? `ajunge pentru circa ${duration(b.hours)}` : "";
+  const autonomy = mode === "discharging" ? b.hours : b.kwh && ir?.load_power > 50 ? (b.kwh * 1000) / ir.load_power : null;
+  const today = state.energy.find((r) => r.day === todayStr()) || {};
+  const week = state.energy.slice(-7).reduce((a, r) => a + (r.pv_kwh || 0), 0);
+  return { b, inv, ir, bp, list, mode, modeText, eta, health, autonomy, today, week,
+    capKwh: b.capacity_ah && b.voltage ? (b.capacity_ah * b.voltage) / 1000 : null };
+}
+
+const ICON = {
+  sun: '<circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/>',
+  home: '<path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h13V9.5M10 20v-5.5h4V20"/>',
+  inv: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 14h6M9 17h6M13 6l-2 3h2l-2 3"/>',
+  grid: '<path d="M8 3 6 21M16 3l2 18M7.5 8h9M7 13h10M12 3v18"/>',
+  batt: '<rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 10.5v3M9 12h4M11 10v4"/>',
+};
+const icon = (k) => `<svg viewBox="0 0 24 24">${ICON[k]}</svg>`;
+const kv = (v, u, d = 0) => (v == null ? "–" : `${num(v, d)}<span class="u">${u}</span>`);
+function put(root, k, html) { root.querySelectorAll(`[data-k="${k}"]`).forEach((e) => { if (e._h !== html) e.innerHTML = e._h = html; }); }
+function modeClass(el, h, extra = "") { el.className = `${extra} mode-${h.mode} ${h.health.cls === "fault" ? "fault" : ""}`.trim(); }
+
+/* ---------- tema Cadrane ---------- */
+const ARC = Math.PI * 56, RING = 2 * Math.PI * 62;
+const GAUGES = [["pv", "Panouri", "--sun"], ["load", "Consum", "--load"], ["bat", "Baterie", "--charge"], ["temp", "Invertor", "--cell"]];
+const cadrane = {
+  html: () => `
+    <button class="card k-hero" data-open="packs" aria-label="Bateria — vezi pachetele">
+      <div class="k-ring"><svg viewBox="0 0 150 150"><circle class="trk" cx="75" cy="75" r="62"/><circle class="arc" cx="75" cy="75" r="62"/></svg>
+        <div class="c"><b><span data-k="soc">–</span><sup>%</sup></b><span>baterie</span></div></div>
+      <div class="k-ht"><div class="k">Energie rămasă</div><div class="v" data-k="kwh">–</div>
+        <span class="pill" data-k="mode"></span><div class="eta" data-k="eta"></div><div class="health" data-k="health"></div></div>
+    </button>
+    <div class="k-gauges">${GAUGES.map(([k, l, c]) => `
+      <div class="card k-g" style="--gc:var(${c})"${k === "temp" ? ' data-open="inverter" role="button" tabindex="0"' : ""}><svg viewBox="0 0 140 78"><path class="trk" d="M14 72 A56 56 0 0 1 126 72"/>
+        <path class="arc" data-g="${k}" d="M14 72 A56 56 0 0 1 126 72" stroke-dasharray="0 ${ARC}"/></svg>
+        <div class="val num" data-k="g-${k}">–</div><div class="lbl" data-k="l-${k}">${l}</div></div>`).join("")}</div>
+    <section class="card k-day"><h3><span>Azi</span><span data-k="day"></span></h3><svg data-k="chart" viewBox="0 0 330 92" preserveAspectRatio="none"></svg></section>
+    <div class="inv-line" data-k="inv" data-open="inverter" role="button" tabindex="0"></div>`,
+  update(root, h) {
+    const { b, ir, bp } = h;
+    modeClass(root.querySelector(".k-hero"), h, "card k-hero");
+    root.querySelector(".k-ring .arc").setAttribute("stroke-dasharray", `${((b.soc ?? 0) / 100) * RING} ${RING}`);
+    put(root, "soc", b.soc == null ? "–" : num(b.soc, 0));
+    put(root, "kwh", b.kwh == null ? "–" : `${num(b.kwh, 1)} <span class="u">din ${num(h.capKwh, 1)} kWh</span>`);
+    put(root, "mode", (h.mode === "charging" ? "▲ " : h.mode === "discharging" ? "▼ " : "") + h.modeText);
+    put(root, "eta", h.eta);
+    put(root, "health", h.health.text);
+    root.querySelector('[data-k="health"]').className = "health " + h.health.cls;
+    const g = { pv: [ir?.pv_power, 4000, "W"], load: [ir?.load_power, 5000, "W"], bat: [bp == null ? null : Math.abs(bp), 5000, "W"],
+      temp: [ir?.inverter_temp, 80, "°C"] };
+    for (const [k, [v, max, u]] of Object.entries(g)) {
+      const f = v == null ? 0 : Math.min(1, v / Math.max(max, v));
+      root.querySelector(`[data-g="${k}"]`).setAttribute("stroke-dasharray", `${v ? Math.max(3, f * ARC) : 0} ${ARC}`);
+      put(root, "g-" + k, u === "W" ? watts(v) : kv(v, u));
+    }
+    root.querySelector('[data-g="bat"]').style.stroke = h.mode === "discharging" ? "var(--cell)" : "var(--charge)";
+    put(root, "l-bat", bp > 20 ? "Baterie, intră" : bp < -20 ? "Baterie, iese" : "Baterie");
+    put(root, "day", h.today.pv_kwh == null ? "" : `produs <b>${num(h.today.pv_kwh, 1)} kWh</b> · consumat <b>${num(h.today.load_kwh, 1)} kWh</b>`);
+    put(root, "inv", invLine(h));
+    drawDay(root.querySelector('[data-k="chart"]'));
+  },
+};
+
+function invLine({ inv, ir }) {
+  if (!inv) return "";
+  if (!ir) return `${esc(inv.name)}: fără date ${inv.error ? "(" + esc(inv.error) + ")" : ""}`;
+  return `${esc(inv.name)}: ${esc(ir.status || "–")}, ${num(ir.battery_voltage, 1)} V, ${num(ir.inverter_temp, 0)} °C` +
+    (ir.fault_code ? `, DEFECT ${ir.fault_code}: ${esc(ir.fault_text || "")}` : "") +
+    (ir.warnings?.length ? `, avertisment: ${esc(ir.warnings.join("; "))}` : "");
+}
+
+/* graficul zilei (producție și consum), din istoricul invertorului */
+async function loadDay() {
+  const inv = state.info?.devices.find((d) => d.kind === "inverter");
+  if (!inv) return;
+  const mid = new Date(); mid.setHours(0, 0, 0, 0);
+  const hours = (Date.now() - mid) / 3600000;
+  try {
+    const r = await api(`/api/history?device=${encodeURIComponent(inv.id)}&hours=${Math.max(0.1, hours)}&points=144`);
+    state.day = { t0: mid / 1000, rows: r.rows };
+    state.dayDrawn = null;
+    if (state.snap) renderNow();
+  } catch {}
+}
+function drawDay(svg) {
+  if (!svg || !state.day || state.dayDrawn === svg) return;
+  state.dayDrawn = svg;
+  const { t0, rows } = state.day, W = 330, H = 92;
+  const max = Math.max(1000, ...rows.map((r) => Math.max(r.pv_power || 0, r.load_power || 0))) * 1.08;
+  const X = (t) => ((t - t0) / 86400) * W, Y = (v) => H - 2 - (v / max) * (H - 6);
+  const line = (k) => rows.filter((r) => r[k] != null).map((r, i) => `${i ? "L" : "M"}${X(r.t).toFixed(1)} ${Y(r[k]).toFixed(1)}`).join(" ");
+  const pv = line("pv_power"), ld = line("load_power");
+  const last = rows.length ? X(rows[rows.length - 1].t) : 0, first = rows.length ? X(rows[0].t) : 0;
+  svg.innerHTML = `<defs><linearGradient id="dpv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3B840" stop-opacity=".5"/>
+    <stop offset="1" stop-color="#F3B840" stop-opacity="0"/></linearGradient></defs>
+    ${[6, 12, 18].map((h) => `<line x1="${(h / 24) * W}" y1="0" x2="${(h / 24) * W}" y2="${H}" stroke="var(--line)" stroke-dasharray="2 4"/>`).join("")}
+    ${pv ? `<path d="${pv} L${last} ${H} L${first} ${H}Z" fill="url(#dpv)"/><path d="${pv}" fill="none" stroke="#F3B840" stroke-width="2" vector-effect="non-scaling-stroke"/>` : ""}
+    ${ld ? `<path d="${ld}" fill="none" stroke="#C9A6F0" stroke-width="2" vector-effect="non-scaling-stroke"/>` : ""}
+    ${rows.length ? "" : `<text x="8" y="50" fill="var(--muted)" font-size="13">Încă nu sunt date pentru azi.</text>`}`;
+}
+
+/* ---------- tema Flux de energie ---------- */
+// coordonate în viewBox 360 × 330; bateria e sub diagramă
+const FLUX = {
+  pv: "M72 128 C72 182 128 205 152 213", load: "M208 213 C232 205 288 182 288 128",
+  bat: "M180 247 L180 330", grid: "M58 290 C100 290 148 262 160 240",
+};
+const flux = {
+  html: () => `
+    <div class="f-inv" data-k="inv" data-open="inverter" role="button" tabindex="0"></div>
+    <div class="f-diag">
+      <svg class="lines" viewBox="0 0 360 330">${Object.entries(FLUX).map(([k, d]) =>
+        `<path class="ln" data-ln="${k}" d="${d}"/><path class="dots" data-dots="${k}" d="${d}"/>`).join("")}</svg>
+      <div class="f-node" style="left:20%;top:19%;--c:var(--sun)"><div class="disc">${icon("sun")}</div><div class="w" data-k="pv">–</div><div class="l">Panouri</div></div>
+      <div class="f-node" style="left:80%;top:19%;--c:var(--load)"><div class="disc">${icon("home")}</div><div class="w" data-k="load">–</div><div class="l">Consum casă</div></div>
+      <div class="f-node sm" data-open="inverter" role="button" tabindex="0" aria-label="Invertor" style="left:50%;top:69%;--c:var(--cell)"><div class="disc" style="width:64px;height:64px">${icon("inv")}</div></div>
+      <div class="f-node sm" data-k-cls="grid" style="left:11%;top:88%;--c:var(--muted)"><div class="disc">${icon("grid")}</div><div class="l" data-k="grid">Rețea</div></div>
+      <div class="f-blabel" data-k="bat" style="left:53%;top:87%"></div>
+    </div>
+    <button class="f-batt" data-open="packs" aria-label="Bateria — vezi pachetele">
+      <div class="f-cap"></div><div class="f-cell"><div class="f-fill"></div><b><span data-k="soc">–</span>%</b></div>
+      <div class="k" data-k="kwh"></div><div class="s" data-k="eta"></div><span class="health" data-k="health"></span>
+    </button>
+    <div class="f-cards"><div class="card"><span>Produs azi</span><b data-k="tpv">–</b></div>
+      <div class="card"><span>Consumat azi</span><b data-k="tld">–</b></div>
+      <div class="card"><span>Autonomie</span><b data-k="aut">–</b></div></div>`,
+  update(root, h) {
+    const { b, ir, bp } = h;
+    const ac = ir?.ac_in_power || 0;
+    const flows = {
+      pv: [ir?.pv_power, "var(--sun)", false], load: [ir?.load_power, "var(--load)", false],
+      bat: [bp == null ? null : Math.abs(bp), h.mode === "discharging" ? "var(--cell)" : "var(--charge)", bp < 0],
+      grid: [ac, "var(--muted)", false],
+    };
+    for (const [k, [w, c, rev]] of Object.entries(flows)) {
+      const ln = root.querySelector(`[data-ln="${k}"]`), dots = root.querySelector(`[data-dots="${k}"]`);
+      ln.style.stroke = c; dots.style.stroke = `color-mix(in srgb, ${c} 45%, #fff)`;
+      ln.classList.toggle("off", !(w > 20));
+      dots.classList.toggle("on", w > 20);
+      dots.classList.toggle("rev", !!rev);
+      dots.style.setProperty("--dur", `${Math.max(0.7, 3 - (w || 0) / 1500).toFixed(1)}s`);
+    }
+    root.querySelector(".f-diag").className = `f-diag mode-${h.mode}`;
+    put(root, "pv", watts(ir?.pv_power));
+    put(root, "load", watts(ir?.load_power));
+    put(root, "bat", bp == null || Math.abs(bp) <= 20 ? "" : watts(Math.abs(bp)));
+    const gridOn = ir?.ac_in_voltage > 50;
+    root.querySelector('[data-k-cls="grid"]').classList.toggle("dim", !gridOn);
+    put(root, "grid", `Rețea<br>${ir?.ac_in_voltage == null ? "–" : num(ir.ac_in_voltage, 0) + " V"}`);
+    put(root, "inv", ir ? `Invertor: <b>${esc(ir.status || "–")}</b><br>${num(ir.inverter_temp, 0)} °C · ${num(ir.output_voltage, 0)} V · ${num(ir.output_freq, 1)} Hz`
+      : h.inv ? `${esc(h.inv.name)}: fără date` : "");
+    modeClass(root.querySelector(".f-batt"), h, "f-batt");
+    root.querySelector(".f-fill").style.height = `calc(${Math.max(0, Math.min(100, b.soc ?? 0))}% - 12px)`;
+    put(root, "soc", b.soc == null ? "–" : num(b.soc, 0));
+    put(root, "kwh", b.kwh == null ? h.modeText : `${num(b.kwh, 1)} kWh · ${h.modeText[0].toLowerCase() + h.modeText.slice(1)}`);
+    put(root, "eta", [h.eta, b.voltage ? num(b.voltage, 1) + " V" : ""].filter(Boolean).join(" · "));
+    put(root, "health", h.health.text);
+    root.querySelector('[data-k="health"]').className = "health " + h.health.cls;
+    put(root, "tpv", kv(h.today.pv_kwh, "kWh", 1));
+    put(root, "tld", kv(h.today.load_kwh, "kWh", 1));
+    put(root, "aut", h.autonomy == null ? "–" : `~${duration(h.autonomy)}`);
+  },
+};
+
+/* ---------- tema Carduri ---------- */
+const carduri = {
+  html: () => `
+    <section class="c-head"><div class="st" data-k="st" data-open="inverter" role="button" tabindex="0"></div>
+      <div class="c-sum"><div>Produs azi<b data-k="tpv">–</b></div><div>Consumat azi<b data-k="tld">–</b></div><div>7 zile<b data-k="tw">–</b></div></div></section>
+    <button class="card c-batt" data-open="packs" aria-label="Bateria — vezi pachetele">
+      <div class="c-row"><div class="soc"><span data-k="soc">–</span><sup>%</sup></div>
+        <div class="r">Energie rămasă<b data-k="kwh">–</b><span data-k="volt"></span></div></div>
+      <div class="c-bar"><div class="body">${"<i></i>".repeat(10)}</div><div class="nub"></div></div>
+      <div class="c-mode" data-k="mode"></div>
+      <div class="c-chips" data-k="chips"></div>
+      <div class="c-foot"><span class="health" data-k="health"></span><b>Toate bateriile ›</b></div>
+    </button>
+    <section class="card c-list">${[["pv", "Panouri solare", "--sun", "sun"], ["load", "Consum casă", "--load", "home"],
+      ["bat", "Baterie", "--charge", "batt"], ["grid", "Rețea", "--muted", "grid"]].map(([k, l, c, i]) => `
+      <div class="c-it" style="--ic:var(${c})" data-it="${k}"><div class="c-ico">${icon(i)}</div>
+        <div class="m"><div class="k" data-k="l-${k}">${l}</div><div class="tr"><i data-bar="${k}"></i></div></div><div class="v" data-k="v-${k}">–</div></div>`).join("")}</section>`,
+  update(root, h) {
+    const { b, ir, bp } = h;
+    put(root, "st", `${h.ir ? esc(ir.status || "") : "Invertor: fără date"}${ir ? ` · ${num(ir.inverter_temp, 0)} °C` : ""} ›`);
+    put(root, "tpv", kv(h.today.pv_kwh, "kWh", 1));
+    put(root, "tld", kv(h.today.load_kwh, "kWh", 1));
+    put(root, "tw", kv(h.week, "kWh", 1));
+    modeClass(root.querySelector(".c-batt"), h, "card c-batt");
+    put(root, "soc", b.soc == null ? "–" : num(b.soc, 0));
+    put(root, "kwh", b.kwh == null ? "–" : `${num(b.kwh, 1)} / ${num(h.capKwh, 1)} kWh`);
+    put(root, "volt", b.voltage ? `${num(b.voltage, 1)} V` : "");
+    const segs = (b.soc ?? 0) / 10;
+    root.querySelectorAll(".c-bar .body i").forEach((el, i) => {
+      el.className = i < Math.floor(segs) ? "f" : "";
+      el.style.background = i === Math.floor(segs) && segs % 1 > 0.05
+        ? `linear-gradient(90deg, var(--mc) ${(segs % 1) * 100}%, var(--panel-2) 0)` : "";
+    });
+    put(root, "mode", (h.mode === "charging" ? "▲ " : h.mode === "discharging" ? "▼ " : "") + h.modeText + (h.eta ? " · " + h.eta : ""));
+    put(root, "chips", h.list.map((x) => `<span class="${x.cls.includes("fault") ? "fault" : x.cls.includes("warn") ? "warn" : ""}">${esc(x.d.name)}
+      <b>${x.d.stale || x.d.reading?.soc == null ? "–" : num(x.d.reading.soc, 0) + "%"}</b></span>`).join(""));
+    put(root, "health", h.health.text);
+    root.querySelector('[data-k="health"]').className = "health " + h.health.cls;
+    const vals = { pv: [ir?.pv_power, 4000], load: [ir?.load_power, 5000], bat: [bp == null ? null : Math.abs(bp), 5000] };
+    for (const [k, [v, max]] of Object.entries(vals)) {
+      put(root, "v-" + k, watts(v));
+      root.querySelector(`[data-bar="${k}"]`).style.width = `${v == null ? 0 : Math.min(100, (v / Math.max(max, v)) * 100)}%`;
+    }
+    root.querySelector('[data-it="bat"]').style.setProperty("--ic", h.mode === "discharging" ? "var(--cell)" : "var(--charge)");
+    put(root, "l-bat", bp > 20 ? "Baterie, intră" : bp < -20 ? "Baterie, iese" : "Baterie");
+    put(root, "v-grid", kv(ir?.ac_in_voltage, "V"));
+    root.querySelector('[data-bar="grid"]').style.width = ir?.ac_in_voltage > 50 ? "100%" : "0";
+  },
+};
+
+const LOOKS = {
+  cadrane: { name: "Cadrane", desc: "Inel cu încărcarea, cadrane și graficul zilei", sw: "conic-gradient(#52C98F 0 75%, #2A4255 0)", c: "#63B7E6", ...cadrane },
+  flux: { name: "Flux de energie", desc: "Soare → invertor → casă și baterie, cu energia în mișcare", sw: "radial-gradient(circle at 50% 40%, #F3B840 0 22%, #18303F 24%)", c: "#F3B840", ...flux },
+  carduri: { name: "Carduri", desc: "Antet portocaliu, baterie pe segmente, listă cu bare", sw: "linear-gradient(135deg, #E08A2E, #8E3320)", c: "#FF8A3D", ...carduri },
+};
+let drawnLook = null;
+
+function renderNow() {
+  const s = state.snap;
+  if (!s) return;
+  const home = $("#home");
+  const L = LOOKS[state.look] || LOOKS.cadrane;
+  if (drawnLook !== state.look) {
+    home.innerHTML = L.html();
+    drawnLook = state.look;
+    state.dayDrawn = null;
+    $$("[data-open=packs]", home).forEach((el) => (el.onclick = () => show("packs")));
+    $$("[data-open=inverter]", home).forEach((el) => (el.onclick = () => show("inverter")));
+  }
+  L.update(home, homeData());
+  if (state.view === "packs") renderPacks();
+  if (state.view === "inverter") renderInverterLive();
+  if (state.view === "settings") renderDaly();
+
+  // bannere: câte unul pe dispozitiv, cu cauza cea mai probabilă primul
+  const groups = new Map();
+  // „nu mai comunică” nu apare pe prima pagină: vine ca notificare și rămâne în secțiunea Alerte
+  for (const a of [...(s.alerts || [])].filter((x) => x.rule !== "comm_lost" && x.level !== "info").sort(alertOrder)) {
+    const k = a.device || a.rule;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(a);
+  }
+  const gs = [...groups.values()];
+  $("#banners").innerHTML = gs.slice(0, 3).map((g) => {
+    const a = g[0], more = g.length - 1;
+    return `<div class="banner ${a.level}" role="alert"><b>${esc(a.message)}</b>
+      <small>de ${a.since ? ago(a.since).replace("acum ", "") : ""}${more ? `, plus încă ${more === 1 ? "o alertă" : more + " alerte"} pentru același modul` : ""}</small></div>`;
+  }).join("") + (gs.length > 3 ? `<div class="note">Alte alerte în secțiunea Alerte.</div>` : "");
+}
+
+/* ------------------------------------------------------------------ ecranul BATERIILE */
+function renderPacks() {
+  const h = homeData(), b = h.b;
+  $("#pk-soc").textContent = b.soc == null ? "–" : `${num(b.soc, 0)}%`;
+  const temps = h.list.flatMap((x) => (x.d.stale ? [] : x.d.reading?.temps || []));
+  $("#pk-sum").innerHTML = [["Rămas", kv(b.kwh, "kWh", 1)], ["Curent", b.current == null ? "–" : `${b.current > 0 ? "+" : ""}${num(b.current, 1)} A`],
+    ["Tensiune", kv(b.voltage, "V", 1)], ["Temp. max", temps.length ? kv(Math.max(...temps), "°C") : "–"]]
+    .map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join("");
+  const box = $("#pk-list");
+  const ids = h.list.map((x) => x.d.id).join("|");
+  if (box.dataset.ids !== ids) {
+    box.dataset.ids = ids;
+    box.innerHTML = h.list.map((x) => `<button class="card pk" data-id="${esc(x.d.id)}"></button>`).join("");
+    $$(".pk", box).forEach((el) => (el.onclick = (ev) => {
+      const g = ev.target.closest("[data-bms]");
+      g ? openBms(g.dataset.bms) : openSheet(el.dataset.id);
+    }));
+  }
+  for (const { d, cls, tag } of h.list) {
+    const r = d.reading || {}, el = box.querySelector(`[data-id="${CSS.escape(d.id)}"]`);
+    const mode = cls.split(" ")[0];
+    el.className = `card pk mode-${["charging", "discharging"].includes(mode) ? mode : "idle"} ${cls.includes("fault") ? "fault" : cls.includes("warn") ? "warn" : ""} ${d.stale ? "stale" : ""}`;
+    const label = tag || { charging: "se încarcă", discharging: "se descarcă" }[mode] || "în repaus";
+    const cells = r.cells || [];
+    const lo = cells.length ? Math.min(...cells) : null, hi = cells.length ? Math.max(...cells) : null;
+    const floor = Math.min(lo ?? 3, 3.0) - 0.05, span = Math.max((hi ?? 3.45) + 0.02, 3.45) - floor;
+    const mos = (v, n) => `<span class="${v === false ? "off" : ""}">${n}${v === false ? " OPRIT" : ""}</span>`;
+    const facts = [r.current == null ? null : `${r.current > 0 ? "+" : ""}${num(r.current, 1)} A`, r.voltage == null ? null : `${num(r.voltage, 2)} V`,
+      r.temps?.length ? `${num(Math.max(...r.temps), 0)} °C` : null, r.cycles != null ? `${r.cycles} cicluri` : null].filter(Boolean).join(" · ");
+    el.innerHTML = `<div class="h"><div class="pk-mini"><i style="height:${Math.max(0, Math.min(100, r.soc ?? 0))}%"></i></div>
+      <div class="t"><div class="n">${esc(d.name)} <span class="tag">${esc(label)}</span>${d.type === "daly" && !d.stale
+        ? `<span class="pk-gear" data-bms="${esc(d.id)}" role="button" tabindex="0" aria-label="Setările BMS ${esc(d.name)}">⚙</span>` : ""}</div>
+      <div class="s">${d.stale ? `Nu comunică${d.error ? ": " + esc(d.error) : ""}` : facts}</div></div>
+      <div class="soc">${r.soc == null ? "–" : num(r.soc, 0)}<sup>%</sup></div></div>
+      ${cells.length ? `<div class="pk-cells">${cells.map((v) => `<i class="${hi - lo > 0.005 ? (v === hi ? "hi" : v === lo ? "lo" : "") : ""}"
+        style="height:${Math.max(8, ((v - floor) / span) * 100)}%"></i>`).join("")}</div>` : ""}
+      <div class="ft"><span>${cells.length ? `${cells.length} celule · min <b>${num(lo, 3)}</b> · max <b>${num(hi, 3)}</b>` : ""}</span>
+      <span class="mos">${mos(r.charge_mos, "încărcare")}${mos(r.discharge_mos, "descărcare")}</span></div>`;
+  }
+}
+$("#pk-back").onclick = () => show("now");
+
+/* ------------------------------------------------------------------ ecranul INVERTOR */
+const inv = { data: null, edit: null };
+$("#iv-back").onclick = () => show("now");
+
+function renderInverterLive() {
+  const d = inverter();
+  if (!d) return;
+  const r = d.stale ? null : d.reading;
+  $("#iv-title").textContent = d.name;
+  $("#iv-state").innerHTML = r ? `Stare: <b>${esc(r.status || "–")}</b>` +
+    (r.fault_code ? `<br><b style="color:var(--alarm)">Defect ${r.fault_code}: ${esc(r.fault_text || "")}</b>` : "") +
+    (r.warnings?.length ? `<br><b style="color:var(--warn)">Avertisment: ${esc(r.warnings.join("; "))}</b>` : "") +
+    (r.notices?.length ? `<br>${esc(r.notices.join("; "))}` : "") :
+    `Fără date${d.error ? ": " + esc(d.error) : ""}`;
+  $("#iv-sum").innerHTML = [["Panouri", watts(r?.pv_power)], ["Consum", watts(r?.load_power)],
+    ["Baterie", kv(r?.battery_voltage, "V", 1)], ["Temp.", kv(r?.inverter_temp, "°C")]]
+    .map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join("");
+}
+
+async function loadInverter() {
+  if (!inv.data) $("#iv-list").innerHTML = `<div class="note">Citesc setările din invertor…</div>`;
+  try {
+    const r = await api("/api/inverter/settings");
+    if (r.error) throw new Error(r.error);
+    inv.data = r;
+    renderInverter();
+  } catch (e) {
+    if (e.message !== "auth") $("#iv-list").innerHTML = `<div class="banner">${esc(e.message)}</div>`;
+  }
+}
+
+function renderInverter() {
+  const r = inv.data;
+  const groups = [...new Set(r.settings.map((x) => x.group))];
+  $("#iv-list").innerHTML = (r.can_write ? "" : `<div class="banner warning"><b>Modificarea e dezactivată</b>
+      <small>Setați o parolă pentru aplicație (web.password în config) ca să poată fi schimbate setările.</small></div>`) +
+    groups.map((g) => `<h2>${esc(g)}</h2><div class="list iv-set">${r.settings.filter((x) => x.group === g).map((x) => `
+      <button class="row iv-row" data-key="${esc(x.key)}" ${r.can_write ? "" : "disabled"}>
+        <span class="k">${esc(x.label)}${x.risky ? ' <i class="risk" title="Setare cu risc">!</i>' : ""}</span>
+        <span class="v">${esc(x.text)}</span>${r.can_write ? '<span class="ed">Modifică ›</span>' : ""}</button>`).join("")}</div>`).join("");
+  $$(".iv-row", $("#iv-list")).forEach((el) => (el.onclick = () => openEdit(el.dataset.key)));
+  $("#iv-clock").innerHTML = `Invertor: <b>${esc(r.clock || "–")}</b><br>Pi: <b>${esc(r.pi_clock)}</b>`;
+  $("#iv-sync").disabled = !r.can_write;
+  $("#iv-log").innerHTML = r.log.length ? r.log.map((x) => `
+    <div class="row ${x.ok ? "" : "critical"}"><span>${esc(x.setting)}: ${x.ok ? `${esc(x.old)} → <b>${esc(x.new)}</b>` : `EȘUAT — ${esc(x.error)}`}</span>
+    <span class="t">${dayTime(x.ts)}</span></div>`).join("") : `<div class="empty">Nicio modificare până acum.</div>`;
+}
+
+const editor = { item: null, target: "", write: null };
+const decimals = (step) => (step < 0.01 ? 3 : step < 1 ? 1 : 0);
+function openEdit(key) {
+  const x = inv.data.settings.find((s) => s.key === key);
+  openEditor(x, "invertor", async (v) => {
+    await writeInverter("/api/inverter/settings", { key: x.key, value: v }, $("#ed-go"));
+    await loadInverter();
+  });
+}
+function openEditor(x, target, write) {
+  Object.assign(editor, { item: x, target, write });
+  inv.edit = x;
+  $("#ed-title").textContent = x.group ? `${x.group}: ${x.label}` : x.label;
+  $("#ed-now").innerHTML = `Acum: <b>${esc(x.text)}</b>`;
+  $("#ed-field").innerHTML = x.kind === "enum"
+    ? `<select id="ed-val" class="ed-in">${x.options.map(([v, t]) => `<option value="${v}" ${v === x.raw ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>`
+    : `<div class="ed-num"><input id="ed-val" class="ed-in" type="number" inputmode="decimal" min="${x.min}" max="${x.max}" step="${x.step}" value="${x.value ?? ""}">
+       <span>${esc(x.unit)}</span></div><p class="note">Între ${num(x.min, decimals(x.step))} și ${num(x.max, decimals(x.step))} ${esc(x.unit)}.${x.role ? ` Acum e pragul de <b>${esc(x.role)}</b>.` : ""}</p>`;
+  $("#ed-warn").hidden = !(x.risky || x.note);
+  $("#ed-warn").innerHTML = (x.risky ? "<b>Atenție: setare cu risc.</b> " : "") + esc(x.note || (x.risky ? "O valoare greșită poate opri alimentarea sau afecta bateria." : ""));
+  $("#ed-go").textContent = `Scrie în ${target}`;
+  $("#ed-ackbox").hidden = !x.risky;
+  $("#ed-ack").checked = false;
+  $("#ed-err").textContent = "";
+  $("#ed-val").oninput = $("#ed-val").onchange = updateDiff;
+  $("#ed-ack").onchange = updateDiff;
+  updateDiff();
+  $("#edit").showModal();
+}
+
+function editValue() {
+  const x = inv.edit, el = $("#ed-val");
+  if (x.kind === "enum") return { value: +el.value, text: x.options.find(([v]) => v === +el.value)?.[1] };
+  const v = parseFloat(String(el.value).replace(",", "."));
+  if (isNaN(v) || v < x.min - 1e-9 || v > x.max + 1e-9) return { error: `Valoarea trebuie să fie între ${num(x.min, decimals(x.step))} și ${num(x.max, decimals(x.step))} ${x.unit}.` };
+  return { value: v, text: `${num(v, decimals(x.step))} ${x.unit}` };
+}
+
+function updateDiff() {
+  const x = inv.edit, e = editValue();
+  const same = !e.error && (x.kind === "enum" ? e.value === x.raw : Math.abs(e.value - x.value) < 1e-9);
+  $("#ed-diff").innerHTML = e.error ? `<span class="err">${esc(e.error)}</span>` : same ? "Aceeași valoare ca acum." :
+    `${esc(x.text)} → <b>${esc(e.text)}</b>`;
+  $("#ed-go").disabled = !!e.error || same || (x.risky && !$("#ed-ack").checked);
+}
+
+async function writeInverter(path, body, btn) {
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = "Se scrie și se verifică…";
+  try {
+    const r = await fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}) });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || `eroare ${r.status}`);
+    inv.data.settings = j.settings;
+    if (j.clock) inv.data.clock = j.clock;
+    return j;
+  } finally {
+    btn.textContent = label;
+    btn.disabled = false;
+  }
+}
+
+$("#ed-close").onclick = () => $("#edit").close();
+$("#ed-go").onclick = async () => {
+  const x = editor.item, e = editValue();
+  if (e.error) return;
+  if (!confirm(`Scriu în ${editor.target}?\n\n${x.group ? x.group + ", " : ""}${x.label}: ${x.text} → ${e.text}`)) return;
+  try {
+    await editor.write(e.value);
+    $("#edit").close();
+  } catch (err) {
+    $("#ed-err").textContent = err.message;
+  }
+};
+$("#iv-sync").onclick = async () => {
+  if (!confirm("Pun ceasul invertorului după ora Pi-ului?")) return;
+  try {
+    await writeInverter("/api/inverter/clock", null, $("#iv-sync"));
+    await loadInverter();
+  } catch (err) {
+    alert(err.message);
+  }
+};
+
+/* ------------------------------------------------------------------ SETĂRI BMS (Daly) */
+const bms = { id: null, data: null };
+$("#bms-back").onclick = () => show("packs");
+function openBms(id) {
+  bms.id = id;
+  bms.data = null;
+  show("bms");
+}
+async function loadBms() {
+  const d = state.snap?.devices?.[bms.id];
+  $("#bms-title").textContent = `Setări BMS — ${d?.name || bms.id}`;
+  if (!bms.data) $("#bms-list").innerHTML = `<div class="note">Citesc setările din BMS…</div>`;
+  try {
+    const r = await api(`/api/daly/${encodeURIComponent(bms.id)}/settings`);
+    if (r.error) throw new Error(r.error);
+    bms.data = r;
+    renderBms();
+  } catch (e) {
+    if (e.message !== "auth") $("#bms-list").innerHTML = `<div class="banner">${esc(e.message)}</div>`;
+  }
+}
+function renderBms() {
+  const r = bms.data, groups = [...new Set(r.settings.map((x) => x.group))];
+  $("#bms-list").innerHTML = (r.can_write ? "" : `<div class="banner warning"><b>Modificarea e dezactivată</b>
+      <small>Setați o parolă pentru aplicație ca să poată fi schimbate setările.</small></div>`) +
+    groups.map((g) => `<h2>${esc(g)}</h2><div class="list iv-set">${r.settings.filter((x) => x.group === g).map((x) => `
+      <button class="row iv-row" data-key="${esc(x.key)}" ${r.can_write ? "" : "disabled"}>
+        <span class="k">${esc(x.label)}${x.risky ? ' <i class="risk" title="Setare cu risc">!</i>' : ""}${x.role
+          ? ` <span class="role ${x.role === "protecție" ? "p" : ""}">${esc(x.role)}</span>` : ""}</span>
+        <span class="v">${esc(x.text)}</span>${r.can_write ? '<span class="ed">Modifică ›</span>' : ""}</button>`).join("")}</div>`).join("");
+  $$(".iv-row", $("#bms-list")).forEach((el) => (el.onclick = () => {
+    const x = bms.data.settings.find((s) => s.key === el.dataset.key);
+    openEditor(x, "BMS", async (v) => {
+      const res = await fetch(`/api/daly/${encodeURIComponent(bms.id)}/settings`, { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: x.key, value: v }) });
+      const j = await res.json();
+      if (!res.ok || !j.ok) throw new Error(j.error || `eroare ${res.status}`);
+      bms.data.settings = j.settings;
+      renderBms();
+    });
+  }));
+  $("#bms-log").innerHTML = r.log?.length ? r.log.map((x) => `
+    <div class="row ${x.ok ? "" : "critical"}"><span>${esc(x.setting)}: ${x.ok ? `${esc(x.old)} → <b>${esc(x.new)}</b>` : `EȘUAT — ${esc(x.error)}`}</span>
+    <span class="t">${dayTime(x.ts)}</span></div>`).join("") : `<div class="empty">Nicio modificare până acum.</div>`;
+}
+
+/* ------------------------------------------------------------------ SETĂRI */
+function renderLooks() {
+  $("#looks").innerHTML = Object.entries(LOOKS).map(([k, L]) => `
+    <button class="card look" data-look="${k}" aria-pressed="${k === state.look}" style="--lc:${L.c};--lg:${L.sw}">
+      <span class="sw"></span><span><b>${L.name}</b><span>${L.desc}</span></span><span class="ck"></span></button>`).join("");
+  $$("#looks .look").forEach((el) => (el.onclick = () => {
+    setLook(el.dataset.look); savePref("look", state.look); renderLooks();
+    $("#set-teme-sub").textContent = `Acum: ${LOOKS[state.look].name}`;
+  }));
+}
+function renderDaly() {
+  const ds = Object.values(state.snap?.devices || {}).filter((d) => d.type === "daly");
+  const on = ds.filter((d) => d.connected && !d.stale).length;
+  $("#set-daly-sub").textContent = ds.length ? `${on} din ${ds.length} conectate` : "Niciun modul Daly în config";
+  $("#daly-list").innerHTML = ds.length ? "" : `<div class="empty">Niciun modul Daly în configurare.</div>`;
+  $("#daly-list").innerHTML += ds.map((d) => {
+    const link = d.reading?.raw?.link;
+    const txt = d.connected ? (d.stale ? `nu răspunde acum${link ? " · " + link : ""}` : `conectat${link ? " · " + link : ""}`)
+      : (d.error || "caut…").replace(/^[^:]*: /, "");
+    return `<div class="row ${d.connected && !d.stale ? "" : d.connected ? "warning" : ""}"><span><b>${esc(d.name)}</b></span>
+      <span class="t">${esc(txt)}</span></div>`;
+  }).join("");
+}
+$("#daly-search").onclick = async () => {
+  const b = $("#daly-search");
+  b.disabled = true;
+  b.textContent = "Caut… (până la un minut)";
+  try { await api("/api/daly/search", { method: "POST" }); } catch {}
+  setTimeout(() => { b.disabled = false; b.textContent = "Caută acum"; }, 30000);
+};
+
+/* meniul setărilor: butoane → secțiuni (Teme, Notificări, Module Daly) */
+function showPanel(name) {
+  $("#set-menu").hidden = !!name;
+  for (const k of ["teme", "notif", "daly", "info"]) $("#set-" + k).hidden = k !== name;
+  clearInterval(state.infoTimer);
+  if (name === "info") { loadInfo(); state.infoTimer = setInterval(() => !$("#set-info").hidden && loadInfo(), 5000); }
+  if (name === "notif") renderNotif();
+  if (name === "daly") renderDaly();
+  window.scrollTo(0, 0);
+}
+$$(".set-btn").forEach((b) => (b.onclick = () => showPanel(b.dataset.panel)));
+$$(".set-back").forEach((b) => (b.onclick = () => showPanel(null)));
+
+/* ---------- Setări → Info: Pi-ul, rețeaua, porturile; schimbarea rețelei WiFi ---------- */
+const bars4 = (sig) => "▂▄▆█".slice(0, Math.max(1, Math.min(4, Math.floor((sig || 0) / 25) + 1)));
+function upFor(s) {
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  return d ? `${d} zile ${h} h` : h ? `${h} h ${m} min` : `${m} min`;
+}
+async function loadInfo() {
+  let x;
+  try { x = await api("/api/system"); } catch { return; }
+  if (x.error) { $("#info-body").innerHTML = `<p class="note">${esc(x.error)}</p>`; return; }
+  const n = x.network || {}, w = n.wifi, ts = n.tailscale || {};
+  const tempCls = x.cpu_temp >= 75 ? "off" : x.cpu_temp >= 65 ? "warnc" : "";
+  const pw = x.power?.flags?.length ? `<span class="v off">${esc(x.power.flags.join("; "))}</span>`
+    : x.power?.value ? `<span class="v on">OK</span>` : "–";
+  const eth = (n.devices || []).find((d) => d.type === "ethernet");
+  $("#info-body").innerHTML = `
+    <div class="stats info-stats">
+      <div><span class="k">Procesor</span><span class="v">${num(x.cpu_percent, 0)} %</span></div>
+      <div><span class="k">Temperatură</span><span class="v ${tempCls}">${num(x.cpu_temp, 1)} °C</span></div>
+      <div><span class="k">Memorie</span><span class="v">${num(x.memory?.used_mb, 0)} / ${num(x.memory?.total_mb, 0)} MB</span></div>
+      <div><span class="k">Card</span><span class="v">${num(x.disk?.used_gb, 1)} / ${num(x.disk?.total_gb, 0)} GB</span></div>
+      <div><span class="k">Pornit de</span><span class="v">${upFor(x.uptime_s)}</span></div>
+      <div><span class="k">Alimentare</span>${pw}</div>
+    </div>
+    <p class="note">${esc(x.model)} · ${esc(x.hostname)} · încărcare ${esc((x.load || []).join(" / "))}</p>
+    <h2>Rețea</h2>
+    <div class="list">
+      <div class="row"><span>WiFi: <b>${w ? esc(w.ssid) : "neconectat"}</b>${x.wifi_job?.hotspot ? " · hotspot Amper-Setup pornit" : ""}</span>
+        <span class="t">${w ? `semnal ${bars4(w.signal)} ${w.signal}% · ${esc(w.freq)} · canal ${esc(w.channel)}` : ""}</span></div>
+      <div class="row"><span>Adrese locale</span><span class="t">${Object.entries(n.ip || {}).filter(([k]) => k !== "lo")
+        .map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(" · ") || "–"}</span></div>
+      <div class="row"><span>Cablu de rețea</span><span class="t">${eth ? (eth.state === "connected" ? "legat" : "nelegat") : "–"}</span></div>
+      <div class="row"><span>Tailscale: <b>${ts.state === "Running" ? "conectat" : esc(ts.state || "–")}</b></span>
+        <span class="t">${esc(ts.ip || "")} · ${esc(ts.name || "")}</span></div>
+      ${(ts.peers || []).map((p) => `<div class="row"><span>${esc(p.name)}</span>
+        <span class="t">${p.online ? "online" : "offline"} · ${esc(p.os || "")}</span></div>`).join("")}
+    </div>
+    <h2>Porturi USB</h2>
+    <div class="list">${(x.ports || []).map((p) => `<div class="row"><span>${esc(p.port)}</span>
+      <span class="t">${esc(p.dev)} · ${p.used_by.length ? "folosit de " + esc(p.used_by.join(", ")) : "liber"}</span></div>`).join("")
+      || `<div class="empty">Niciun adaptor USB-serial legat.</div>`}</div>
+    <h2>Bluetooth</h2>
+    <div class="list">${(x.bluetooth || []).map((b) => `<div class="row"><span>${esc(b.device)}</span>
+      <span class="t">${esc(b.target)} · ${b.ok ? "conectat, citește" : b.connected ? "conectat, nu răspunde" : "neconectat"}</span></div>`).join("")
+      || `<div class="empty">Niciun modul Bluetooth.</div>`}</div>
+    <p class="note">Actualizat ${esc(x.time)}</p>`;
+  $("#set-info-sub").textContent = `${num(x.cpu_temp, 0)} °C · ${w ? "WiFi " + w.ssid + " " + w.signal + "%" : "fără WiFi"}`;
+}
+
+const wifi = { chosen: null, nets: [] };
+$("#wifi-scan").onclick = async () => {
+  const b = $("#wifi-scan");
+  b.disabled = true; b.textContent = "Caut…";
+  try {
+    const r = await api("/api/wifi/scan");
+    if (r.error) throw new Error(r.error);
+    wifi.nets = r.networks || [];
+    const active = (r.active || "").replace(/^wifi-/, "");
+    $("#wifi-list").innerHTML = wifi.nets.map((n, i) => `<button class="row wifi-net ${n.ssid === active ? "on" : ""}" data-i="${i}">
+      <span>${esc(n.ssid)}${n.secure ? " 🔒" : ""}${n.ssid === active ? " · <b>acum</b>" : ""}</span>
+      <span class="t">${bars4(n.signal)} ${n.signal}%</span></button>`).join("") || `<div class="empty">Nicio rețea găsită.</div>`;
+    $$(".wifi-net").forEach((el) => (el.onclick = () => {
+      wifi.chosen = wifi.nets[+el.dataset.i];
+      $$(".wifi-net").forEach((x) => x.classList.toggle("sel", x === el));
+      $("#wifi-form").hidden = false;
+      $("#wifi-chosen").innerHTML = `Rețeaua aleasă: <b>${esc(wifi.chosen.ssid)}</b> (semnal ${wifi.chosen.signal}%)`;
+      $("#wifi-pw").hidden = !wifi.chosen.secure;
+      $("#wifi-pw").value = "";
+    }));
+  } catch (e) {
+    $("#wifi-msg").textContent = e.message === "auth" ? "" : e.message;
+  } finally {
+    b.disabled = false; b.textContent = "Caută din nou";
+  }
+};
+$("#wifi-go").onclick = async () => {
+  const n = wifi.chosen;
+  if (!n) return;
+  if (!confirm(`Trec Pi-ul pe rețeaua „${n.ssid}”?\n\nDacă nu merge, revine singur la rețeaua de acum.`)) return;
+  const b = $("#wifi-go");
+  b.disabled = true;
+  try {
+    const r = await fetch("/api/wifi/connect", { method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ssid: n.ssid, password: $("#wifi-pw").value }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || `eroare ${r.status}`);
+    $("#wifi-msg").textContent = `Mă conectez la „${n.ssid}”… legătura cu Pi-ul se poate întrerupe câteva secunde.`;
+    const t0 = Date.now();
+    const poll = async () => {               // urmărim rezultatul; în timpul schimbării Pi-ul poate să nu răspundă
+      try {
+        const st = await api("/api/wifi/status");
+        if (st.state && st.state !== "connecting") {
+          $("#wifi-msg").textContent = st.message;
+          b.disabled = false; $("#wifi-form").hidden = st.state === "ok"; loadInfo();
+          return;
+        }
+      } catch {}
+      if (Date.now() - t0 < 180000) setTimeout(poll, 3000);
+      else { $("#wifi-msg").textContent = "Nu primesc răspuns de la Pi. Verifică din nou peste câteva minute."; b.disabled = false; }
+    };
+    setTimeout(poll, 4000);
+  } catch (e) {
+    $("#wifi-msg").textContent = e.message;
+    b.disabled = false;
+  }
+};
+
+function renderNotif() {
+  $("#notif-state").textContent = state.info?.notifications
+    ? "Alertele se trimit și prin aplicația ntfy (rezervă), dacă e configurată."
+    : "Notificările nu sunt configurate încă. Completează secțiunea notify din config.yaml.";
+  renderPush();
+}
+
+function renderSettingsMenu() {
+  $("#set-teme-sub").textContent = `Acum: ${LOOKS[state.look]?.name || ""}`;
+  renderDaly();
+  if (window.isSecureContext && "PushManager" in window && "serviceWorker" in navigator) {
+    navigator.serviceWorker.ready.then((r) => r.pushManager.getSubscription()).then((sub) => {
+      $("#set-notif-sub").textContent = sub && Notification.permission === "granted"
+        ? "Pornite pe acest telefon" : "Oprite pe acest telefon";
+    }).catch(() => {});
+  } else {
+    $("#set-notif-sub").textContent = "Alertele pe telefon";
+  }
+}
+
+function setLook(k) {
+  state.look = LOOKS[k] ? k : "cadrane";
+  document.body.dataset.look = state.look;
+  if (state.snap) renderNow();
+}
+$("#gear").onclick = () => show(state.view === "settings" ? "now" : "settings");
+
+const RULE_ORDER = ["comm_lost", "charge_mos_off", "discharge_mos_off", "not_charging", "cell_low", "temp_high",
+  "temp_low_charge", "bms_protection", "low_soc", "inverter_fault", "inverter_warning", "bms_alarm", "cell_high",
+  "cell_delta", "soc_divergence"];
+function alertOrder(a, b) {
+  const l = (x) => (x.level === "critical" ? 0 : 1);
+  return l(a) - l(b) || RULE_ORDER.indexOf(a.rule) - RULE_ORDER.indexOf(b.rule);
+}
+
+async function loadEnergy() {
+  try {
+    const e = await api("/api/energy?days=30");
+    state.energy = e.rows || [];
+    if (state.snap) renderNow();
+    if (state.view === "hist") loadEnergyRange();
+  } catch {}
+}
+
+const alertId = (a) => `${a.key || a.rule + "|" + a.device}|${a.since}`;
+function seenAlerts() { try { return new Set(JSON.parse(localStorage.getItem("seenAlerts") || "[]")); } catch { return new Set(); } }
+function markAlertsSeen() {
+  const ids = (state.snap?.alerts || []).map(alertId);
+  try { localStorage.setItem("seenAlerts", JSON.stringify(ids)); } catch {}
+  renderBadge();
+}
+function renderBadge() {
+  const seen = seenAlerts();
+  const n = (state.snap?.alerts || []).filter((a) => !seen.has(alertId(a))).length;
+  const b = $("#badge");
+  if (n) b.dataset.n = n; else delete b.dataset.n;
+}
+
+/* ------------------------------------------------------------------ fișa modulului */
+function openSheet(id) {
+  state.sheetDev = id;
+  renderSheet();
+  $("#sheet").showModal();
+}
+$("#sh-close").onclick = () => $("#sheet").close();
+$("#sheet").addEventListener("close", () => (state.sheetDev = null));
+$("#sheet").addEventListener("click", (e) => { if (e.target.id === "sheet") $("#sheet").close(); });
+
+function renderSheet() {
+  const d = state.snap?.devices?.[state.sheetDev];
+  if (!d) return;
+  const r = d.reading || {};
+  const { cls, tag } = packStatus(d);
+  $("#sh-title").textContent = d.name;
+  const stEl = $("#sh-state");
+  stEl.className = "state " + cls.split(" ")[0];
+  stEl.textContent = d.stale ? `Nu comunică${d.error ? ": " + d.error : ""}` :
+    ({ charging: "Se încarcă", discharging: "Se descarcă", idle: "În repaus" }[cls.split(" ")[0]] || "") + (tag ? `, ${tag}` : "");
+  const mos = (v) => (v == null ? ["–", ""] : v ? ["pornit", "on"] : ["OPRIT", "off"]);
+  const [cm, cmc] = mos(r.charge_mos), [dm, dmc] = mos(r.discharge_mos);
+  const cells = r.cells || [];
+  const stats = [
+    ["Încărcare", `${num(r.soc, 1)} %`], ["Tensiune", `${num(r.voltage, 2)} V`], ["Curent", `${num(r.current, 1)} A`],
+    ["Putere", watts(r.power, false)], ["Rămas", `${num(r.remaining_ah, 1)} Ah`], ["Capacitate", `${num(d.capacity_ah ?? r.capacity_ah, 0)} Ah`],
+    ["MOSFET încărcare", cm, cmc], ["MOSFET descărcare", dm, dmc], ["Cicluri", r.cycles ?? "–"],
+    ["Temperaturi", (r.temps || []).map((t) => num(t, 0)).join(" / ") + " °C"],
+    ["Diferență celule", r.cell_delta == null ? "–" : `${num(r.cell_delta * 1000, 0)} mV`],
+    ["Sănătate", r.soh == null ? "–" : `${num(r.soh, 0)} %`],
+  ];
+  $("#sh-stats").innerHTML = stats.map(([k, v, c]) => `<div><span class="k">${k}</span><span class="v ${c || ""}">${v}</span></div>`).join("");
+  if (cells.length) {
+    const lo = Math.min(...cells), hi = Math.max(...cells);
+    const floor = Math.min(lo, 3.0) - 0.05, top = Math.max(hi, 3.45) + 0.02;
+    $("#sh-cellnote").textContent = `min ${num(lo, 3)} V, max ${num(hi, 3)} V`;
+    $("#sh-cells").innerHTML = cells.map((v, i) => {
+      const h = ((v - floor) / (top - floor)) * 100;
+      const c = cells.length > 1 && hi - lo > 0.005 ? (v === hi ? "hi" : v === lo ? "lo" : "") : "";
+      return `<div class="cellbar ${c}"><div class="tube"><i style="height:${h}%"></i></div><b>${num(v, 3).slice(0, 5)}</b>${i + 1}</div>`;
+    }).join("");
+  } else {
+    $("#sh-cellnote").textContent = "BMS-ul nu a trimis tensiunile pe celule.";
+    $("#sh-cells").innerHTML = "";
+  }
+  $("#sh-alarms").innerHTML = (r.protections || []).map((a) => `<li class="prot">Protecție: ${esc(a)}</li>`).join("") +
+    (r.alarms || []).map((a) => `<li>${esc(a)}</li>`).join("");
+  $("#sh-upd").textContent = d.last_ok ? `Actualizat ${ago(d.last_ok)}` : "";
+}
+
+/* ------------------------------------------------------------------ navigare */
+$$("nav.tabs button").forEach((b) => (b.onclick = () => show(b.dataset.view)));
+function show(v) {
+  state.view = v;
+  const tab = ["packs", "inverter", "bms"].includes(v) ? "now" : v;      // se deschid din „Acum”
+  $$("nav.tabs button").forEach((b) => b.dataset.view === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
+  for (const k of ["now", "hist", "alerts", "packs", "inverter", "bms", "settings"]) $("#view-" + k).hidden = v !== k;
+  if (v === "bms") loadBms();
+  if (v === "packs") renderPacks();
+  if (v === "inverter") { renderInverterLive(); loadInverter(); }
+  if (v === "settings") { showPanel(null); renderSettingsMenu(); }
+  window.scrollTo(0, 0);
+  if (v === "hist") loadHistory();
+  if (v === "alerts") { loadAlerts(); markAlertsSeen(); loadUserAlerts(); }
+}
+
+/* ------------------------------------------------------------------ ISTORIC */
+$$("#range button").forEach((b) => (b.onclick = () => {
+  $$("#range button").forEach((x) => x.setAttribute("aria-pressed", x === b));
+  state.hours = +b.dataset.h;
+  loadHistory();
+}));
+
+async function loadHistory() {
+  const devs = state.info.devices.filter((d) => connected(state.snap?.devices?.[d.id] || {}));
+  const pk = devs.filter((d) => d.kind === "pack");
+  const inv = devs.find((d) => d.kind === "inverter");
+  const pts = Math.min(400, Math.round(innerWidth * 1.2));
+  const get = (d) => api(`/api/history?device=${encodeURIComponent(d.id)}&hours=${state.hours}&points=${pts}`);
+  const [ph, ih] = await Promise.all([Promise.all(pk.map(get)), inv ? get(inv) : null]);
+  const ser = (rows, key) => rows.map((r) => [r.t, r[key]]).filter((p) => p[1] != null);
+  lineChart($("#ch-soc"), pk.map((d, i) => ({ name: d.name, color: SERIES[i % SERIES.length], data: ser(ph[i].rows, "soc") })),
+    { min: 0, max: 100, fmt: (v) => num(v, 0) + "%" });
+  lineChart($("#ch-cur"), pk.map((d, i) => ({ name: d.name, color: SERIES[i % SERIES.length], data: ser(ph[i].rows, "current") })),
+    { zero: true, fmt: (v) => num(v, 1) + " A" });
+  const css = getComputedStyle(document.documentElement);
+  if (ih) {
+    // culori bine diferite: galben producție, roșu consum, verde rețea
+    lineChart($("#ch-pow"), [
+      { name: "Panouri", color: css.getPropertyValue("--sun").trim(), data: ser(ih.rows, "pv_power") },
+      { name: "Consum", color: "#F0524B", data: ser(ih.rows, "load_power") },
+      { name: "Rețea", color: "#3FCB7E", data: ser(ih.rows, "ac_in_power") },
+    ], { zero: true, fmt: (v) => watts(v, false) });
+  }
+  drawEnergy();
+}
+
+/* ---------- ordinea graficelor, aleasă de utilizator (păstrată pe telefon) ---------- */
+function applyChartOrder() {
+  const box = $("#charts");
+  const saved = loadPref("chartOrder", "").split(",").filter((id) => id && $("#" + id));
+  for (const id of saved) box.appendChild($("#" + id));           // cele salvate primele, în ordinea lor
+  for (const el of [...box.children]) if (!saved.includes(el.id)) box.appendChild(el);   // cele noi, la coadă
+}
+function saveChartOrder() {
+  savePref("chartOrder", [...$("#charts").children].map((el) => el.id).join(","));
+}
+function moveChart(id, dir) {
+  const el = $("#" + id), box = $("#charts");
+  const sib = dir < 0 ? el.previousElementSibling : el.nextElementSibling;
+  if (!sib) return;
+  dir < 0 ? box.insertBefore(el, sib) : box.insertBefore(sib, el);
+  saveChartOrder();
+  el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+$("#hist-edit").onclick = () => {
+  const box = $("#charts"), on = !box.classList.contains("editing");
+  box.classList.toggle("editing", on);
+  $("#hist-edit").textContent = on ? "Gata" : "Editează ordinea";
+  $("#hist-edit-note").hidden = !on;
+  for (const el of box.children) {
+    el.querySelector(".mv")?.remove();
+    if (on) {
+      const mv = document.createElement("div");
+      mv.className = "mv";
+      mv.innerHTML = `<button aria-label="Mută mai sus">▲</button><button aria-label="Mută mai jos">▼</button>`;
+      const [up, down] = mv.querySelectorAll("button");
+      up.onclick = () => moveChart(el.id, -1);
+      down.onclick = () => moveChart(el.id, 1);
+      el.prepend(mv);
+    }
+  }
+};
+applyChartOrder();
+
+/* ---------- energia pe zi, cu interval propriu (7 zile, 30 zile, 1 an sau de la–până la) ---------- */
+const isoDay = (d) => d.toLocaleDateString("sv-SE");
+const enRange = { days: 7, rows: [], from: null, to: null };
+
+function enDates() {
+  if (enRange.days !== "custom") {
+    const to = new Date(), from = new Date();
+    from.setDate(from.getDate() - enRange.days + 1);
+    return [isoDay(from), isoDay(to)];
+  }
+  return [$("#en-from").value, $("#en-to").value].sort();
+}
+
+async function loadEnergyRange() {
+  const [from, to] = enDates();
+  if (!from || !to) return;
+  try {
+    const r = await api(`/api/energy?from=${from}&to=${to}`);
+    Object.assign(enRange, { rows: r.rows || [], from, to });
+    drawEnergy();
+  } catch {}
+}
+
+function drawEnergy() {
+  const css = getComputedStyle(document.documentElement);
+  const { from, to } = enRange;
+  if (!from) return loadEnergyRange();
+  const byDay = new Map(enRange.rows.map((r) => [r.day, r]));
+  // toate zilele din interval (cele fără date = 0); peste 62 de zile: totaluri pe lună
+  const days = [];
+  for (let d = new Date(from + "T12:00"); isoDay(d) <= to; d.setDate(d.getDate() + 1)) days.push(isoDay(d));
+  const monthly = days.length > 62;
+  const keys = [...new Set(days.map((d) => (monthly ? d.slice(0, 7) : d)))];
+  const sum = (k, field) => days.filter((d) => (monthly ? d.slice(0, 7) : d) === k).reduce((a, d) => a + (byDay.get(d)?.[field] || 0), 0);
+  const pv = keys.map((k) => sum(k, "pv_kwh")), load = keys.map((k) => sum(k, "load_kwh"));
+  $("#ch-energy h3").textContent = monthly ? "Energie pe lună (kWh)" : "Energie pe zi (kWh)";
+  $("#en-total").innerHTML = `Total ${dayTime2(from)} – ${dayTime2(to)}: produs <b>${num(pv.reduce((a, b) => a + b, 0), 1)} kWh</b>` +
+    ` · consumat <b>${num(load.reduce((a, b) => a + b, 0), 1)} kWh</b>`;
+  barChart($("#ch-energy"), keys, [
+    { name: "Produs", color: css.getPropertyValue("--sun").trim(), data: pv },
+    { name: "Consumat", color: css.getPropertyValue("--load").trim(), data: load },
+  ]);
+}
+const dayTime2 = (d) => new Date(d + "T12:00").toLocaleDateString("ro-RO", { day: "numeric", month: "short", year: "numeric" });
+
+$$("#en-range button").forEach((b) => (b.onclick = () => {
+  $$("#en-range button").forEach((x) => x.setAttribute("aria-pressed", x === b));
+  enRange.days = b.dataset.d === "custom" ? "custom" : +b.dataset.d;
+  $("#en-custom").hidden = enRange.days !== "custom";
+  if (enRange.days === "custom" && !$("#en-from").value) {
+    const t = new Date(), f = new Date();
+    f.setDate(f.getDate() - 29);
+    $("#en-from").value = isoDay(f);
+    $("#en-to").value = isoDay(t);
+  }
+  loadEnergyRange();
+}));
+$("#en-from").onchange = $("#en-to").onchange = loadEnergyRange;
+
+/* ---------- grafice pe canvas (fără biblioteci) ---------- */
+function setupCanvas(box) {
+  const cv = box.querySelector("canvas");
+  const dpr = devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const css = getComputedStyle(document.documentElement);
+  return { cv, ctx, w, h, grid: css.getPropertyValue("--line").trim(), txt: css.getPropertyValue("--muted").trim(),
+    font: `13px Barlow, system-ui, sans-serif` };
+}
+
+function niceStep(range, n) {
+  const raw = range / n, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  return [1, 2, 2.5, 5, 10].map((m) => m * p).find((s) => s >= raw) || raw;
+}
+
+function lineChart(box, series, opt = {}) {
+  box._draw = (cursorX) => {
+    const { cv, ctx, w, h, grid, txt, font } = setupCanvas(box);
+    const all = series.flatMap((s) => s.data);
+    const legend = box.querySelector(".legend");
+    if (!all.length) {
+      ctx.fillStyle = txt; ctx.font = font; ctx.fillText("Încă nu sunt date pentru acest interval.", 8, h / 2);
+      legend.innerHTML = ""; return;
+    }
+    const t0 = Math.min(...all.map((p) => p[0])), t1 = Math.max(...all.map((p) => p[0]));
+    let lo = opt.min ?? Math.min(...all.map((p) => p[1])), hi = opt.max ?? Math.max(...all.map((p) => p[1]));
+    if (opt.zero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+    if (hi - lo < 1e-6) { hi += 1; lo -= 1; }
+    const step = niceStep(hi - lo, 4);
+    if (opt.min == null) lo = Math.floor(lo / step) * step;
+    if (opt.max == null) hi = Math.ceil(hi / step) * step;
+    const L = 46, R = 6, T = 8, B = 22;
+    const X = (t) => L + ((t - t0) / Math.max(1, t1 - t0)) * (w - L - R);
+    const Y = (v) => T + (1 - (v - lo) / (hi - lo)) * (h - T - B);
+    ctx.font = font; ctx.lineWidth = 1;
+    for (let v = lo; v <= hi + step / 2; v += step) {
+      ctx.strokeStyle = grid; ctx.globalAlpha = Math.abs(v) < step / 1000 && opt.zero ? 1 : 0.55;
+      ctx.beginPath(); ctx.moveTo(L, Y(v)); ctx.lineTo(w - R, Y(v)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = txt; ctx.textAlign = "right";
+      ctx.fillText(shortVal(v, opt), L - 6, Y(v) + 4);
+    }
+    const span = t1 - t0;
+    const lbl = span > 2 * 86400 ? (t) => new Date(t * 1000).toLocaleDateString("ro-RO", { day: "numeric", month: "short" }) : hhmm;
+    ctx.textAlign = "center";
+    for (let i = 0; i <= 4; i++) { const t = t0 + (span * i) / 4; ctx.fillText(lbl(t), Math.min(w - 24, Math.max(L + 16, X(t))), h - 5); }
+    ctx.lineWidth = 2; ctx.lineJoin = "round";
+    // zona de sub linie, plină până jos (sau până la zero, la grafice cu valori negative)
+    const base = Y(opt.zero ? 0 : lo);
+    const segments = (s) => {
+      const out = [];
+      let prev = null;
+      for (const p of s.data) {
+        if (prev == null || p[0] - prev > Math.max(900, span / 60)) out.push([]);
+        out[out.length - 1].push(p);
+        prev = p[0];
+      }
+      return out;
+    };
+    for (const s of series) {
+      ctx.fillStyle = s.color; ctx.globalAlpha = series.length > 3 ? 0.07 : series.length > 1 ? 0.14 : 0.22;
+      for (const seg of segments(s)) {
+        ctx.beginPath(); ctx.moveTo(X(seg[0][0]), base);
+        for (const [t, v] of seg) ctx.lineTo(X(t), Y(v));
+        ctx.lineTo(X(seg[seg.length - 1][0]), base); ctx.closePath(); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+    for (const s of series) {
+      ctx.strokeStyle = s.color;
+      for (const seg of segments(s)) {
+        ctx.beginPath();
+        seg.forEach(([t, v], i) => (i ? ctx.lineTo(X(t), Y(v)) : ctx.moveTo(X(t), Y(v))));
+        ctx.stroke();
+      }
+    }
+    // cursor
+    let tc = null;
+    if (cursorX != null) {
+      tc = t0 + ((cursorX - L) / (w - L - R)) * span;
+      tc = Math.max(t0, Math.min(t1, tc));
+      ctx.strokeStyle = txt; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(tc), T); ctx.lineTo(X(tc), h - B); ctx.stroke();
+    }
+    const valAt = (s) => {
+      if (!s.data.length) return null;
+      if (tc == null) return s.data[s.data.length - 1][1];
+      let best = s.data[0];
+      for (const p of s.data) if (Math.abs(p[0] - tc) < Math.abs(best[0] - tc)) best = p;
+      return best[1];
+    };
+    legend.innerHTML = series.map((s) => `<span style="--c:${s.color}">${esc(s.name)}<b>${opt.fmt(valAt(s))}</b></span>`).join("");
+    box.querySelector(".when").textContent = tc == null ? "ultima valoare" : dayTime(tc);
+  };
+  attachCursor(box);
+  box._draw(null);
+}
+
+function shortVal(v, opt) {
+  if (opt.fmt && opt.max === 100) return num(v, 0);
+  const a = Math.abs(v);
+  return a >= 1000 ? num(v / 1000, a % 1000 ? 1 : 0) + "k" : num(v, a < 10 && v % 1 ? 1 : 0);
+}
+
+function barChart(box, labels, series) {
+  box._draw = (cursorX) => {
+    const { ctx, w, h, grid, txt, font } = setupCanvas(box);
+    const legend = box.querySelector(".legend");
+    if (!labels.length) { ctx.fillStyle = txt; ctx.font = font; ctx.fillText("Încă nu sunt date.", 8, h / 2); legend.innerHTML = ""; return; }
+    const hiRaw = Math.max(1, ...series.flatMap((s) => s.data));
+    const step = niceStep(hiRaw, 4), hi = Math.ceil(hiRaw / step) * step;
+    const L = 34, R = 4, T = 8, B = 22;
+    const gw = (w - L - R) / labels.length, bw = Math.max(2, (gw * 0.72) / series.length);
+    const Y = (v) => T + (1 - v / hi) * (h - T - B);
+    ctx.font = font;
+    for (let v = 0; v <= hi + step / 2; v += step) {
+      ctx.strokeStyle = grid; ctx.globalAlpha = 0.55; ctx.beginPath(); ctx.moveTo(L, Y(v)); ctx.lineTo(w - R, Y(v)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = txt; ctx.textAlign = "right"; ctx.fillText(num(v, 0), L - 6, Y(v) + 4);
+    }
+    let sel = labels.length - 1;
+    if (cursorX != null) sel = Math.max(0, Math.min(labels.length - 1, Math.floor((cursorX - L) / gw)));
+    labels.forEach((d, i) => {
+      series.forEach((s, k) => {
+        ctx.fillStyle = s.color; ctx.globalAlpha = i === sel ? 1 : 0.6;
+        const x = L + i * gw + gw * 0.14 + k * bw;
+        ctx.fillRect(x, Y(s.data[i] || 0), bw - 1, Y(0) - Y(s.data[i] || 0));
+      });
+      ctx.globalAlpha = 1;
+    });
+    ctx.fillStyle = txt; ctx.textAlign = "center";
+    const every = Math.ceil(labels.length / 6);
+    // etichete: zile (AAAA-LL-ZZ) sau luni (AAAA-LL), când intervalul e lung
+    const monthly = labels[0].length === 7;
+    const short = (d) => monthly ? new Date(d + "-01").toLocaleDateString("ro-RO", { month: "short" }) : d.slice(8) + "." + d.slice(5, 7);
+    labels.forEach((d, i) => { if ((labels.length - 1 - i) % every === 0) ctx.fillText(short(d), L + i * gw + gw / 2, h - 5); });
+    legend.innerHTML = series.map((s) => `<span style="--c:${s.color}">${esc(s.name)}<b>${num(s.data[sel], 1)} kWh</b></span>`).join("");
+    box.querySelector(".when").textContent = monthly
+      ? new Date(labels[sel] + "-01").toLocaleDateString("ro-RO", { month: "long", year: "numeric" })
+      : new Date(labels[sel]).toLocaleDateString("ro-RO", { weekday: "long", day: "numeric", month: "long" });
+  };
+  attachCursor(box);
+  box._draw(null);
+}
+
+function attachCursor(box) {
+  if (box._attached) return;
+  box._attached = true;
+  const cv = box.querySelector("canvas");
+  const at = (e) => e.clientX - cv.getBoundingClientRect().left;
+  cv.addEventListener("pointermove", (e) => box._draw(at(e)));
+  cv.addEventListener("pointerdown", (e) => box._draw(at(e)));
+  cv.addEventListener("pointerleave", () => box._draw(null));
+}
+let rz;
+addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => $$(".chart").forEach((b) => b._draw && !b.closest("[hidden]") && b._draw(null)), 150); });
+
+/* ------------------------------------------------------------------ ALERTE */
+function renderActiveAlerts() {
+  const a = state.snap?.alerts || [];
+  $("#al-active").innerHTML = a.length ? a.map((x) => `
+    <div class="row ${x.level}"><span>${esc(x.message)}</span><span class="t">de ${x.since ? ago(x.since).replace("acum ", "") : ""}</span></div>`).join("")
+    : `<div class="empty">Nicio alertă. Toate modulele funcționează normal.</div>`;
+}
+async function loadAlerts() {
+  renderActiveAlerts();
+  const r = await api("/api/alerts?limit=60");
+  const closed = r.history.filter((x) => x.ts_end);
+  $("#al-hist").innerHTML = closed.length ? closed.map((x) => `
+    <div class="row ${x.level} closed"><span>${esc(x.message)}</span>
+    <span class="t">${dayTime(x.ts_start)} – ${hhmm(x.ts_end)}</span></div>`).join("")
+    : `<div class="empty">Nu au fost alerte până acum.</div>`;
+}
+
+/* ---------- notificări direct în aplicația Amper (Web Push) ---------- */
+const b64ToBytes = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - s.length % 4) % 4)), (c) => c.charCodeAt(0));
+const jsonPost = (body) => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+async function renderPush() {
+  const st = $("#push-state"), b = $("#push-on");
+  b.hidden = true;
+  const HTTPS_URL = esc(state.info?.public_url || "adresa https a Pi-ului");
+  if (!window.isSecureContext) {
+    st.innerHTML = `Ca să primești notificări <b>direct în aplicația Amper</b>, deschide-o de la adresa
+      <a href="${HTTPS_URL}">${HTTPS_URL}</a> și adaug-o pe ecranul principal (Partajare → Adaugă pe ecranul principal).`;
+    return;
+  }
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+    st.textContent = "Pe iPhone, notificările merg doar din aplicația Amper de pe ecranul principal: în Safari, " +
+      "Partajare → Adaugă pe ecranul principal, apoi deschide Amper de pe ecranul principal și revino aici.";
+    return;
+  }
+  const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+  if (Notification.permission === "denied") {
+    st.textContent = "Notificările sunt blocate pentru Amper. Pornește-le din Setări iPhone → Notificări → Amper.";
+    return;
+  }
+  b.hidden = false;
+  b.dataset.on = sub && Notification.permission === "granted" ? "1" : "";
+  st.textContent = b.dataset.on ? "Acest telefon primește notificările direct în aplicația Amper." :
+    "Acest telefon nu primește încă notificări în aplicația Amper.";
+  b.textContent = b.dataset.on ? "Oprește notificările pe acest telefon" : "Pornește notificările pe acest telefon";
+}
+
+$("#push-on").onclick = async () => {
+  const b = $("#push-on");
+  b.disabled = true;
+  try {
+    if (b.dataset.on) {
+      const s = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+      if (s) { await api("/api/push/unsubscribe", jsonPost({ endpoint: s.endpoint })); await s.unsubscribe(); }
+    } else {
+      // întâi permisiunea, direct din apăsare (altfel iPhone-ul nu arată întrebarea)
+      if ((await Notification.requestPermission()) !== "granted") throw new Error("Notificările nu au fost permise.");
+      const { key, error } = await api("/api/push/key");
+      if (!key) throw new Error(error || "Pi-ul nu are cheia pentru notificări.");
+      const reg = await navigator.serviceWorker.ready;
+      const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
+      const r = await api("/api/push/subscribe", jsonPost({ subscription: s.toJSON() }));
+      if (!r.ok) throw new Error(r.error || "Abonarea a eșuat.");
+      $("#test-res").textContent = "Gata. Apasă „Trimite o notificare de test” ca să verifici.";
+    }
+    await renderPush();
+  } catch (e) {
+    if (e.message !== "auth") $("#push-state").textContent = e.message;
+  } finally {
+    b.disabled = false;
+  }
+};
+$("#test-notif").onclick = async () => {
+  const r = await api("/api/test-notification", { method: "POST" });
+  $("#test-res").textContent = r.ok ? "Trimisă. Ar trebui să apară pe telefon în câteva secunde." : r.error;
+};
+
+/* ------------------------------------------------------------------ ALERTELE MELE */
+const UA_TEMPLATES = [
+  { t: "Bateria a scăzut sub 25%", metric: "bank_soc", op: "<", value: 25, hold: 1, level: "warning", clear: true },
+  { t: "Bateria s-a încărcat complet", metric: "bank_soc", op: ">", value: 99, hold: 5, level: "info", clear: false,
+    name: "Bateria s-a încărcat complet" },
+  { t: "Bateria aproape goală (sub 15%)", metric: "bank_soc", op: "<", value: 15, hold: 1, level: "critical", clear: true },
+  { t: "O celulă a coborât sub 3,00 V", metric: "cell_min", op: "<", value: 3.0, hold: 1, level: "warning", clear: true },
+  { t: "Consum mare (peste 3000 W)", metric: "load_power", op: ">", value: 3000, hold: 2, level: "info", clear: false },
+  { t: "Rețeaua / generatorul a pornit", metric: "grid_voltage", op: ">", value: 100, hold: 1, level: "info", clear: true,
+    name: "Rețeaua / generatorul a pornit" },
+  { t: "Module prea calde (peste 45 °C)", metric: "pack_temp_max", op: ">", value: 45, hold: 2, level: "warning", clear: true },
+  { t: "Altceva (completez eu)", metric: "bank_soc", op: "<", value: 20, hold: 1, level: "warning", clear: true },
+];
+const ua = { metrics: [], rules: [] };
+const LEVELS = { info: "🔔 informare", warning: "🟠 atenție", critical: "🔴 critic" };
+
+async function loadUserAlerts() {
+  try {
+    const r = await api("/api/user-alerts");
+    Object.assign(ua, r);
+  } catch { return; }
+  const unit = (m) => ua.metrics.find((x) => x.id === m)?.unit || "";
+  const mname = (m) => ua.metrics.find((x) => x.id === m)?.name || m;
+  $("#ua-list").innerHTML = ua.rules.length ? ua.rules.map((r) => `
+    <div class="row ua-rule ${r.enabled ? "" : "off"}"><span><b>${esc(r.name || `${mname(r.metric)} ${r.op === "<" ? "sub" : "peste"} ${num(r.value, r.value % 1 ? 2 : 0)} ${unit(r.metric)}`)}</b>
+      <small>${esc(mname(r.metric))} ${r.op === "<" ? "<" : ">"} ${num(r.value, r.value % 1 ? 2 : 0)} ${esc(unit(r.metric))}${r.hold_s ? ` · cel puțin ${Math.round(r.hold_s / 60)} min` : ""} · ${LEVELS[r.level] || r.level}${r.notify_clear ? "" : " · fără „Rezolvat”"}</small></span>
+      <span class="ua-act"><button class="btn sm" data-tog="${r.id}">${r.enabled ? "Oprește" : "Pornește"}</button>
+      <button class="btn sm danger" data-del="${r.id}">Șterge</button></span></div>`).join("")
+    : `<div class="empty">Nicio alertă proprie. Apasă „+ Adaugă alertă”.</div>`;
+  $$("[data-tog]", $("#ua-list")).forEach((b) => (b.onclick = async () => {
+    const r = ua.rules.find((x) => x.id === +b.dataset.tog);
+    await api(`/api/user-alerts/${r.id}`, jsonPost({ enabled: !r.enabled }));
+    loadUserAlerts();
+  }));
+  $$("[data-del]", $("#ua-list")).forEach((b) => (b.onclick = async () => {
+    if (!confirm("Ștergi această alertă?")) return;
+    await api(`/api/user-alerts/${b.dataset.del}`, { method: "DELETE" });
+    loadUserAlerts();
+  }));
+}
+
+function uaApplyTemplate(i) {
+  const t = UA_TEMPLATES[i];
+  $("#ua-metric").value = t.metric; $("#ua-op").value = t.op; $("#ua-value").value = t.value;
+  $("#ua-hold").value = t.hold; $("#ua-level").value = t.level; $("#ua-clear").checked = t.clear;
+  $("#ua-name").value = t.name || "";
+  uaPreview();
+}
+function uaPreview() {
+  const m = ua.metrics.find((x) => x.id === $("#ua-metric").value) || {};
+  $("#ua-unit").textContent = m.unit || "";
+  const v = parseFloat(String($("#ua-value").value).replace(",", "."));
+  const hold = +$("#ua-hold").value || 0;
+  $("#ua-preview").innerHTML = isNaN(v) ? `<span class="err">Scrie o valoare.</span>` :
+    `Primești ${LEVELS[$("#ua-level").value]} când <b>${esc(m.name || "")}</b> e ${$("#ua-op").value === "<" ? "sub" : "peste"}
+     <b>${num(v, v % 1 ? 2 : 0)} ${esc(m.unit || "")}</b>${hold ? ` cel puțin ${hold} min` : ""}.`;
+  $("#ua-save").disabled = isNaN(v);
+}
+$("#ua-add").onclick = async () => {
+  if (!ua.metrics.length) await loadUserAlerts();
+  $("#ua-tpl").innerHTML = UA_TEMPLATES.map((t, i) => `<option value="${i}">${esc(t.t)}</option>`).join("");
+  $("#ua-metric").innerHTML = ua.metrics.map((m) => `<option value="${m.id}">${esc(m.name)} (${esc(m.unit)})</option>`).join("");
+  $("#ua-err").textContent = "";
+  uaApplyTemplate(0);
+  $("#ua").showModal();
+};
+$("#ua-tpl").onchange = () => uaApplyTemplate(+$("#ua-tpl").value);
+for (const id of ["#ua-metric", "#ua-op", "#ua-value", "#ua-hold", "#ua-level"]) $(id).oninput = $(id).onchange = uaPreview;
+$("#ua-close").onclick = () => $("#ua").close();
+$("#ua-save").onclick = async () => {
+  const body = { metric: $("#ua-metric").value, op: $("#ua-op").value,
+    value: parseFloat(String($("#ua-value").value).replace(",", ".")), hold_min: +$("#ua-hold").value || 0,
+    level: $("#ua-level").value, notify_clear: $("#ua-clear").checked, name: $("#ua-name").value.trim() };
+  try {
+    const r = await api("/api/user-alerts", jsonPost(body));
+    if (!r.ok) throw new Error(r.error || "Nu am putut salva alerta.");
+    $("#ua").close();
+    loadUserAlerts();
+  } catch (e) {
+    if (e.message !== "auth") $("#ua-err").textContent = e.message;
+  }
+};
+
+/* ------------------------------------------------------------------ preferințe (pe dispozitiv) */
+function loadPref(k, d) { try { return localStorage.getItem(k) || d; } catch { return d; } }
+function savePref(k, v) { try { localStorage.setItem(k, v); } catch {} }
+
+boot();

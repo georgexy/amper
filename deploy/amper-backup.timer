@@ -1,0 +1,10 @@
+[Unit]
+Description=amper - copie de siguranta in fiecare noapte la 00:00
+
+[Timer]
+OnCalendar=*-*-* 00:00:00
+# dacă Pi-ul a fost oprit la miezul nopții, copia se face la pornire
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Amper</title>
+  <meta name="theme-color" content="#0E1A22">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Amper">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div id="login" class="login" hidden>
+    <h1 class="num" style="margin:0;font-size:30px">Amper</h1>
+    <label for="pw">Parola aplicației</label>
+    <input id="pw" type="password" autocomplete="current-password">
+    <button class="btn" id="pwgo">Intră</button>
+    <div class="err" id="pwerr"></div>
+  </div>
+
+  <div id="app" hidden>
+    <div class="wrap">
+      <header class="top">
+        <h1>Amper</h1>
+        <div class="conn" id="conn"><i></i><span>Se conectează…</span></div>
+        <button class="gear" id="gear" aria-label="Setări">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        </button>
+      </header>
+      <div class="sim" id="simnote" hidden>Date simulate — nu e conectat la hardware</div>
+    </div>
+
+    <!-- ====================== ACUM ====================== -->
+    <main id="view-now" class="wrap">
+      <div id="banners"></div>
+      <!-- conținutul depinde de tema aleasă (app.js, LOOKS) -->
+      <div id="home"></div>
+    </main>
+
+    <!-- ====================== BATERIILE ====================== -->
+    <main id="view-packs" class="wrap" hidden>
+      <div class="pk-top">
+        <button class="back" id="pk-back" aria-label="Înapoi">‹</button>
+        <h2>Bateriile</h2>
+        <div class="pk-tot">total<b class="num" id="pk-soc">–</b></div>
+      </div>
+      <div class="pk-sum" id="pk-sum"></div>
+      <div id="pk-list"></div>
+      <p class="note">Atinge un pachet pentru celule, temperaturi și MOSFET-uri.</p>
+    </main>
+
+    <!-- ====================== SETĂRI BMS (Daly) ====================== -->
+    <main id="view-bms" class="wrap" hidden>
+      <div class="pk-top">
+        <button class="back" id="bms-back" aria-label="Înapoi la baterii">‹</button>
+        <h2 id="bms-title">Setări BMS</h2>
+      </div>
+      <p class="note">Valorile sunt citite acum din BMS. La fiecare pereche de praguri, BMS-ul avertizează la cel mai
+        puțin sever și oprește (protecție) la cel mai sever. Fiecare modificare se citește înapoi din BMS ca să fie verificată.</p>
+      <div id="bms-list"></div>
+      <h2>Modificări făcute</h2>
+      <div class="list" id="bms-log"></div>
+    </main>
+
+    <!-- ====================== INVERTOR ====================== -->
+    <main id="view-inverter" class="wrap" hidden>
+      <div class="pk-top">
+        <button class="back" id="iv-back" aria-label="Înapoi">‹</button>
+        <h2 id="iv-title">Invertor</h2>
+      </div>
+      <div class="pk-sum" id="iv-sum"></div>
+      <p class="note" id="iv-state"></p>
+      <div id="iv-list"></div>
+      <h2>Ceas</h2>
+      <div class="card iv-clock"><div id="iv-clock"></div><button class="btn" id="iv-sync">Potrivește cu ora Pi-ului</button></div>
+      <h2>Modificări făcute</h2>
+      <div class="list" id="iv-log"></div>
+      <p class="note">Setările se scriu direct în invertor. Fiecare modificare e verificată prin citire înapoi,
+        notată aici și trimisă ca notificare.</p>
+    </main>
+
+    <!-- ====================== SETĂRI ====================== -->
+    <main id="view-settings" class="wrap" hidden>
+      <!-- meniul setărilor: un buton pentru fiecare secțiune -->
+      <div id="set-menu">
+        <h2>Setări</h2>
+        <div class="set-menu">
+          <button class="card set-btn" data-panel="teme"><span class="ic" style="--ic:var(--acc)">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg></span>
+            <span><b>Teme</b><span id="set-teme-sub">Cum arată ecranul principal</span></span><i>›</i></button>
+          <button class="card set-btn" data-panel="notif"><span class="ic" style="--ic:var(--warn)">
+            <svg viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4"/></svg></span>
+            <span><b>Notificări</b><span id="set-notif-sub">Alertele pe telefon</span></span><i>›</i></button>
+          <button class="card set-btn" data-panel="info"><span class="ic" style="--ic:var(--cell)">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg></span>
+            <span><b>Info</b><span id="set-info-sub">Pi-ul, rețeaua, porturile</span></span><i>›</i></button>
+          <button class="card set-btn" data-panel="daly"><span class="ic" style="--ic:var(--charge)">
+            <svg viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 10.5v3M7 10v4M11 10v4M15 10v4"/></svg></span>
+            <span><b>Module Daly</b><span id="set-daly-sub">Cablu USB sau Bluetooth</span></span><i>›</i></button>
+        </div>
+        <p class="note" id="version"></p>
+      </div>
+
+      <section class="set-panel" id="set-teme" hidden>
+        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Teme</h2></div>
+        <div class="looks" id="looks"></div>
+        <p class="note">Tema se păstrează pe fiecare telefon sau calculator în parte. Pentru ecranul HDMI se alege din
+          adresă, de exemplu <code>http://localhost:8080/?tema=flux</code>.</p>
+      </section>
+
+      <section class="set-panel" id="set-notif" hidden>
+        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Notificări</h2></div>
+        <p class="note" id="push-state"></p>
+        <button class="btn" id="push-on" hidden>Pornește notificările pe acest telefon</button>
+        <p class="note" id="notif-state"></p>
+        <button class="btn" id="test-notif">Trimite o notificare de test</button>
+        <p class="note" id="test-res"></p>
+      </section>
+
+      <section class="set-panel" id="set-info" hidden>
+        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Info</h2></div>
+        <div id="info-body"><p class="note">Citesc…</p></div>
+        <h2>Schimbă rețeaua WiFi</h2>
+        <p class="note">Pi-ul trece pe altă rețea din zonă. Dacă rețeaua nouă nu merge (parolă greșită, fără internet),
+          revine singur la cea de acum, în cel mult ~2 minute. Cât timp schimbă, aplicația pierde legătura câteva secunde.</p>
+        <button class="btn" id="wifi-scan">Caută rețele</button>
+        <div class="list" id="wifi-list"></div>
+        <div id="wifi-form" hidden>
+          <p class="note" id="wifi-chosen"></p>
+          <input class="ed-in" type="password" id="wifi-pw" placeholder="parola rețelei" autocomplete="off">
+          <button class="btn ed-go" id="wifi-go">Conectează Pi-ul la această rețea</button>
+        </div>
+        <p class="note" id="wifi-msg"></p>
+      </section>
+
+      <section class="set-panel" id="set-daly" hidden>
+        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Module Daly</h2></div>
+        <div class="list" id="daly-list"></div>
+        <p class="note">Modulele Daly se găsesc singure, pe cablu USB sau prin Bluetooth (nume „DL-…”), și apar pe
+          ecranul principal la prima citire. Căutarea se face la 30 s în primele 10 minute, apoi la 3 minute.</p>
+        <button class="btn" id="daly-search">Caută acum</button>
+      </section>
+    </main>
+
+    <!-- ====================== ISTORIC ====================== -->
+    <main id="view-hist" class="wrap" hidden>
+      <div class="hist-head"><h2>Istoric</h2><button class="btn sm" id="hist-edit">Editează ordinea</button></div>
+      <div class="seg" id="range" role="group" aria-label="Interval">
+        <button data-h="6">6 ore</button>
+        <button data-h="24" aria-pressed="true">24 ore</button>
+        <button data-h="168">7 zile</button>
+        <button data-h="720">30 zile</button>
+      </div>
+      <div class="note" id="hist-edit-note" hidden>Mută graficele cu săgețile ▲ ▼. Ordinea se păstrează pe acest telefon.</div>
+      <div id="charts">
+      <div class="chart" id="ch-soc"><h3>Încărcare module (%)</h3><div class="legend"></div><canvas></canvas><div class="when"></div></div>
+      <div class="chart" id="ch-cur"><h3>Curent module (A)</h3><div class="legend"></div><canvas></canvas><div class="when"></div></div>
+      <div class="chart" id="ch-pow"><h3>Putere (W)</h3><div class="legend"></div><canvas></canvas><div class="when"></div></div>
+      <div class="chart" id="ch-energy"><h3>Energie pe zi (kWh)</h3>
+        <div class="seg en-range" id="en-range" role="group" aria-label="Interval energie">
+          <button data-d="7" aria-pressed="true">7 zile</button><button data-d="30">30 zile</button>
+          <button data-d="365">1 an</button><button data-d="custom">Interval</button>
+        </div>
+        <div class="en-custom" id="en-custom" hidden>
+          <label>de la <input type="date" id="en-from"></label><label>până la <input type="date" id="en-to"></label>
+        </div>
+        <div class="en-total" id="en-total"></div>
+        <div class="legend"></div><canvas></canvas><div class="when"></div></div>
+      </div>
+    </main>
+
+    <!-- ====================== ALERTE ====================== -->
+    <main id="view-alerts" class="wrap" hidden>
+      <h2>Alerte active</h2>
+      <div class="list" id="al-active"></div>
+      <div class="hist-head"><h2>Alertele mele</h2><button class="btn sm" id="ua-add">+ Adaugă alertă</button></div>
+      <p class="note">Alerte setate de tine (de ex. „bateria sub 25%”, „bateria încărcată complet”). Vin pe toate telefoanele.</p>
+      <div class="list" id="ua-list"></div>
+      <h2>Istoric alerte</h2>
+      <div class="list" id="al-hist"></div>
+      <p class="note">Notificările pe telefon se pornesc din Setări (rotița de sus) → Notificări.</p>
+    </main>
+
+    <nav class="tabs" aria-label="Secțiuni">
+      <button data-view="now" aria-current="page">
+        <svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 2h6M8.5 14h7M8.5 10.5h7"/></svg>Acum</button>
+      <button data-view="hist">
+        <svg viewBox="0 0 24 24"><path d="M3 20h18M5 16l4-6 4 3 6-9"/></svg>Istoric</button>
+      <button data-view="alerts"><span class="badge" id="badge">
+        <svg viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4"/></svg></span>Alerte</button>
+    </nav>
+  </div>
+
+  <dialog id="sheet" aria-labelledby="sh-title">
+    <div class="sheet">
+      <div class="grab"></div>
+      <header><h2 id="sh-title">Modul</h2><button class="close" id="sh-close">Închide</button></header>
+      <div class="state" id="sh-state"></div>
+      <div class="stats" id="sh-stats"></div>
+      <h2>Celule</h2>
+      <div class="note" id="sh-cellnote"></div>
+      <div class="cells" id="sh-cells"></div>
+      <ul class="alarms" id="sh-alarms"></ul>
+      <p class="note" id="sh-upd"></p>
+    </div>
+  </dialog>
+
+  <dialog id="edit" aria-labelledby="ed-title">
+    <div class="sheet">
+      <div class="grab"></div>
+      <header><h2 id="ed-title">Setare</h2><button class="close" id="ed-close">Renunță</button></header>
+      <p class="note" id="ed-now"></p>
+      <div id="ed-field"></div>
+      <div class="ed-warn" id="ed-warn" hidden></div>
+      <label class="ed-ack" id="ed-ackbox" hidden><input type="checkbox" id="ed-ack"> Am înțeles riscul</label>
+      <p class="ed-diff" id="ed-diff"></p>
+      <button class="btn ed-go" id="ed-go">Scrie în invertor</button>
+      <p class="err" id="ed-err"></p>
+    </div>
+  </dialog>
+
+  <dialog id="ua" aria-labelledby="ua-title">
+    <div class="sheet">
+      <div class="grab"></div>
+      <header><h2 id="ua-title">Alertă nouă</h2><button class="close" id="ua-close">Renunță</button></header>
+      <label class="ua-l">Pornește de la<select id="ua-tpl" class="ed-in"></select></label>
+      <label class="ua-l">Ce urmărești<select id="ua-metric" class="ed-in"></select></label>
+      <div class="ua-row">
+        <label class="ua-l">Când e<select id="ua-op" class="ed-in"><option value="<">sub</option><option value=">">peste</option></select></label>
+        <label class="ua-l">Valoarea<span class="ed-num"><input id="ua-value" class="ed-in" type="number" inputmode="decimal" step="any"><span id="ua-unit"></span></span></label>
+      </div>
+      <div class="ua-row">
+        <label class="ua-l">Cel puțin (minute)<input id="ua-hold" class="ed-in" type="number" inputmode="numeric" min="0" max="1440" value="1"></label>
+        <label class="ua-l">Importanță<select id="ua-level" class="ed-in">
+          <option value="info">🔔 informare</option><option value="warning" selected>🟠 atenție</option><option value="critical">🔴 critic (sunet)</option></select></label>
+      </div>
+      <label class="ua-l">Nume (opțional)<input id="ua-name" class="ed-in" type="text" maxlength="80" placeholder="ex. Bateria e aproape goală"></label>
+      <label class="ed-ack"><input type="checkbox" id="ua-clear" checked> Anunță-mă și când trece</label>
+      <p class="ed-diff" id="ua-preview"></p>
+      <button class="btn ed-go" id="ua-save">Salvează alerta</button>
+      <p class="err" id="ua-err"></p>
+    </div>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# date și secrete locale — nu ajung pe GitHub
+config.yaml
+*.db
+*.db-*
+*.sqlite*
+vapid.json
+daly-auto.json
+rclone.conf
+*.key
+*.pem
+LOCAL.md
+# imagini SD
+*.img
+*.img.xz
+*.img.gz
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/

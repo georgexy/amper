@@ -1,0 +1,14 @@
+[Unit]
+Description=amper - copie de siguranta in Google Drive (date + clona cardului)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# opțional: AMPER_BACKUP_REMOTE=gdrive:folder
+EnvironmentFile=-/etc/amper/backup.env
+ExecStart=/bin/bash /opt/amper/deploy/backup.sh
+# să nu încurce citirile: prioritate mică la procesor și la card
+Nice=15
+IOSchedulingClass=idle
+TimeoutStartSec=4h

@@ -1,0 +1,120 @@
+# ============================================================
+#  amper — fișier de configurare
+#  Pe Pi se află în: /etc/amper/config.yaml
+#  După orice modificare:  sudo systemctl restart amper
+# ============================================================
+
+# Cât de des se citesc dispozitivele (secunde)
+poll_interval: 2
+
+# Cât de des se salvează o valoare în baza de date (secunde)
+store_interval: 10
+
+# Unde se ține baza de date
+database: /var/lib/amper/amper.db
+
+# Câte zile se păstrează datele detaliate (după aceea rămân medii la 5 minute, pentru totdeauna)
+raw_retention_days: 14
+
+web:
+  host: 0.0.0.0
+  port: 8080
+  # Parolă opțională pentru aplicație (gol = fără parolă; recomandat cu Tailscale)
+  password: ""
+
+# Configurarea WiFi de pe telefon: când Pi-ul nu are internet `offline_minutes` minute, pornește rețeaua
+# WiFi de mai jos; conectați-vă la ea, se deschide o pagină cu rețelele din jur, alegeți una și scrieți parola.
+# Parola e generată la instalare (minim 8 caractere).
+wifi_setup:
+  enabled: true
+  ssid: Amper-Setup
+  password: REPLACE-WIFI-SETUP
+  offline_minutes: 2
+
+# ------------------------------------------------------------
+#  Dispozitive
+#  port: folosiți căile /dev/serial/by-id/... (nu se schimbă la repornire).
+#        Comanda  `amper scan`  le găsește și vă spune ce e pe fiecare.
+#  capacity_ah: capacitatea modulului — folosită pentru SOC-ul total al băncii.
+# ------------------------------------------------------------
+#
+#  Daly — trei variante de legătură:
+#    port: auto                          se găsește singur: cablu USB nou SAU modul Bluetooth („DL-...”)
+#    port: /dev/serial/by-id/usb-...     cablu USB-UART anume
+#    ble: AA:BB:CC:DD:EE:FF              modul Bluetooth anume (adresa sau numele, ex. DL-40D63C2xxxxx)
+#  Cu „auto”, legătura găsită se ține minte în /var/lib/amper/daly-auto.json (ștergeți-l ca să se refacă).
+#  `amper scan` arată și modulele Bluetooth din jur.
+# ------------------------------------------------------------
+devices:
+  - id: daly1
+    name: "Daly 1"
+    type: daly
+    port: auto
+    capacity_ah: 100
+
+  - id: daly2
+    name: "Daly 2"
+    type: daly
+    port: auto
+    capacity_ah: 100
+
+  - id: daly3
+    name: "Daly 3"
+    type: daly
+    port: auto
+    capacity_ah: 100
+
+  - id: seplos
+    name: "Seplos"
+    type: seplos
+    port: /dev/serial/by-id/REPLACE-seplos
+    baudrate: 19200        # Seplos V2 pe RS485; dacă nu răspunde încercați 9600
+    address: 0             # adresa pachetului (DIP switch)
+    capacity_ah: 280
+
+  - id: inverter
+    name: "Growatt SPF 5000 ES"
+    type: growatt_spf
+    port: /dev/serial/by-id/REPLACE-growatt
+    baudrate: 9600
+    address: 1
+
+# ------------------------------------------------------------
+#  Alerte
+# ------------------------------------------------------------
+alerts:
+  # Modul care nu se încarcă în timp ce restul băncii se încarcă
+  not_charging_minutes: 10       # cât timp trebuie să persiste
+  bank_charging_amps: 5          # peste acest curent total considerăm banca "în încărcare"
+  pack_idle_amps: 0.5            # sub acest curent modulul e considerat "nu se încarcă"
+  full_soc: 97                   # peste acest SOC e normal să nu se mai încarce
+
+  soc_divergence_percent: 15     # diferență față de mediana celorlalte module
+  soc_divergence_minutes: 30
+
+  low_soc_warning: 25
+  low_soc_critical: 12
+
+  cell_high_volts: 3.60
+  cell_low_volts: 2.90
+  cell_delta_volts: 0.15
+  temp_high_c: 50
+  temp_low_charge_c: 1           # încărcare sub această temperatură = pericol pentru LiFePO4
+
+  comm_lost_seconds: 120
+
+# ------------------------------------------------------------
+#  Notificări pe telefon
+#  ntfy: instalați aplicația "ntfy" (Android/iPhone) și abonați-vă la topicul de mai jos.
+#        Topicul e generat aleator la instalare — tratați-l ca pe o parolă.
+#  telegram: opțional (bot_token + chat_id).
+# ------------------------------------------------------------
+notify:
+  ntfy:
+    enabled: true
+    server: https://ntfy.sh
+    topic: REPLACE-TOPIC
+  telegram:
+    enabled: false
+    bot_token: ""
+    chat_id: ""

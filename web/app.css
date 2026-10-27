@@ -1,0 +1,408 @@
+/* ---------- fonturi (locale, merg și fără internet) ---------- */
+@font-face { font-family: "Barlow"; font-weight: 400; font-display: swap; src: url(fonts/barlow-latin-400-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Barlow"; font-weight: 400; font-display: swap; src: url(fonts/barlow-latin-ext-400-normal.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C0, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Barlow"; font-weight: 500; font-display: swap; src: url(fonts/barlow-latin-500-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Barlow"; font-weight: 500; font-display: swap; src: url(fonts/barlow-latin-ext-500-normal.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C0, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Barlow"; font-weight: 600; font-display: swap; src: url(fonts/barlow-latin-600-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Barlow"; font-weight: 600; font-display: swap; src: url(fonts/barlow-latin-ext-600-normal.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C0, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Barlow Condensed"; font-weight: 600; font-display: swap; src: url(fonts/barlow-condensed-latin-600-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Barlow Condensed"; font-weight: 600; font-display: swap; src: url(fonts/barlow-condensed-latin-ext-600-normal.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C0, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Barlow Condensed"; font-weight: 700; font-display: swap; src: url(fonts/barlow-condensed-latin-700-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Barlow Condensed"; font-weight: 700; font-display: swap; src: url(fonts/barlow-condensed-latin-ext-700-normal.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C0, U+2C60-2C7F, U+A720-A7FF; }
+
+/* ---------- culori ----------
+   bleu celulă LiFePO4 (folia celulelor EVE), verde încărcare, galben solar, roșu alarmă,
+   pe un fundal ardezie de noapte. Toate temele sunt întunecate; --acc e culoarea temei. */
+:root {
+  --bg: #0E1A22; --panel: #172632; --panel-2: #1D3040; --line: #2A4255;
+  --text: #E7EFF3; --muted: #8FA6B4; --faint: #5E7787;
+  --cell: #63B7E6; --charge: #52C98F; --sun: #F3B840; --load: #C9A6F0;
+  --alarm: #F2564F; --warn: #F5A040;
+  --shell: #2E4659; --shell-hi: #3E5B72;
+  --radius-l: 18px; --radius-s: 8px;
+  --acc: #63B7E6;
+  color-scheme: dark;
+}
+body[data-look="flux"] { --acc: #F3B840; background: radial-gradient(90% 50% at 50% 22%, #18303F 0%, var(--bg) 70%) fixed; }
+body[data-look="carduri"] { --acc: #FF8A3D; --bg: #11161B; --panel: #1B2229; --panel-2: #232C35; --line: #2C3843; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body {
+  font: 400 16px/1.45 "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-text-size-adjust: 100%;
+  padding: env(safe-area-inset-top) 0 calc(104px + env(safe-area-inset-bottom));
+  min-height: 100vh;
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--cell); outline-offset: 2px; }
+.wrap { max-width: 720px; margin: 0 auto; padding: 0 16px; }
+.num { font-family: "Barlow Condensed", "Barlow", sans-serif; font-weight: 600; letter-spacing: .01em; }
+.muted { color: var(--muted); }
+[hidden] { display: none !important; }
+
+/* ---------- antet ---------- */
+.top { display: flex; align-items: center; justify-content: space-between; padding: 14px 0 6px; }
+.top h1 { margin: 0; font: 700 22px/1 "Barlow Condensed", sans-serif; letter-spacing: .01em; }
+.conn { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+.conn i { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); }
+.conn.ok i { background: var(--charge); }
+.conn.bad i { background: var(--alarm); }
+.sim { font-size: 13px; color: var(--warn); }
+
+/* ---------- alerte sus ---------- */
+.banner { margin: 10px 0 0; border-radius: var(--radius-s); padding: 10px 14px; display: grid; gap: 2px; font-size: 15px; line-height: 1.35;
+  background: color-mix(in srgb, var(--alarm) 16%, var(--panel)); border-left: 4px solid var(--alarm); }
+.banner.warning { background: color-mix(in srgb, var(--warn) 14%, var(--panel)); border-left-color: var(--warn); }
+.banner b { font-weight: 600; }
+.banner small { color: var(--muted); }
+
+/* ---------- ecranul principal: comune temelor ---------- */
+.gear { border: 0; background: none; padding: 6px; margin-left: 10px; cursor: pointer; color: var(--muted); display: flex; }
+.gear svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.top .conn { margin-left: auto; }
+#home { padding-bottom: 8px; }
+#home button { text-align: inherit; cursor: pointer; }
+#home .f-batt { text-align: center; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-l); }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 99px; font-size: 14px; font-weight: 600;
+  background: color-mix(in srgb, var(--mc) 16%, transparent); color: var(--mc); }
+.health { font-size: 13.5px; font-weight: 600; color: var(--charge); }
+.health.warn { color: var(--warn); } .health.fault { color: var(--alarm); } .health.stale { color: var(--muted); }
+.health::after { content: " ›"; color: var(--acc); }
+.mode-charging { --mc: var(--charge); } .mode-discharging { --mc: var(--cell); } .mode-idle { --mc: var(--muted); }
+.u, #home .num small, #home [data-k] > small { font-size: .6em; color: var(--muted); font-weight: 600; margin-left: 2px; }
+#home .pill { white-space: nowrap; font-size: 13px; }
+
+/* ---------- tema Cadrane ---------- */
+.k-hero { width: 100%; display: flex; gap: 14px; align-items: center; margin-top: 10px; padding: 18px; color: inherit;
+  background: radial-gradient(120% 140% at 0% 0%, #1F3B4F 0%, var(--panel) 55%, #142330 100%); }
+.k-hero.fault { border-color: var(--alarm); box-shadow: 0 0 0 3px color-mix(in srgb, var(--alarm) 25%, transparent); }
+.k-ring { width: 132px; height: 132px; position: relative; flex: none; }
+.k-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.k-ring .trk { fill: none; stroke: var(--line); stroke-width: 12; }
+.k-ring .arc { fill: none; stroke: var(--mc); stroke-width: 12; stroke-linecap: round; transition: stroke-dasharray .8s ease; }
+.k-hero.fault .arc { stroke: var(--alarm); }
+.k-ring .c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.k-ring .c b { font: 700 48px/1 "Barlow Condensed", sans-serif; }
+.k-ring .c b sup { font-size: 22px; vertical-align: 22px; color: var(--muted); }
+.k-ring .c > span { font-size: 12px; color: var(--muted); }
+.k-ht { display: grid; gap: 6px; justify-items: start; min-width: 0; }
+.k-ht .k { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.k-ht .v { font: 700 26px/1.05 "Barlow Condensed", sans-serif; }
+.k-ht .eta { font-size: 13.5px; color: var(--muted); }
+.k-gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.k-g { padding: 12px 10px 10px; text-align: center; }
+.k-g svg { width: 140px; height: 78px; display: block; margin: 0 auto; }
+.k-g .trk { fill: none; stroke: var(--line); stroke-width: 11; stroke-linecap: round; }
+.k-g .arc { fill: none; stroke: var(--gc); stroke-width: 11; stroke-linecap: round; transition: stroke-dasharray .8s ease; }
+.k-g .val { font: 700 26px/1 "Barlow Condensed", sans-serif; margin-top: -30px; }
+.k-g .lbl { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.k-day { margin-top: 12px; padding: 12px 14px; }
+.k-day h3 { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+.k-day h3 b { color: var(--text); font-weight: 600; }
+.k-day svg { width: 100%; height: 92px; display: block; margin-top: 8px; }
+.inv-line { font-size: 13.5px; color: var(--muted); padding: 10px 2px 0; }
+
+/* ---------- tema Flux de energie ---------- */
+.f-inv { font-size: 13px; color: var(--muted); text-align: right; margin-top: -2px; }
+.f-inv b { color: var(--acc); font-weight: 600; }
+.f-diag { position: relative; width: 100%; max-width: 420px; margin: 4px auto 0; aspect-ratio: 360 / 330; }
+.f-diag svg.lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.f-diag .ln { fill: none; stroke-width: 3; opacity: .9; }
+.f-diag .dots { fill: none; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 0 22; opacity: 0; }
+.f-diag .dots.on { opacity: 1; animation: fdash var(--dur, 2s) linear infinite; }
+.f-diag .dots.rev { animation-direction: reverse; }
+@keyframes fdash { to { stroke-dashoffset: -44; } }
+@media (prefers-reduced-motion: reduce) { .f-diag .dots.on { animation: none; } }
+.f-diag .off { stroke-dasharray: 4 6; opacity: .5; }
+.f-node { position: absolute; transform: translate(-50%, -50%); text-align: center; width: 30%; }
+.f-node .disc { width: 78px; height: 78px; margin: 0 auto; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: #142631; border: 2px solid var(--c); box-shadow: 0 0 24px -4px var(--c), inset 0 0 18px -8px var(--c); }
+.f-node .disc svg { width: 38px; height: 38px; fill: none; stroke: var(--c); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.f-node .w { font: 700 24px/1 "Barlow Condensed", sans-serif; margin-top: 8px; }
+.f-node .l { font-size: 12.5px; color: var(--muted); }
+.f-node.sm .disc { width: 56px; height: 56px; } .f-node.sm .disc svg { width: 28px; height: 28px; }
+.f-node.dim .disc { border-style: dashed; box-shadow: none; opacity: .55; }
+.f-blabel { position: absolute; font: 700 18px "Barlow Condensed", sans-serif; color: var(--mc); transform: translateY(-50%); }
+.f-batt { display: block; margin: 0 auto; border: 0; background: none; color: inherit; text-align: center; padding: 0; }
+.f-cap { width: 40px; height: 10px; border-radius: 4px 4px 0 0; background: #4A6A80; margin: 0 auto; }
+.f-cell { width: 116px; height: 136px; margin: 0 auto; position: relative; border-radius: 20px; border: 3px solid #4A6A80;
+  background: #0F1D26; overflow: hidden; box-shadow: 0 0 40px -10px var(--mc); }
+.f-batt.fault .f-cell { border-color: var(--alarm); box-shadow: 0 0 40px -6px var(--alarm); }
+.f-fill { position: absolute; left: 6px; right: 6px; bottom: 6px; border-radius: 13px; transition: height .8s ease;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--mc) 55%, #fff), var(--mc)); }
+.f-cell b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font: 700 44px "Barlow Condensed", sans-serif; color: #fff; text-shadow: 0 1px 6px rgb(0 0 0 / .45); }
+.f-batt .k { font: 600 17px "Barlow Condensed", sans-serif; margin-top: 8px; }
+.f-batt .s { font-size: 13px; color: var(--muted); }
+.f-batt .health { display: inline-block; margin-top: 4px; }
+.f-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
+.f-cards > div { padding: 9px 10px; }
+.f-cards > div > span { display: block; font-size: 12px; color: var(--muted); }
+.f-cards b { font: 700 21px "Barlow Condensed", sans-serif; white-space: nowrap; }
+
+/* ---------- tema Carduri ---------- */
+.c-head { margin-top: 8px; border-radius: 24px; padding: 16px 18px 74px; color: #fff;
+  background: linear-gradient(135deg, #E08A2E 0%, #C9562A 55%, #8E3320 100%); }
+.c-head .st { font-size: 13px; opacity: .9; }
+.c-sum { display: flex; gap: 22px; margin-top: 10px; font-size: 13px; opacity: .95; }
+.c-sum b { display: block; font: 700 22px "Barlow Condensed", sans-serif; }
+.c-sum .u { color: rgb(255 255 255 / .75); }
+.c-batt { width: 100%; margin: -62px 0 0; padding: 18px 18px 14px; color: inherit; position: relative;
+  box-shadow: 0 14px 30px -14px #000; }
+.c-batt.fault { border-color: var(--alarm); }
+.c-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
+.c-row .soc { font: 700 64px/.9 "Barlow Condensed", sans-serif; }
+.c-row .soc sup { font-size: 26px; vertical-align: 30px; color: var(--muted); }
+.c-row .r { text-align: right; font-size: 13px; color: var(--muted); }
+.c-row .r b { display: block; font: 700 22px "Barlow Condensed", sans-serif; color: var(--text); }
+.c-bar { margin-top: 14px; display: flex; align-items: center; gap: 4px; }
+.c-bar .body { flex: 1; height: 44px; border: 3px solid #56656F; border-radius: 12px; padding: 4px; display: flex; gap: 3px; }
+.c-bar .body i { flex: 1; border-radius: 4px; background: var(--panel-2); }
+.c-bar .body i.f { background: linear-gradient(180deg, color-mix(in srgb, var(--mc) 70%, #fff), var(--mc)); }
+.c-batt.fault .c-bar .body { border-color: var(--alarm); }
+.c-bar .nub { width: 6px; height: 18px; background: #56656F; border-radius: 0 3px 3px 0; }
+.c-mode { margin-top: 12px; font-size: 14px; font-weight: 600; color: var(--mc); }
+.c-chips { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.c-chips span { flex: 1; min-width: 90px; font-size: 12px; color: var(--muted); background: var(--panel-2); border-radius: 8px; padding: 5px 8px;
+  display: flex; justify-content: space-between; gap: 6px; }
+.c-chips span b { color: var(--text); }
+.c-chips span.fault { color: var(--alarm); } .c-chips span.warn { color: var(--warn); }
+.c-foot { display: flex; justify-content: space-between; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.c-foot b { color: var(--acc); font-weight: 600; }
+.c-list { margin-top: 12px; padding: 2px 16px; }
+.c-it { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.c-it:last-child { border-bottom: 0; }
+.c-ico { width: 42px; height: 42px; border-radius: 13px; display: flex; align-items: center; justify-content: center; flex: none;
+  background: color-mix(in srgb, var(--ic) 16%, transparent); }
+.c-ico svg { width: 24px; height: 24px; fill: none; stroke: var(--ic); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.c-it .m { flex: 1; min-width: 0; }
+.c-it .m .k { font-size: 13.5px; color: var(--muted); }
+.c-it .tr { height: 6px; border-radius: 3px; background: var(--panel-2); margin-top: 6px; overflow: hidden; }
+.c-it .tr i { display: block; height: 100%; border-radius: 3px; background: var(--ic); transition: width .8s ease; }
+.c-it .v { font: 700 24px "Barlow Condensed", sans-serif; min-width: 86px; text-align: right; }
+
+/* ---------- ecranul Bateriile ---------- */
+.pk-top { display: flex; align-items: center; gap: 12px; padding-top: 6px; }
+.pk-top h2 { margin: 0; flex: 1; font-size: 24px; }
+.back { width: 38px; height: 38px; border-radius: 12px; border: 0; background: var(--panel); color: var(--acc); font-size: 24px; line-height: 1; cursor: pointer; }
+.pk-tot { text-align: right; font-size: 12px; color: var(--muted); }
+.pk-tot b { display: block; font-size: 24px; line-height: 1; color: var(--charge); }
+.pk-sum { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; }
+.pk-sum div { background: var(--panel); border-radius: 12px; padding: 7px 9px; font-size: 11.5px; color: var(--muted); }
+.pk-sum b { display: block; font: 700 18px "Barlow Condensed", sans-serif; color: var(--text); }
+.pk { display: block; width: 100%; margin-top: 10px; padding: 12px 14px; color: inherit; text-align: left; cursor: pointer;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 92%, #fff 3%), var(--panel)); }
+.pk.fault { border-color: var(--alarm); box-shadow: 0 0 0 3px color-mix(in srgb, var(--alarm) 25%, transparent); }
+.pk.warn { border-color: var(--warn); }
+.pk.stale { opacity: .6; }
+.pk .h { display: flex; gap: 12px; align-items: center; }
+.pk-mini { width: 40px; height: 62px; border: 2.5px solid #4A6A80; border-radius: 9px; padding: 3px; position: relative; flex: none;
+  display: flex; align-items: flex-end; margin-top: 6px; }
+.pk-mini::before { content: ""; position: absolute; top: -7px; left: 50%; width: 16px; height: 5px; border-radius: 2px 2px 0 0;
+  background: #4A6A80; transform: translateX(-50%); }
+.pk-mini i { display: block; width: 100%; border-radius: 5px; background: linear-gradient(180deg, color-mix(in srgb, var(--mc) 55%, #fff), var(--mc)); }
+.pk.fault .pk-mini { border-color: var(--alarm); }
+.pk .t { flex: 1; min-width: 0; }
+.pk .n { font: 600 18px "Barlow Condensed", sans-serif; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pk .tag { font: 600 11.5px "Barlow", sans-serif; padding: 2px 8px; border-radius: 99px; color: var(--mc); background: color-mix(in srgb, var(--mc) 16%, transparent); }
+.pk.fault .tag { color: var(--alarm); background: color-mix(in srgb, var(--alarm) 16%, transparent); }
+.pk.warn .tag { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+.pk .s { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.pk .soc { font: 700 38px/1 "Barlow Condensed", sans-serif; }
+.pk .soc sup { font-size: 16px; color: var(--muted); vertical-align: 16px; }
+.pk-cells { display: flex; gap: 3px; align-items: flex-end; height: 34px; margin-top: 10px; }
+.pk-cells i { flex: 1; background: #3E7FA6; border-radius: 2px; }
+.pk-cells i.hi { background: var(--warn); } .pk-cells i.lo { background: var(--cell); }
+.pk .ft { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--muted); margin-top: 6px; flex-wrap: wrap; }
+.pk .ft b { color: var(--text); font-weight: 600; }
+.pk .ft .mos span + span { margin-left: 8px; }
+.pk .ft .mos span::before { content: "●"; margin-right: 3px; color: var(--charge); }
+.pk .ft .mos span.off { color: var(--alarm); } .pk .ft .mos span.off::before { color: var(--alarm); }
+
+/* ---------- setări: alegerea temei ---------- */
+.looks { display: grid; gap: 10px; }
+.look { display: flex; gap: 14px; align-items: center; width: 100%; padding: 12px 14px; color: inherit; text-align: left; cursor: pointer; }
+.look[aria-pressed="true"] { border-color: var(--lc); box-shadow: 0 0 0 2px color-mix(in srgb, var(--lc) 40%, transparent); }
+.look .sw { width: 46px; height: 46px; border-radius: 14px; flex: none; background: var(--lg); }
+.look b { display: block; font: 600 18px "Barlow Condensed", sans-serif; }
+.look span { font-size: 13.5px; color: var(--muted); }
+.look .ck { margin-left: auto; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); flex: none; }
+.look[aria-pressed="true"] .ck { border-color: var(--lc); background: radial-gradient(circle, var(--lc) 45%, transparent 50%); }
+code { font-size: 13px; color: var(--text); }
+
+/* ---------- secțiuni ---------- */
+h2 { font: 600 20px/1.2 "Barlow Condensed", sans-serif; margin: 26px 0 10px; }
+.seg { display: inline-flex; background: var(--panel); border-radius: 999px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: none; padding: 7px 14px; border-radius: 999px; font-size: 15px; cursor: pointer; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--panel-2); color: var(--text); font-weight: 600; }
+
+.chart { background: var(--panel); border-radius: var(--radius-l); padding: 12px 12px 6px; margin-top: 12px; }
+.chart h3 { margin: 0 0 2px; font-size: 16px; font-weight: 600; }
+.chart .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13.5px; color: var(--muted); min-height: 20px; }
+.chart .legend span::before { content: ""; display: inline-block; width: 10px; height: 3px; border-radius: 2px;
+  background: var(--c); margin-right: 6px; vertical-align: middle; }
+.chart .legend b { color: var(--text); font-weight: 600; margin-left: 4px; }
+.chart canvas { width: 100%; height: 190px; display: block; touch-action: pan-y; }
+.chart .when { font-size: 13px; color: var(--muted); text-align: right; min-height: 18px; }
+
+/* ---------- liste ---------- */
+.list { background: var(--panel); border-radius: var(--radius-l); overflow: hidden; }
+.list .row { padding: 12px 14px; display: grid; gap: 2px; border-top: 1px solid var(--line); }
+.list .row:first-child { border-top: 0; }
+.list .row .t { font-size: 13.5px; color: var(--muted); }
+.list .row.critical { border-left: 4px solid var(--alarm); }
+.list .row.warning { border-left: 4px solid var(--warn); }
+.list .row.closed { opacity: .7; border-left-color: var(--line); }
+.empty { padding: 18px 14px; color: var(--muted); }
+.btn { border: 1px solid var(--line); background: var(--panel); padding: 10px 16px; border-radius: 999px; cursor: pointer; font-weight: 500; }
+.btn:active { background: var(--panel-2); }
+.note { font-size: 14px; color: var(--muted); margin: 8px 0; }
+
+/* ---------- fișa modulului ---------- */
+dialog { border: 0; padding: 0; width: 100%; max-width: 720px; max-height: 92vh; margin: auto auto 0; color: var(--text);
+  background: var(--bg); border-radius: 22px 22px 0 0; }
+dialog::backdrop { background: rgb(4 10 14 / .6); }
+dialog .sheet { padding: 8px 16px calc(24px + env(safe-area-inset-bottom)); }
+dialog .grab { width: 44px; height: 5px; border-radius: 3px; background: var(--line); margin: 6px auto 10px; }
+dialog header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+dialog header h2 { margin: 0; font-size: 26px; }
+dialog .close { border: 0; background: var(--panel); border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border-radius: var(--radius-s);
+  overflow: hidden; margin-top: 14px; }
+.stats > div { background: var(--panel); padding: 10px 12px; display: grid; }
+.stats .k { font-size: 13px; color: var(--muted); }
+.stats .v { font: 600 22px/1.15 "Barlow Condensed", sans-serif; }
+.stats .v.off { color: var(--alarm); }
+.stats .v.on { color: var(--charge); }
+.cells { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 8px; }
+.cellbar { display: grid; gap: 3px; justify-items: center; font-size: 12px; color: var(--muted); }
+.cellbar .tube { width: 100%; height: 64px; background: var(--panel); border-radius: 5px; position: relative; overflow: hidden; }
+.cellbar .tube i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--cell); }
+.cellbar.hi .tube i { background: var(--warn); }
+.cellbar.lo .tube i { background: var(--alarm); }
+.cellbar b { font: 600 14px/1 "Barlow Condensed", sans-serif; color: var(--text); }
+.alarms { margin: 10px 0 0; padding-left: 18px; color: var(--warn); }
+.alarms .prot { color: var(--alarm); font-weight: 600; }
+
+/* ---------- navigație jos ---------- */
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(3, 1fr);
+  background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); z-index: 5; }
+nav.tabs button { border: 0; background: none; padding: 10px 0 12px; display: grid; justify-items: center; gap: 2px;
+  font-size: 13px; color: var(--muted); cursor: pointer; }
+nav.tabs svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+nav.tabs button[aria-current="page"] { color: var(--text); }
+nav.tabs button[aria-current="page"] svg { stroke: var(--acc); }
+nav.tabs .badge { position: relative; }
+nav.tabs .badge[data-n]::after { content: attr(data-n); position: absolute; top: -4px; right: -10px; background: var(--alarm);
+  color: #fff; font-size: 11px; font-weight: 600; border-radius: 999px; padding: 0 5px; line-height: 16px; }
+
+/* ---------- autentificare ---------- */
+.login { max-width: 360px; margin: 18vh auto 0; padding: 0 16px; display: grid; gap: 12px; }
+.login input { font: inherit; padding: 12px 14px; border-radius: var(--radius-s); border: 1px solid var(--line);
+  background: var(--panel); color: var(--text); }
+.login .btn { background: var(--cell); color: #04121B; border: 0; font-weight: 600; }
+.err { color: var(--alarm); min-height: 22px; }
+
+
+/* ---------- ecranul Invertor și editarea setărilor ---------- */
+[data-open="inverter"] { cursor: pointer; }
+.f-inv[data-open]::after, .inv-line[data-open]::after { content: " ›"; color: var(--acc); }
+.iv-set .iv-row { width: 100%; border: 0; border-top: 1px solid var(--line); background: none; color: inherit; text-align: left;
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; padding: 12px 14px; cursor: pointer; }
+.iv-set .iv-row:first-child { border-top: 0; }
+.iv-set .iv-row:disabled { cursor: default; }
+.iv-row .k { font-size: 15px; }
+.iv-row .v { font: 600 18px "Barlow Condensed", sans-serif; text-align: right; }
+.iv-row .ed { grid-column: 2; font-size: 12.5px; color: var(--acc); text-align: right; }
+.risk { display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: var(--warn); color: #1a1000;
+  font: 700 11px/16px "Barlow", sans-serif; text-align: center; font-style: normal; vertical-align: 1px; }
+.iv-clock { padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+.iv-clock b { color: var(--text); font-weight: 600; }
+.ed-in { font: inherit; font-size: 18px; width: 100%; padding: 12px 14px; border-radius: var(--radius-s); border: 1px solid var(--line);
+  background: var(--panel); color: var(--text); }
+.ed-num { display: flex; align-items: center; gap: 10px; }
+.ed-num span { font-size: 18px; color: var(--muted); }
+.ed-warn { margin-top: 12px; padding: 10px 12px; border-radius: var(--radius-s); font-size: 14px;
+  background: color-mix(in srgb, var(--warn) 14%, var(--panel)); border-left: 4px solid var(--warn); }
+.ed-ack { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 15px; }
+.ed-ack input { width: 20px; height: 20px; }
+.ed-diff { font-size: 17px; margin: 14px 0 10px; }
+.ed-go { width: 100%; background: var(--acc); color: #0B1418; border: 0; font-weight: 600; padding: 13px; }
+.ed-go:disabled { opacity: .4; cursor: default; }
+.btn:disabled { opacity: .45; }
+.pk-sum b small { font-size: .6em; color: var(--muted); margin-left: 2px; }
+
+/* ---------- graficul de energie: interval propriu ---------- */
+.en-range { margin: 6px 0 4px; }
+.en-range button { padding: 5px 11px; font-size: 13.5px; }
+.en-custom { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0; font-size: 13.5px; color: var(--muted); }
+.en-custom input { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 8px; margin-left: 4px; color-scheme: dark; }
+.en-total { font-size: 13.5px; color: var(--muted); margin: 4px 0 2px; }
+.en-total b { color: var(--text); font-weight: 600; }
+
+/* ---------- setări: meniul cu butoane ---------- */
+.set-menu { display: grid; gap: 10px; }
+.set-btn { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px; color: inherit; text-align: left; cursor: pointer; }
+.set-btn .ic { width: 44px; height: 44px; border-radius: 13px; flex: none; display: flex; align-items: center; justify-content: center;
+  color: var(--ic); background: color-mix(in srgb, var(--ic) 16%, transparent); }
+.set-btn .ic svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.set-btn > span:nth-child(2) { flex: 1; min-width: 0; }
+.set-btn b { display: block; font: 600 19px "Barlow Condensed", sans-serif; }
+.set-btn > span:nth-child(2) > span { font-size: 13.5px; color: var(--muted); }
+.set-btn i { font-style: normal; font-size: 24px; color: var(--muted); }
+.set-panel .pk-top { margin-bottom: 8px; }
+
+/* ---------- istoric: ordinea graficelor ---------- */
+.hist-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.btn.sm { padding: 6px 12px; font-size: 13.5px; }
+#charts .chart { position: relative; }
+#charts.editing .chart { outline: 1px dashed var(--acc); outline-offset: 2px; }
+#charts.editing canvas { pointer-events: none; }
+.chart .mv { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 2; }
+.chart .mv button { width: 38px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2);
+  color: var(--acc); font-size: 15px; cursor: pointer; }
+#charts .chart:first-child .mv button:first-child, #charts .chart:last-child .mv button:last-child { opacity: .3; }
+
+/* ---------- setări → info ---------- */
+.info-stats { margin-top: 0; }
+.stats .v.warnc { color: var(--warn); }
+.wifi-net { width: 100%; border: 0; border-top: 1px solid var(--line); background: none; color: inherit; text-align: left;
+  display: flex; justify-content: space-between; gap: 10px; cursor: pointer; }
+.wifi-net:first-child { border-top: 0; }
+.wifi-net.on b { color: var(--charge); }
+.wifi-net.sel { background: color-mix(in srgb, var(--acc) 14%, transparent); }
+#wifi-form { margin-top: 10px; display: grid; gap: 10px; }
+#wifi-list { margin-top: 10px; }
+
+/* ---------- setări BMS ---------- */
+.pk-gear { margin-left: auto; font-size: 18px; line-height: 1; padding: 4px 6px; border-radius: 8px; color: var(--muted);
+  background: var(--panel-2); cursor: pointer; }
+.pk-gear:hover { color: var(--acc); }
+.role { font: 600 11px "Barlow", sans-serif; padding: 1px 7px; border-radius: 99px; color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 15%, transparent); vertical-align: 1px; }
+.role.p { color: var(--alarm); background: color-mix(in srgb, var(--alarm) 15%, transparent); }
+
+/* ---------- alertele mele ---------- */
+.ua-rule { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.ua-rule > span:first-child { display: grid; gap: 2px; min-width: 0; }
+.ua-rule small { color: var(--muted); font-size: 12.5px; }
+.ua-rule.off { opacity: .5; }
+.ua-act { display: flex; gap: 6px; flex: none; }
+.btn.danger { color: var(--alarm); }
+.ua-l { display: grid; gap: 4px; font-size: 13.5px; color: var(--muted); margin-top: 10px; }
+.ua-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

@@ -1,0 +1,13 @@
+[Unit]
+Description=amper - extinde partitia sistemului pe tot cardul (dupa restaurarea unei clone)
+DefaultDependencies=no
+After=local-fs.target
+Before=amper.service
+
+[Service]
+Type=oneshot
+# nu face nimic dacă partiția ocupă deja tot cardul
+ExecStart=/bin/sh -c 'R=$(findmnt -no SOURCE /); D=/dev/$(lsblk -no pkname "$R"); N=$(cat /sys/class/block/$(basename "$R")/partition); if growpart "$D" "$N"; then resize2fs "$R"; fi; exit 0'
+
+[Install]
+WantedBy=multi-user.target
