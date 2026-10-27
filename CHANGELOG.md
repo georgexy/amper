@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 0.3.0-beta.10 — în pregătire
+## 0.3.0-beta.10 — 2026-10-27
 - Actualizări: comutatorul „versiunile de test (beta)” e primul, sus; butonul se numește „Caută actualizări”;
   „Descarcă” stă în dreapta titlului „Versiune nouă”, iar bara și „Instalează acum” apar imediat sub el.
 - Notificarea pentru o versiune nouă e scurtă: titlul „Amper”, textul „Versiune nouă detectată. Atinge pentru a
