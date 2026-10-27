@@ -767,11 +767,19 @@ function renderDaly() {
   const all = state.info?.devices || [], devs = state.snap?.devices || {};
   const inv = all.filter((x) => x.kind === "inverter"), bms = all.filter((x) => x.kind === "pack");
   const n = inv.length + bms.length;
-  const ok = [...inv, ...bms].filter((x) => devs[x.id]?.connected && !devs[x.id]?.stale).length;
-  $("#set-daly-sub").textContent = n ? `${ok} din ${n} comunică` : "Niciun dispozitiv configurat";
-  $("#daly-list").innerHTML = n ? devSection(inv.length > 1 ? "Invertoare" : "Invertor", inv, devs) + devSection("BMS-uri", bms, devs)
-    : `<div class="empty">Niciun dispozitiv în configurare. Adaugă-le din Ghid de configurare.</div>`;
-  $("#daly-auto-box").hidden = !bms.some((x) => x.type === "daly");
+  // pe ecran doar cele care comunică acum; celelalte (configurate, dar tăcute) într-un meniu separat
+  const on = (x) => devs[x.id]?.connected && !devs[x.id]?.stale;
+  const ok = [...inv, ...bms].filter(on), off = [...inv, ...bms].filter((x) => !on(x));
+  $("#set-daly-sub").textContent = n ? `${ok.length} comunică${off.length ? ` · ${off.length} inactive` : ""}`
+    : "Niciun dispozitiv configurat";
+  const oInv = inv.filter(on), oBms = bms.filter(on);
+  $("#daly-list").innerHTML = ok.length ? devSection(oInv.length > 1 ? "Invertoare" : "Invertor", oInv, devs) + devSection("BMS-uri", oBms, devs)
+    : `<div class="empty">${n ? "Niciun dispozitiv nu comunică acum." : "Niciun dispozitiv configurat. Adaugă-le cu butonul de mai jos."}</div>`;
+  $("#dev-off-btn").hidden = !off.length;
+  $("#dev-off-n").textContent = off.length === 1 ? "1 dispozitiv configurat care nu comunică" : `${off.length} dispozitive configurate care nu comunică`;
+  const fInv = inv.filter((x) => !on(x)), fBms = bms.filter((x) => !on(x));
+  $("#dev-off-list").innerHTML = devSection(fInv.length > 1 ? "Invertoare" : "Invertor", fInv, devs) + devSection("BMS-uri", fBms, devs);
+  $("#daly-auto-box").hidden = !bms.some((x) => x.type === "daly" && !on(x));
 }
 $("#daly-search").onclick = async () => {
   const b = $("#daly-search");
@@ -784,7 +792,7 @@ $("#daly-search").onclick = async () => {
 /* meniul setărilor: butoane → secțiuni (Teme, Notificări, Module Daly) */
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "notif", "daly", "info", "update", "security", "remote", "auto", "about", "conn", "share", "wifi"])
+  for (const k of ["teme", "notif", "daly", "devoff", "info", "update", "security", "remote", "auto", "about", "conn", "share", "wifi"])
     $("#set-" + k).hidden = k !== name;
   if (name === "about") $("#about-version").textContent = $("#version").textContent;
   if (name === "share") loadShare();
@@ -797,7 +805,7 @@ function showPanel(name) {
   if (name === "update") loadUpdate();
   if (name === "info") { loadInfo(); state.infoTimer = setInterval(() => !$("#set-info").hidden && loadInfo(), 5000); }
   if (name === "notif") renderNotif();
-  if (name === "daly") renderDaly();
+  if (name === "daly" || name === "devoff") renderDaly();
   window.scrollTo(0, 0);
 }
 $$(".set-btn[data-panel]").forEach((b) => (b.onclick = () => showPanel(b.dataset.panel)));
@@ -851,16 +859,17 @@ async function loadInfo() {
     <p class="note">${esc(x.model)} · ${esc(x.hostname)} · încărcare ${esc((x.load || []).join(" / "))}</p>
     <h2>Rețea</h2>
     <div class="list">
-      <div class="row"><span>WiFi: <b>${w ? esc(w.ssid) : "neconectat"}</b>${x.wifi_job?.hotspot ? " · hotspot Amper-Setup pornit" : ""}</span>
-        <span class="t">${w ? `semnal ${bars4(w.signal)} ${w.signal}% · ${esc(w.freq)} · canal ${esc(w.channel)}` : ""}</span></div>
+      <button class="row row-link" id="info-wifi"><span>WiFi: <b class="lnk">${w ? esc(w.ssid) : "neconectat"}</b>${x.wifi_job?.hotspot ? " · hotspot Amper-Setup pornit" : ""}</span>
+        <span class="t">${w ? `semnal ${bars4(w.signal)} ${w.signal}% · ${esc(w.freq)} · canal ${esc(w.channel)} · ` : ""}schimbă rețeaua ›</span></button>
       <div class="row"><span>Adrese locale</span><span class="t">${Object.entries(n.ip || {}).filter(([k]) => k !== "lo")
         .map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(" · ") || "–"}</span></div>
       <div class="row"><span>Cablu de rețea</span><span class="t">${eth ? (eth.state === "connected" ? "legat" : "nelegat") : "–"}</span></div>
       <div class="row"><span>Server: <b>${ts.state === "Running" ? "conectat" : ts.state ? "neconectat" : "–"}</b></span>
         <span class="t">${esc(ts.ip || "")} · ${esc(ts.name || "")}</span></div>
-      ${(ts.peers || []).map((p) => `<div class="row"><span>${esc(p.name)}</span>
-        <span class="t">${p.online ? "online" : "offline"} · ${esc(p.os || "")}</span></div>`).join("")}
     </div>
+    ${(ts.peers || []).length ? `<h2>Aparatele tale legate la server</h2>
+    <div class="list">${ts.peers.map((p) => `<div class="row"><span>${esc(p.name)}</span>
+        <span class="t">${p.online ? "online" : "offline"}${p.os ? " · " + esc(p.os) : ""}</span></div>`).join("")}</div>` : ""}
     <h2>Porturi USB</h2>
     <div class="list">${(x.ports || []).map((p) => `<div class="row"><span>${esc(p.port)}</span>
       <span class="t">${esc(p.dev)} · ${p.used_by.length ? "folosit de " + esc(p.used_by.join(", ")) : "liber"}</span></div>`).join("")
@@ -870,6 +879,7 @@ async function loadInfo() {
       <span class="t">${esc(b.target)} · ${b.ok ? "conectat, citește" : b.connected ? "conectat, nu răspunde" : "neconectat"}</span></div>`).join("")
       || `<div class="empty">Niciun modul Bluetooth.</div>`}</div>
     <p class="note">Actualizat ${esc(x.time)}</p>`;
+  $("#info-wifi").onclick = () => showPanel("wifi");
   $("#set-info-sub").textContent = `${num(x.cpu_temp, 0)} °C · ${w ? "WiFi " + w.ssid + " " + w.signal + "%" : "fără WiFi"}`;
 }
 
@@ -1193,17 +1203,51 @@ async function loadHistory() {
   const pts = Math.min(400, Math.round(innerWidth * 1.2));
   // toate graficele într-o singură cerere; până vin datele, „Se încarcă…”; o eroare nu lasă ecranul gol
   const req = ++state.histReq;
-  $$("#charts .when").forEach((el) => (el.textContent = "Se încarcă…"));
+  const ids = [...pk, ...(inv ? [inv] : [])].map((d) => encodeURIComponent(d.id)).join(",");
+  const key = `${state.hours}|${ids}`, st = $("#hist-status");
+  // ultima încărcare a aceluiași interval se desenează imediat (din memorie sau de pe telefon); cea nouă vine după
+  const cached = histCache.get(key);
+  if (cached) drawHistory(cached.data, pk, inv);
+  else $$("#charts .when").forEach((el) => (el.textContent = "Se încarcă…"));
+  st.textContent = cached ? `Actualizez… (afișat: ${hm(cached.at)})` : "Se încarcă…";
+  const t0 = performance.now();
   let data;
   try {
-    const ids = [...pk, ...(inv ? [inv] : [])].map((d) => encodeURIComponent(d.id)).join(",");
     data = await api(`/api/history/all?devices=${ids}&hours=${state.hours}&points=${pts}`);
   } catch (e) {
-    if (e.message !== "auth" && req === state.histReq)
-      $$("#charts .when").forEach((el) => (el.textContent = "Pi-ul nu a răspuns. Încearcă din nou."));
+    if (e.message !== "auth" && req === state.histReq) {
+      st.textContent = cached ? `Pi-ul nu a răspuns; afișat: ${hm(cached.at)}.` : "Pi-ul nu a răspuns. Încearcă din nou.";
+      if (!cached) $$("#charts .when").forEach((el) => (el.textContent = "Pi-ul nu a răspuns. Încearcă din nou."));
+    }
     return;
   }
   if (req !== state.histReq) return;                     // între timp s-a ales alt interval
+  const total = (performance.now() - t0) / 1000, srv = (data.ms || 0) / 1000;
+  // cât a durat: pe Pi (citirea de pe card) și pe drum (internet) — ca să știm ce e lent
+  st.textContent = `Încărcat în ${num(total, 1)} s (Pi ${num(srv, 1)} s, rețea ${num(Math.max(0, total - srv), 1)} s)`;
+  histCache.put(key, data);
+  drawHistory(data, pk, inv);
+}
+
+/* graficele încărcate ultima dată, pe interval: în memorie și pe telefon (se deschid instant data viitoare) */
+const histCache = {
+  mem: new Map(),
+  get(k) {
+    if (this.mem.has(k)) return this.mem.get(k);
+    try { const v = JSON.parse(localStorage.getItem("hist:" + k) || "null"); if (v) this.mem.set(k, v); return v; } catch { return null; }
+  },
+  put(k, data) {
+    const v = { at: Date.now(), data };
+    this.mem.set(k, v);
+    try {
+      for (const x of Object.keys(localStorage)) if (x.startsWith("hist:") && x !== "hist:" + k && x.split("|")[1] !== k.split("|")[1]) localStorage.removeItem(x);
+      localStorage.setItem("hist:" + k, JSON.stringify(v));
+    } catch {}
+  },
+};
+const hm = (t) => new Date(t).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
+
+function drawHistory(data, pk, inv) {
   const S = data.series || {}, rowsOf = (d) => S[d.id]?.rows || [];
   const ph = pk.map((d) => ({ rows: rowsOf(d) })), ih = inv ? { rows: rowsOf(inv) } : null;
   const ser = (rows, key) => rows.map((r) => [r.t, r[key]]).filter((p) => p[1] != null);

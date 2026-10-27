@@ -16,6 +16,13 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Revenire de pe card: fișierul `revenire.txt` pus pe partiția „bootfs” → la pornire, versiunea anterioară.
 - Actualizări urgente: o versiune marcată „urgentă” se instalează singură pe toate Pi-urile (în câteva ore), cu
   aceleași verificări și revenire automată. Pi-ul caută versiuni noi la 6 ore (anunță tot o singură dată).
+- Istoric: graficele apar imediat din ultima încărcare (ținută și pe telefon) și se actualizează în fundal; sub
+  intervale scrie cât a durat încărcarea (pe Pi și pe drum), ca să vedem ce e lent.
+- „Dispozitive conectate” arată doar dispozitivele care comunică acum; cele configurate dar tăcute sunt în meniul
+  „Dispozitive inactive”.
+- Rețeaua WiFi s-a mutat în Setări → Despre → Info: atingi rândul „WiFi” (sau „neconectat”) și se deschide
+  schimbarea rețelei. Info nu mai arată nodurile tehnice „funnel-ingress-node”; aparatele tale legate la server au
+  secțiunea lor.
 - Documentație nouă, simplă, pentru cei care primesc Amper (README): ce trebuie cumpărat, scrierea cardului,
   prima pornire, ce faci dacă nu apare „Amper-Setup”. Instalarea manuală a trecut în docs/instalare-avansata.md.
 

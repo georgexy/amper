@@ -68,7 +68,7 @@ Android (Chrome) → ⋮ → *Instalează aplicația*. Pe iPhone, notificările 
 - **Actualizări:** Setări → Despre → Actualizări. Pi-ul caută singur o dată pe săptămână și te anunță; tu alegi
   când instalezi. Datele și setările rămân; dacă versiunea nouă nu pornește, Pi-ul revine singur la cea veche.
 - **Dă adresa celor din casă:** Setări → Conectare → Partajează Amper.
-- **Alt WiFi** (ex. ai schimbat routerul): Setări → Conectare → Rețeaua WiFi. Dacă Pi-ul rămâne fără internet,
+- **Alt WiFi** (ex. ai schimbat routerul): Setări → Despre → Info → atinge rândul „WiFi”. Dacă Pi-ul rămâne fără internet,
   pornește din nou „Amper-Setup” și o iei de la pasul 3.
 - **Un dispozitiv nou** (ex. ai adăugat o baterie): Setări → Dispozitive conectate → + Adaugă dispozitiv.
 - **Setările BMS și ale invertorului** se pot schimba din aplicație (cu parola). Atenție: sunt pe răspunderea ta.

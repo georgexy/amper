@@ -265,6 +265,9 @@ h2 { font: 600 20px/1.2 "Barlow Condensed", sans-serif; margin: 26px 0 10px; }
 .list .row .t { font-size: 13.5px; color: var(--muted); }
 .list .row.critical { border-left: 4px solid var(--alarm); }
 .list .row.warning { border-left: 4px solid var(--warn); }
+.list button.row-link { width: 100%; text-align: left; font: inherit; color: inherit; background: none; border-left: 0;
+  border-right: 0; border-bottom: 0; cursor: pointer; }
+.lnk { text-decoration: underline; text-underline-offset: 3px; color: var(--acc); }
 .list .row.closed { opacity: .7; border-left-color: var(--line); }
 .empty { padding: 18px 14px; color: var(--muted); }
 .btn { border: 1px solid var(--line); background: var(--panel); padding: 10px 16px; border-radius: 999px; cursor: pointer; font-weight: 500; }

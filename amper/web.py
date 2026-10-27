@@ -210,6 +210,8 @@ def make_app(engine) -> web.Application:
         end = int(time.time())
         start = end - int(hours * 3600)
 
+        t0 = time.monotonic()
+
         def read():
             out = {}
             for d in ids:
@@ -220,7 +222,11 @@ def make_app(engine) -> web.Application:
                     log.warning("istoric %s: %s", d, e)
                     out[d] = dict(kind=kind, rows=[], error=str(e))
             return out
-        return _json(dict(start=start, end=end, series=await asyncio.to_thread(read)))
+        series = await asyncio.to_thread(read)
+        ms = int((time.monotonic() - t0) * 1000)
+        if ms > 1500:
+            log.warning("istoricul (%s h, %d dispozitive) a durat %.1f s", hours, len(ids), ms / 1000)
+        return _json(dict(start=start, end=end, series=series, ms=ms))
 
     async def energy(request):
         inv = [k for k, v in engine.devices.items() if v.driver.kind == "inverter"]
