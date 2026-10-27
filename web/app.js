@@ -1438,7 +1438,7 @@ const jsonPost = (body) => ({ method: "POST", headers: { "Content-Type": "applic
 
 async function renderPush() {
   const st = $("#push-state"), b = $("#push-on");
-  b.hidden = true;
+  $("#push-row").hidden = true;
   const HTTPS_URL = esc(state.info?.public_url || "adresa https a Pi-ului");
   if (!window.isSecureContext) {
     st.innerHTML = `Ca să primești notificări <b>direct în aplicația Amper</b>, deschide-o de la adresa
@@ -1455,11 +1455,11 @@ async function renderPush() {
     st.textContent = "Notificările sunt blocate pentru Amper. Pornește-le din Setări iPhone → Notificări → Amper.";
     return;
   }
-  b.hidden = false;
+  $("#push-row").hidden = false;
   b.dataset.on = sub && Notification.permission === "granted" ? "1" : "";
+  b.checked = !!b.dataset.on;
   st.textContent = b.dataset.on ? "Acest telefon primește notificările direct în aplicația Amper." :
     "Acest telefon nu primește încă notificări în aplicația Amper.";
-  b.textContent = b.dataset.on ? "Oprește notificările pe acest telefon" : "Pornește notificările pe acest telefon";
 }
 
 $("#push-on").onclick = async () => {
@@ -1521,7 +1521,7 @@ async function loadUserAlerts() {
   $("#ua-list").innerHTML = ua.rules.length ? ua.rules.map((r) => `
     <div class="row ua-rule ${r.enabled ? "" : "off"}"><span><b>${esc(r.name || `${mname(r.metric)} ${r.op === "<" ? "sub" : "peste"} ${num(r.value, r.value % 1 ? 2 : 0)} ${unit(r.metric)}`)}</b>
       <small>${esc(mname(r.metric))} ${r.op === "<" ? "<" : ">"} ${num(r.value, r.value % 1 ? 2 : 0)} ${esc(unit(r.metric))}${r.hold_s ? ` · cel puțin ${Math.round(r.hold_s / 60)} min` : ""} · ${LEVELS[r.level] || r.level}${r.notify_clear ? "" : " · fără „Rezolvat”"}</small></span>
-      <span class="ua-act"><button class="btn sm" data-tog="${r.id}">${r.enabled ? "Oprește" : "Pornește"}</button>
+      <span class="ua-act"><input type="checkbox" data-tog="${r.id}" ${r.enabled ? "checked" : ""} aria-label="Pornită">
       <button class="btn sm danger" data-del="${r.id}">Șterge</button></span></div>`).join("")
     : `<div class="empty">Nicio automatizare încă. Apasă „+ Adaugă automatizare”.</div>`;
   $$("[data-tog]", $("#ua-list")).forEach((b) => (b.onclick = async () => {

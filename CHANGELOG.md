@@ -6,6 +6,11 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Hotspotul de configurare arată adresa în nume: „Amper-Setup 10.42.0.1”; după ce Pi-ul s-a conectat la WiFi-ul
   ales, timp de 3 minute „Amper gata 192.168.x.y” — adresa de acasă se citește direct din lista de rețele.
 - Instalările noi folosesc parola comună „amper-setup” pentru hotspot (cele existente își păstrează parola).
+- Comutatoare ca pe iPhone (glisoare) în loc de bife: canalul beta, notificările pe acest telefon, automatizările
+  (pornit/oprit), ghidul de configurare, confirmările.
+- Reparat: după o actualizare, iPhone-ul putea folosi încă fișierele vechi ale aplicației (de ex. alertele își
+  arătau încă detaliile). Acum pagina cere fișierele cu versiunea în adresă, iar telefonul verifică mereu dacă
+  s-au schimbat.
 
 ## 0.3.0-beta.6 — 2026-10-27
 - Setări: meniul nou „Despre” cuprinde Actualizări și Info.

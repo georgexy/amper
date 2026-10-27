@@ -108,6 +108,10 @@ def make_app(engine) -> web.Application:
         resp = await handler(request)
         if request.path.startswith("/api/"):
             resp.headers["Cache-Control"] = "no-store"
+        elif "Cache-Control" not in resp.headers and not request.path.startswith("/fonts/"):
+            # fișierele aplicației: telefonul verifică mereu dacă s-au schimbat (altfel Safari păstrează un timp
+            # app.js vechi după o actualizare); fonturile nu se schimbă
+            resp.headers["Cache-Control"] = "no-cache"
         return resp
 
     app = web.Application(middlewares=[headers, auth, no_cache_api])
@@ -129,7 +133,11 @@ def make_app(engine) -> web.Application:
     engine.app_version = app_version
 
     async def index(request):
-        return web.FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
+        # app.js / app.css cu versiunea în adresă: după o actualizare, telefonul nu poate folosi fișierele vechi
+        v = app_version()
+        html = (STATIC / "index.html").read_text(encoding="utf-8")
+        html = html.replace('href="app.css"', f'href="app.css?v={v}"').replace('src="app.js"', f'src="app.js?v={v}"')
+        return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-cache"})
 
     async def login(request):
         body = await request.json()
