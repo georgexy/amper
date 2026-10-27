@@ -112,7 +112,7 @@
             <span><b>Notificări</b><span id="set-notif-sub">Alertele pe telefon</span></span><i>›</i></button>
           <button class="card set-btn" data-panel="daly"><span class="ic" style="--ic:var(--charge)">
             <svg viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 10.5v3M7 10v4M11 10v4M15 10v4"/></svg></span>
-            <span><b>Module Daly</b><span id="set-daly-sub">Cablu USB sau Bluetooth</span></span><i>›</i></button>
+            <span><b>BMS-uri conectate</b><span id="set-daly-sub">Toate BMS-urile, după tip și adresă</span></span><i>›</i></button>
           <button class="card set-btn" data-panel="auto"><span class="ic" style="--ic:var(--sun)">
             <svg viewBox="0 0 24 24"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg></span>
             <span><b>Automatizări</b><span id="set-auto-sub">Anunță-mă când…</span></span><i>›</i></button>
@@ -244,11 +244,14 @@
       </section>
 
       <section class="set-panel" id="set-daly" hidden>
-        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Module Daly</h2></div>
-        <div class="list" id="daly-list"></div>
-        <p class="note">Modulele Daly se găsesc singure, pe cablu USB sau prin Bluetooth (nume „DL-…”), și apar pe
-          ecranul principal la prima citire. Căutarea se face la 30 s în primele 10 minute, apoi la 3 minute.</p>
-        <button class="btn" id="daly-search">Caută acum</button>
+        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>BMS-uri conectate</h2></div>
+        <div id="daly-list"></div>
+        <div id="daly-auto-box">
+          <p class="note">Modulele Daly se găsesc singure, pe cablu USB sau prin Bluetooth (nume „DL-…”). Căutarea se
+            face la 30 s în primele 10 minute după pornire, apoi la 3 minute.</p>
+          <button class="btn" id="daly-search">Caută acum modulele Daly</button>
+        </div>
+        <p class="note">Un BMS nou se adaugă din Setări → Ghid de configurare → Dispozitivele.</p>
       </section>
     </main>
 

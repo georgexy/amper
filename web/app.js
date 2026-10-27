@@ -722,25 +722,45 @@ function renderLooks() {
     $("#set-teme-sub").textContent = `Acum: ${LOOKS[state.look].name}`;
   }));
 }
+/* Setări → BMS-uri conectate: toate BMS-urile, grupate după tip, în ordinea adresei, cu legătura și starea */
+const BMS_TYPE = { daly: "Daly", sim_daly: "Daly (simulat)", seplos: "Seplos V2 (RS485)", sim_seplos: "Seplos (simulat)" };
+function bmsLink(info, d) {
+  const live = d.reading?.raw?.link;                          // Daly: legătura găsită („Bluetooth AA:…”, „cablu …”)
+  if (live) return live.replace(/\/dev\/serial\/by-id\//, "");
+  if (info.ble) return `Bluetooth ${info.ble}`;
+  const port = String(info.port || "");
+  if (info.type === "daly" && (!port || port === "auto" || port.includes("REPLACE"))) return "se caută (cablu sau Bluetooth)";
+  if (port.startsWith("/dev/")) return `${info.type.includes("seplos") ? "RS485" : "cablu"} ${port.replace(/^.*\//, "")}`;
+  return info.type.startsWith("sim_") ? "simulare" : "";
+}
 function renderDaly() {
-  const ds = Object.values(state.snap?.devices || {}).filter((d) => d.type === "daly");
-  const on = ds.filter((d) => d.connected && !d.stale).length;
-  $("#set-daly-sub").textContent = ds.length ? `${on} din ${ds.length} conectate` : "Niciun modul Daly în config";
-  $("#daly-list").innerHTML = ds.length ? "" : `<div class="empty">Niciun modul Daly în configurare.</div>`;
-  $("#daly-list").innerHTML += ds.map((d) => {
-    const link = d.reading?.raw?.link;
-    const txt = d.connected ? (d.stale ? `nu răspunde acum${link ? " · " + link : ""}` : `conectat${link ? " · " + link : ""}`)
-      : (d.error || "caut…").replace(/^[^:]*: /, "");
-    return `<div class="row ${d.connected && !d.stale ? "" : d.connected ? "warning" : ""}"><span><b>${esc(d.name)}</b></span>
-      <span class="t">${esc(txt)}</span></div>`;
-  }).join("");
+  const infos = (state.info?.devices || []).filter((x) => x.kind === "pack");
+  const devs = state.snap?.devices || {};
+  const ok = infos.filter((x) => devs[x.id]?.connected && !devs[x.id]?.stale).length;
+  $("#set-daly-sub").textContent = infos.length ? `${ok} din ${infos.length} comunică` : "Niciun BMS configurat";
+  const groups = {};
+  for (const x of infos) (groups[x.type] ||= []).push(x);
+  $("#daly-list").innerHTML = infos.length ? Object.entries(groups).map(([type, list]) => {
+    list.sort((a, b) => (a.address ?? 0) - (b.address ?? 0) || a.name.localeCompare(b.name));
+    return `<h3 class="bms-h">${esc(BMS_TYPE[type] || type)}</h3><div class="list">${list.map((x) => {
+      const d = devs[x.id] || {};
+      const st = d.connected && !d.stale ? "comunică" : d.connected ? "nu răspunde acum" : "nu a comunicat încă";
+      const cls = d.connected && !d.stale ? "ok" : d.connected ? "warning" : "";
+      const addr = x.address != null && x.type.includes("seplos") ? `adresa ${x.address}` :
+        x.address != null && x.type === "daly" ? `adresa 0x${Number(x.address).toString(16).toUpperCase()}` : "";
+      const parts = [addr, bmsLink(x, d), x.baudrate ? `${x.baudrate} baud` : "", x.capacity_ah ? `${num(x.capacity_ah, 0)} Ah` : ""];
+      return `<div class="row bms-row ${cls === "warning" ? "warning" : ""}"><span><b>${esc(x.name)}</b>
+        <small>${esc(parts.filter(Boolean).join(" · "))}</small></span><span class="bms-st ${cls}">${st}</span></div>`;
+    }).join("")}</div>`;
+  }).join("") : `<div class="empty">Niciun BMS în configurare. Adaugă-le din Ghid de configurare.</div>`;
+  $("#daly-auto-box").hidden = !infos.some((x) => x.type === "daly");
 }
 $("#daly-search").onclick = async () => {
   const b = $("#daly-search");
   b.disabled = true;
   b.textContent = "Caut… (până la un minut)";
   try { await api("/api/daly/search", { method: "POST" }); } catch {}
-  setTimeout(() => { b.disabled = false; b.textContent = "Caută acum"; }, 30000);
+  setTimeout(() => { b.disabled = false; b.textContent = "Caută acum modulele Daly"; }, 30000);
 };
 
 /* meniul setărilor: butoane → secțiuni (Teme, Notificări, Module Daly) */

@@ -163,7 +163,8 @@ def make_app(engine) -> web.Application:
 
     async def info(request):
         devs = [dict(id=d["id"], name=d.get("name", d["id"]), type=d["type"],
-                     kind=engine.devices[d["id"]].driver.kind, capacity_ah=d.get("capacity_ah"))
+                     kind=engine.devices[d["id"]].driver.kind, capacity_ah=d.get("capacity_ah"),
+                     port=d.get("port"), ble=d.get("ble"), address=d.get("address"), baudrate=d.get("baudrate"))
                 for d in cfg["devices"]]
         wp = engine.notifier.webpush
         return _json(dict(devices=devs, auth=auth_.enabled, poll_interval=cfg["poll_interval"], version=__version__,

@@ -20,6 +20,8 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Setări → Despre → „Partajează Amper”: adresa de oriunde și cea de acasă, cu „Trimite” (WhatsApp, Mesaje…) și
   „Copiază”, ca s-o dai celor din casă.
 - În aplicație, conexiunea pentru accesul de oriunde se numește „server” (ex. „Conectare la server”).
+- Setări → „BMS-uri conectate” (în loc de „Module Daly”): toate BMS-urile, grupate după tip și ordonate după
+  adresă, cu legătura (Bluetooth, cablu, RS485), viteza, capacitatea și dacă comunică acum.
 
 ## 0.3.0-beta.6 — 2026-10-27
 - Setări: meniul nou „Despre” cuprinde Actualizări și Info.

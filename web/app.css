@@ -504,3 +504,10 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .share-row small { display: block; color: var(--muted); font-size: 13px; }
 .share-row .share-url { color: var(--text); font-size: 14.5px; word-break: break-all; margin: 2px 0; }
 .share-act { display: flex; flex-direction: column; gap: 6px; }
+
+/* Setări → BMS-uri conectate */
+.bms-h { margin: 16px 0 8px; font-size: 15px; color: var(--muted); font-weight: 600; }
+.list .row.bms-row { grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; }
+.bms-row small { display: block; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.bms-st { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.bms-st.ok { color: var(--charge); } .bms-st.warning { color: var(--warn); }
