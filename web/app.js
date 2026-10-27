@@ -722,9 +722,10 @@ function renderLooks() {
     $("#set-teme-sub").textContent = `Acum: ${LOOKS[state.look].name}`;
   }));
 }
-/* Setări → BMS-uri conectate: toate BMS-urile, grupate după tip, în ordinea adresei, cu legătura și starea */
-const BMS_TYPE = { daly: "Daly", sim_daly: "Daly (simulat)", seplos: "Seplos V2 (RS485)", sim_seplos: "Seplos (simulat)" };
-function bmsLink(info, d) {
+/* Setări → Dispozitive conectate: Invertoare și BMS-uri (grupate după tip, în ordinea adresei), cu legătura și starea */
+const DEV_TYPE = { daly: "Daly", sim_daly: "Daly (simulat)", seplos: "Seplos V2 (RS485)", sim_seplos: "Seplos (simulat)",
+  growatt_spf: "Growatt SPF", sim_growatt: "Growatt (simulat)" };
+function devLink(info, d) {
   const live = d.reading?.raw?.link;                          // Daly: legătura găsită („Bluetooth AA:…”, „cablu …”)
   if (live) return live.replace(/\/dev\/serial\/by-id\//, "");
   if (info.ble) return `Bluetooth ${info.ble}`;
@@ -733,27 +734,36 @@ function bmsLink(info, d) {
   if (port.startsWith("/dev/")) return `${info.type.includes("seplos") ? "RS485" : "cablu"} ${port.replace(/^.*\//, "")}`;
   return info.type.startsWith("sim_") ? "simulare" : "";
 }
-function renderDaly() {
-  const infos = (state.info?.devices || []).filter((x) => x.kind === "pack");
-  const devs = state.snap?.devices || {};
-  const ok = infos.filter((x) => devs[x.id]?.connected && !devs[x.id]?.stale).length;
-  $("#set-daly-sub").textContent = infos.length ? `${ok} din ${infos.length} comunică` : "Niciun BMS configurat";
+function devRow(x, devs) {
+  const d = devs[x.id] || {};
+  const st = d.connected && !d.stale ? "comunică" : d.connected ? "nu răspunde acum" : "nu a comunicat încă";
+  const cls = d.connected && !d.stale ? "ok" : d.connected ? "warning" : "";
+  const addr = x.address == null ? "" : x.type === "daly" ? `adresa 0x${Number(x.address).toString(16).toUpperCase()}`
+    : `adresa ${x.address}`;
+  const parts = [addr, devLink(x, d), x.baudrate ? `${x.baudrate} baud` : "", x.capacity_ah ? `${num(x.capacity_ah, 0)} Ah` : ""];
+  return `<div class="row bms-row ${cls === "warning" ? "warning" : ""}"><span><b>${esc(x.name)}</b>
+    <small>${esc(parts.filter(Boolean).join(" · "))}</small></span><span class="bms-st ${cls}">${st}</span></div>`;
+}
+function devSection(title, infos, devs) {
+  if (!infos.length) return "";
   const groups = {};
   for (const x of infos) (groups[x.type] ||= []).push(x);
-  $("#daly-list").innerHTML = infos.length ? Object.entries(groups).map(([type, list]) => {
+  const many = Object.keys(groups).length > 1;
+  return `<h2>${title}</h2>` + Object.entries(groups).map(([type, list]) => {
     list.sort((a, b) => (a.address ?? 0) - (b.address ?? 0) || a.name.localeCompare(b.name));
-    return `<h3 class="bms-h">${esc(BMS_TYPE[type] || type)}</h3><div class="list">${list.map((x) => {
-      const d = devs[x.id] || {};
-      const st = d.connected && !d.stale ? "comunică" : d.connected ? "nu răspunde acum" : "nu a comunicat încă";
-      const cls = d.connected && !d.stale ? "ok" : d.connected ? "warning" : "";
-      const addr = x.address != null && x.type.includes("seplos") ? `adresa ${x.address}` :
-        x.address != null && x.type === "daly" ? `adresa 0x${Number(x.address).toString(16).toUpperCase()}` : "";
-      const parts = [addr, bmsLink(x, d), x.baudrate ? `${x.baudrate} baud` : "", x.capacity_ah ? `${num(x.capacity_ah, 0)} Ah` : ""];
-      return `<div class="row bms-row ${cls === "warning" ? "warning" : ""}"><span><b>${esc(x.name)}</b>
-        <small>${esc(parts.filter(Boolean).join(" · "))}</small></span><span class="bms-st ${cls}">${st}</span></div>`;
-    }).join("")}</div>`;
-  }).join("") : `<div class="empty">Niciun BMS în configurare. Adaugă-le din Ghid de configurare.</div>`;
-  $("#daly-auto-box").hidden = !infos.some((x) => x.type === "daly");
+    return `${many || title === "BMS-uri" ? `<h3 class="bms-h">${esc(DEV_TYPE[type] || type)}</h3>` : ""}
+      <div class="list">${list.map((x) => devRow(x, devs)).join("")}</div>`;
+  }).join("");
+}
+function renderDaly() {
+  const all = state.info?.devices || [], devs = state.snap?.devices || {};
+  const inv = all.filter((x) => x.kind === "inverter"), bms = all.filter((x) => x.kind === "pack");
+  const n = inv.length + bms.length;
+  const ok = [...inv, ...bms].filter((x) => devs[x.id]?.connected && !devs[x.id]?.stale).length;
+  $("#set-daly-sub").textContent = n ? `${ok} din ${n} comunică` : "Niciun dispozitiv configurat";
+  $("#daly-list").innerHTML = n ? devSection(inv.length > 1 ? "Invertoare" : "Invertor", inv, devs) + devSection("BMS-uri", bms, devs)
+    : `<div class="empty">Niciun dispozitiv în configurare. Adaugă-le din Ghid de configurare.</div>`;
+  $("#daly-auto-box").hidden = !bms.some((x) => x.type === "daly");
 }
 $("#daly-search").onclick = async () => {
   const b = $("#daly-search");
