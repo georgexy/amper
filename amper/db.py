@@ -242,6 +242,8 @@ class Database:
                               (now - 365 * 86400,))
 
     # ---------- citire ----------
+    RAW_MAX_SPAN = 6 * 3600     # peste atât, graficele folosesc mediile la 5 minute (mult mai puțin de citit de pe card)
+
     def history(self, kind: str, device: str, start: int, end: int, points: int = 300,
                 raw_retention_days: int = 14) -> list[dict]:
         cols = PACK_COLS if kind == "pack" else INV_COLS
@@ -249,16 +251,24 @@ class Database:
         table_agg = "pack_5m" if kind == "pack" else "inverter_5m"
         span = max(end - start, 1)
         bucket = max(10, span // max(points, 1))
-        use_agg = span > 3 * 86400 or start < time.time() - raw_retention_days * 86400
-        table = table_agg if use_agg else table_raw
-        if use_agg:
-            bucket = max(bucket, AGG_SECONDS)
+        avg = ", ".join(f"AVG({c}) AS {c}" for c in cols)
+
+        def q(table, b, a, z):
+            return [dict(r) for r in self.conn.execute(
+                f"SELECT (ts / {b}) * {b} AS t, {avg} FROM {table} WHERE device=? AND ts BETWEEN ? AND ? "
+                f"GROUP BY t ORDER BY t", (device, a, z)).fetchall()]
         with self.lock:
-            rows = self.conn.execute(
-                f"SELECT (ts / {bucket}) * {bucket} AS t, {', '.join(f'AVG({c}) AS {c}' for c in cols)} "
-                f"FROM {table} WHERE device=? AND ts BETWEEN ? AND ? GROUP BY t ORDER BY t",
-                (device, start, end)).fetchall()
-        return [dict(r) for r in rows]
+            if span <= self.RAW_MAX_SPAN and start >= time.time() - raw_retention_days * 86400:
+                return q(table_raw, bucket, start, end)                     # ore puține: citirile detaliate
+            # mediile la 5 minute (calculate o dată pe oră) + ultimele minute din citirile detaliate
+            bucket = max(bucket, AGG_SECONDS) // AGG_SECONDS * AGG_SECONDS
+            row = self.conn.execute(f"SELECT MAX(ts) FROM {table_agg} WHERE device=?", (device,)).fetchone()
+            agg_end = min(end, (row[0] + AGG_SECONDS) if row and row[0] is not None else start)
+            agg_end = max(start, agg_end - agg_end % bucket)                # tăietura pe granița unui interval
+            rows = q(table_agg, bucket, start, agg_end - 1) if agg_end > start else []
+            if agg_end < end:
+                rows += q(table_raw, bucket, agg_end, end)
+            return rows
 
     def energy(self, device: str, days: int = 30) -> list[dict]:
         with self.lock:

@@ -184,6 +184,26 @@ def make_app(engine) -> web.Application:
                                        int(request.query.get("points", 300)), cfg["raw_retention_days"])
         return _json(dict(device=device, kind=kind, start=start, end=end, rows=rows))
 
+    async def history_many(request):
+        """Toate graficele din Istoric într-o singură cerere (prin internet contează numărul de cereri)."""
+        ids = [d for d in request.query.get("devices", "").split(",") if d in engine.devices][:20]
+        hours = min(float(request.query.get("hours", 24)), 24 * 400)
+        points = min(int(request.query.get("points", 300)), 1000)
+        end = int(time.time())
+        start = end - int(hours * 3600)
+
+        def read():
+            out = {}
+            for d in ids:
+                kind = engine.devices[d].driver.kind
+                try:
+                    out[d] = dict(kind=kind, rows=engine.db.history(kind, d, start, end, points, cfg["raw_retention_days"]))
+                except Exception as e:                       # un dispozitiv cu probleme nu strică restul
+                    log.warning("istoric %s: %s", d, e)
+                    out[d] = dict(kind=kind, rows=[], error=str(e))
+            return out
+        return _json(dict(start=start, end=end, series=await asyncio.to_thread(read)))
+
     async def energy(request):
         inv = [k for k, v in engine.devices.items() if v.driver.kind == "inverter"]
         if not inv:
@@ -646,6 +666,7 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/api/health", health)
     app.router.add_get("/api/live", live)
     app.router.add_get("/api/history", history)
+    app.router.add_get("/api/history/all", history_many)
     app.router.add_get("/api/energy", energy)
     app.router.add_get("/api/alerts", alerts)
     app.router.add_post("/api/test-notification", test_notification)

@@ -14,6 +14,9 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Același motiv făcea ca butonul „Descarcă și verifică” să nu reacționeze până la redeschiderea aplicației: pagina
   nouă cu codul vechi. Acum pagina și codul vin mereu împreună; butonul arată imediat „Pornesc descărcarea…”.
 - Cale de rezervă fără aplicație (prin SSH): `sudo amper update --install` / `--rollback` / `--check`.
+- Istoric mai rapid: peste 6 ore, graficele folosesc mediile la 5 minute (de ~12 ori mai puțin de citit de pe
+  card), iar toate graficele vin într-o singură cerere; „Se încarcă…” până sosesc datele.
+- Reparat: pe 7 și 30 de zile, cu puține zile de date, liniile nu se desenau deloc (erau rupte după fiecare punct).
 
 ## 0.3.0-beta.6 — 2026-10-27
 - Setări: meniul nou „Despre” cuprinde Actualizări și Info.

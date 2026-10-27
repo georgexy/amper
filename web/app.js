@@ -65,7 +65,7 @@ document.addEventListener("click", (e) => {
   row.classList.toggle("open", !det.hidden);
 });
 
-const state = { info: null, snap: null, view: "now", hours: 24, lastMsg: 0, ws: null, sheetDev: null, energy: [],
+const state = { histReq: 0, info: null, snap: null, view: "now", hours: 24, lastMsg: 0, ws: null, sheetDev: null, energy: [],
   look: "cadrane", day: null, dayDrawn: null };
 
 /* ------------------------------------------------------------------ pornire */
@@ -1142,8 +1142,21 @@ async function loadHistory() {
   const pk = devs.filter((d) => d.kind === "pack");
   const inv = devs.find((d) => d.kind === "inverter");
   const pts = Math.min(400, Math.round(innerWidth * 1.2));
-  const get = (d) => api(`/api/history?device=${encodeURIComponent(d.id)}&hours=${state.hours}&points=${pts}`);
-  const [ph, ih] = await Promise.all([Promise.all(pk.map(get)), inv ? get(inv) : null]);
+  // toate graficele într-o singură cerere; până vin datele, „Se încarcă…”; o eroare nu lasă ecranul gol
+  const req = ++state.histReq;
+  $$("#charts .when").forEach((el) => (el.textContent = "Se încarcă…"));
+  let data;
+  try {
+    const ids = [...pk, ...(inv ? [inv] : [])].map((d) => encodeURIComponent(d.id)).join(",");
+    data = await api(`/api/history/all?devices=${ids}&hours=${state.hours}&points=${pts}`);
+  } catch (e) {
+    if (e.message !== "auth" && req === state.histReq)
+      $$("#charts .when").forEach((el) => (el.textContent = "Pi-ul nu a răspuns. Încearcă din nou."));
+    return;
+  }
+  if (req !== state.histReq) return;                     // între timp s-a ales alt interval
+  const S = data.series || {}, rowsOf = (d) => S[d.id]?.rows || [];
+  const ph = pk.map((d) => ({ rows: rowsOf(d) })), ih = inv ? { rows: rowsOf(inv) } : null;
   const ser = (rows, key) => rows.map((r) => [r.t, r[key]]).filter((p) => p[1] != null);
   lineChart($("#ch-soc"), pk.map((d, i) => ({ name: d.name, color: SERIES[i % SERIES.length], data: ser(ph[i].rows, "soc") })),
     { min: 0, max: 100, fmt: (v) => num(v, 0) + "%" });
@@ -1309,11 +1322,16 @@ function lineChart(box, series, opt = {}) {
     ctx.lineWidth = 2; ctx.lineJoin = "round";
     // zona de sub linie, plină până jos (sau până la zero, la grafice cu valori negative)
     const base = Y(opt.zero ? 0 : lo);
+    // linia se rupe doar la o pauză reală: mult mai mare decât distanța obișnuită dintre puncte (pe 30 de zile
+    // punctele sunt la ~1 h 45 min; cu doar 2 zile de date, pragul span/60 le rupea pe toate)
+    const diffs = series.flatMap((s) => s.data.slice(1).map((p, i) => p[0] - s.data[i][0])).sort((a, b) => a - b);
+    const typical = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 0;
+    const gapLimit = Math.max(900, span / 60, typical * 3);
     const segments = (s) => {
       const out = [];
       let prev = null;
       for (const p of s.data) {
-        if (prev == null || p[0] - prev > Math.max(900, span / 60)) out.push([]);
+        if (prev == null || p[0] - prev > gapLimit) out.push([]);
         out[out.length - 1].push(p);
         prev = p[0];
       }
