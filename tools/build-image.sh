@@ -106,7 +106,7 @@ say "Pregătesc sistemul (nume, SSH oprit, utilizator intern, WiFi $COUNTRY)"
 echo amper > "$ROOT/etc/hostname"
 sed -i 's/^127\.0\.1\.1.*/127.0.1.1\tamper/' "$ROOT/etc/hosts"
 grep -q "^127.0.1.1" "$ROOT/etc/hosts" || printf '127.0.1.1\tamper\n' >> "$ROOT/etc/hosts"
-in_root systemctl disable ssh.service >/dev/null 2>&1 || true
+in_root systemctl disable ssh.service ssh.socket >/dev/null 2>&1 || true
 # fără întrebarea „creează un utilizator” la prima pornire: imaginea nu are cont de logare cu parolă
 in_root systemctl disable userconfig.service >/dev/null 2>&1 || true
 in_root systemctl mask userconfig.service >/dev/null 2>&1 || true
@@ -117,6 +117,12 @@ in_root passwd -l root >/dev/null
 CMD="$ROOT/boot/firmware/cmdline.txt"
 grep -q "ieee80211_regdom" "$CMD" || sed -i "1s/\$/ cfg80211.ieee80211_regdom=$COUNTRY/" "$CMD"
 in_root raspi-config nonint do_wifi_country "$COUNTRY" >/dev/null 2>&1 || true
+
+# cloud-init (Trixie): ce face la prima pornire fără personalizare din Imager — doar afișat, pentru verificare
+for f in user-data meta-data network-config; do
+  [ -f "$ROOT/boot/firmware/$f" ] && { echo "--- boot/firmware/$f"; grep -v '^\s*$' "$ROOT/boot/firmware/$f" | head -30; }
+done
+echo "--- cmdline.txt: $(cat "$CMD")"
 
 # ---------------- curățenie: nimic unic sau personal în imagine ----------------
 say "Curăț (chei, machine-id, jurnale, cache)"
@@ -135,9 +141,11 @@ say "Verific imaginea"
 fail() { echo "::error::$*"; ls -la "$ROOT/etc/systemd/system" "$ROOT/etc/systemd/system/multi-user.target.wants" || true; exit 1; }
 [ -L "$ROOT/opt/amper" ] && [ -f "$ROOT/opt/amper-$VER/amper/__init__.py" ] || fail "programul lipsește"
 for u in amper amper-update amper-wifi amper-firstboot amper-grow-root; do
-  [ -e "$ROOT/etc/systemd/system/multi-user.target.wants/$u.service" ] || fail "$u.service nu e activat"
+  [ -L "$ROOT/etc/systemd/system/multi-user.target.wants/$u.service" ] || fail "$u.service nu e activat"
 done
-[ -e "$ROOT/etc/systemd/system/multi-user.target.wants/ssh.service" ] && fail "SSH e pornit"
+for f in multi-user.target.wants/ssh.service sockets.target.wants/ssh.socket; do
+  [ -L "$ROOT/etc/systemd/system/$f" ] && fail "SSH e pornit ($f)"
+done
 [ -f "$ROOT/etc/amper/.firstboot" ] || fail "lipsește marcajul primei porniri"
 grep -q "REPLACE-TOPIC" "$ROOT/etc/amper/config.yaml" || fail "topicul ntfy e deja generat"
 in_root python3 -c "import yaml,sys; c=yaml.safe_load(open('/etc/amper/config.yaml')); sys.exit(c['devices']!=[])" \
