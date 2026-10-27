@@ -317,3 +317,9 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - Panouri: `InverterReading.pv_current` / `pv2_current` = registrele de intrare 7/8 (Buck1Curr/Buck2Curr, ×0,1 A),
   CITITE din invertor (utilizatorul nu vrea valori calculate). DE CONFIRMAT pe Pi cu afișajul invertorului. Butonul `PV_I` (`data-pvinfo`) în toate temele → `#pvpop` (`pvInfoHtml`, actualizat
   la fiecare citire, se deschide deasupra dacă nu are loc deasupra barei de jos).
+
+## Identificarea BMS-urilor Bluetooth (0.3.0-beta.9, în pregătire)
+- `BleLink.name/address` (aflate la `_resolve`); `DalyBleDriver.link_desc` = proprietate „Bluetooth <nume> · <MAC>”
+  (MAC-ul doar dacă nu e deja în nume); `ble_name` vine din legătura salvată (`daly-auto.json`, `name`).
+  `DalyAutoDriver.link_desc` = proprietate a legăturii interne. `raw.ble_name/ble_mac` → `bleId()` pe cardurile din
+  Bateriile.

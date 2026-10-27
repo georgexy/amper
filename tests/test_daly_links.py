@@ -83,13 +83,15 @@ def test_auto_binds_bluetooth_modules_in_signal_order(auto_env):
     _, drvs = auto_devices()
     assert drvs[0]._search_once() and drvs[1]._search_once()
     assert not drvs[2]._search_once()                     # doar două module Daly în jur
-    assert [d.inner.link_desc for d in drvs[:2]] == ["Bluetooth AA:00:00:00:00:01", "Bluetooth AA:00:00:00:00:02"]
+    assert [d.inner.link_desc for d in drvs[:2]] == ["Bluetooth DL-40D63C2A · AA:00:00:00:00:01",
+                                                          "Bluetooth DL-40D63C2B · AA:00:00:00:00:02"]
     assert drvs[0].read().soc == 64.3
     # după repornire, legăturile rămân aceleași (din daly-auto.json)
     daly_auto._claimed.clear()
     _, again = auto_devices()
-    assert again[0].inner.link_desc == "Bluetooth AA:00:00:00:00:01"
-    assert again[1].inner.link_desc == "Bluetooth AA:00:00:00:00:02"
+    assert again[0].inner.link_desc == "Bluetooth DL-40D63C2A · AA:00:00:00:00:01"   # numele, ținut minte
+    assert again[1].inner.link_desc == "Bluetooth DL-40D63C2B · AA:00:00:00:00:02"
+    assert drvs[0].read().raw["ble_name"] == "DL-40D63C2A"
 
 
 def test_auto_bluetooth_right_after_boot(auto_env, monkeypatch):

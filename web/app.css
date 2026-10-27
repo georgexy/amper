@@ -529,3 +529,6 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .pvpop small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; }
 
 .pvpop .pvp-h span:not(:first-child) { min-width: 64px; text-align: right; }
+.pk-id { display: flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 12.5px; color: var(--muted);
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.pk-id svg { width: 13px; height: 13px; flex: none; fill: none; stroke: var(--acc); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

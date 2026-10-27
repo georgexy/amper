@@ -532,6 +532,13 @@ function renderNow() {
 }
 
 /* ------------------------------------------------------------------ ecranul BATERIILE */
+// Bluetooth: numele modulului (ca în aplicația Daly de pe telefon) și adresa — ca să știi care baterie e care
+function bleId(r) {
+  const n = r.raw?.ble_name, mac = r.raw?.ble_mac;
+  if (!n && !mac) return "";
+  const both = n && mac && !n.toUpperCase().includes(mac.replace(/:/g, ""));
+  return `<div class="pk-id"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>${esc(n || mac)}${both ? ` · ${esc(mac)}` : ""}</div>`;
+}
 function renderPacks() {
   const h = homeData(), b = h.b;
   $("#pk-soc").textContent = b.soc == null ? "–" : `${num(b.soc, 0)}%`;
@@ -563,7 +570,7 @@ function renderPacks() {
     el.innerHTML = `<div class="h"><div class="pk-mini"><i style="height:${Math.max(0, Math.min(100, r.soc ?? 0))}%"></i></div>
       <div class="t"><div class="n">${esc(d.name)} <span class="tag">${esc(label)}</span>${d.type === "daly" && !d.stale
         ? `<span class="pk-gear" data-bms="${esc(d.id)}" role="button" tabindex="0" aria-label="Setările BMS ${esc(d.name)}">⚙</span>` : ""}</div>
-      <div class="s">${d.stale ? `Nu comunică${d.error ? ": " + esc(d.error) : ""}` : facts}</div></div>
+      <div class="s">${d.stale ? `Nu comunică${d.error ? ": " + esc(d.error) : ""}` : facts}</div>${bleId(r)}</div>
       <div class="soc">${r.soc == null ? "–" : num(r.soc, 0)}<sup>%</sup></div></div>
       ${cells.length ? `<div class="pk-cells">${cells.map((v) => `<i class="${hi - lo > 0.005 ? (v === hi ? "hi" : v === lo ? "lo" : "") : ""}"
         style="height:${Math.max(8, ((v - floor) / span) * 100)}%"></i>`).join("")}</div>` : ""}

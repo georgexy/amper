@@ -96,6 +96,8 @@ class BleLink:
 
     def __init__(self, target: str):
         self.target = target                    # adresa MAC sau numele modulului
+        self.address = target.upper() if MAC_RE.match(target) else None    # aflate la conectare
+        self.name = None if MAC_RE.match(target) else target
         self.client = None
         self.write_uuid = WRITE
         self.buf = bytearray()
@@ -120,6 +122,8 @@ class BleLink:
             dev = await bleak.BleakScanner.find_device_by_name(self.target, timeout=10)
         if dev is None:
             raise DriverError(f"Bluetooth: modulul {self.target} nu e în raza de acțiune (sau e conectat la telefon)")
+        self.address = (getattr(dev, "address", None) or self.address or "").upper() or None
+        self.name = getattr(dev, "name", None) or self.name
         return dev
 
     async def _connect(self):
