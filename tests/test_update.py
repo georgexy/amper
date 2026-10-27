@@ -470,3 +470,18 @@ def test_download_failure_keeps_everything(tmp_path):
     assert not u.download()
     assert u.job["state"] == "failed" and "sha256" in u.job["message"]
     assert u.status()["staged"] is None and not e.cmds
+
+
+def test_command_line_install_fallback(tmp_path, monkeypatch, capsys):
+    """`sudo amper update --install`: instalarea fără aplicație (dacă pagina nu merge)."""
+    e = Env(tmp_path)
+    e.publish("0.3.0")
+    u = e.updater()
+    monkeypatch.setattr(up, "Updater", lambda cfg: u)
+    monkeypatch.setattr("amper.config.load_config", lambda path: {})
+    import pytest as _pt
+    with _pt.raises(SystemExit) as ex:
+        up.main(["--install"])
+    assert ex.value.code == 0 and os.path.realpath(e.link).endswith("amper-0.3.0")
+    assert ("systemctl", "stop", "amper-update") in e.cmds and e.cmds[-1] == ("systemctl", "start", "amper-update")
+    assert "0.3.0" in capsys.readouterr().out

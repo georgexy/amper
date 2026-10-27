@@ -987,10 +987,10 @@ async function updateAction(action, btn) {
 $("#up-go").onclick = () => updateAction("install", $("#up-go"));
 $("#up-dl").onclick = async () => {
   const b = $("#up-dl");
-  b.disabled = true; $("#up-msg").textContent = "";
+  b.disabled = true; $("#up-msg").textContent = "Pornesc descărcarea…";
   try {
     const r = await api("/api/update/download", { method: "POST" });
-    if (r.error) $("#up-msg").textContent = r.error;
+    $("#up-msg").textContent = r.error || "";
     setTimeout(loadUpdate, 300);
   } catch (e) { if (e.message !== "auth") $("#up-msg").textContent = "Pi-ul nu răspunde."; }
   b.disabled = false;

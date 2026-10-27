@@ -11,6 +11,9 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Reparat: după o actualizare, iPhone-ul putea folosi încă fișierele vechi ale aplicației (de ex. alertele își
   arătau încă detaliile). Acum pagina cere fișierele cu versiunea în adresă, iar telefonul verifică mereu dacă
   s-au schimbat.
+- Același motiv făcea ca butonul „Descarcă și verifică” să nu reacționeze până la redeschiderea aplicației: pagina
+  nouă cu codul vechi. Acum pagina și codul vin mereu împreună; butonul arată imediat „Pornesc descărcarea…”.
+- Cale de rezervă fără aplicație (prin SSH): `sudo amper update --install` / `--rollback` / `--check`.
 
 ## 0.3.0-beta.6 — 2026-10-27
 - Setări: meniul nou „Despre” cuprinde Actualizări și Info.
