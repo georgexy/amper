@@ -16,8 +16,7 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Revenire de pe card: fișierul `revenire.txt` pus pe partiția „bootfs” → la pornire, versiunea anterioară.
 - Actualizări urgente: o versiune marcată „urgentă” se instalează singură pe toate Pi-urile (în câteva ore), cu
   aceleași verificări și revenire automată. Pi-ul caută versiuni noi la 6 ore (anunță tot o singură dată).
-- Istoric: graficele apar imediat din ultima încărcare (ținută și pe telefon) și se actualizează în fundal; sub
-  intervale scrie cât a durat încărcarea (pe Pi și pe drum), ca să vedem ce e lent.
+- Istoric: graficele apar imediat din ultima încărcare (ținută și pe telefon) și se actualizează în fundal.
 - „Dispozitive conectate” arată doar dispozitivele care comunică acum; cele configurate dar tăcute sunt în meniul
   „Dispozitive inactive”.
 - Rețeaua WiFi s-a mutat în Setări → Despre → Info: atingi rândul „WiFi” (sau „neconectat”) și se deschide

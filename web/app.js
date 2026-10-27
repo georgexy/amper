@@ -1204,27 +1204,20 @@ async function loadHistory() {
   // toate graficele într-o singură cerere; până vin datele, „Se încarcă…”; o eroare nu lasă ecranul gol
   const req = ++state.histReq;
   const ids = [...pk, ...(inv ? [inv] : [])].map((d) => encodeURIComponent(d.id)).join(",");
-  const key = `${state.hours}|${ids}`, st = $("#hist-status");
+  const key = `${state.hours}|${ids}`;
   // ultima încărcare a aceluiași interval se desenează imediat (din memorie sau de pe telefon); cea nouă vine după
   const cached = histCache.get(key);
   if (cached) drawHistory(cached.data, pk, inv);
   else $$("#charts .when").forEach((el) => (el.textContent = "Se încarcă…"));
-  st.textContent = cached ? `Actualizez… (afișat: ${hm(cached.at)})` : "Se încarcă…";
-  const t0 = performance.now();
   let data;
   try {
     data = await api(`/api/history/all?devices=${ids}&hours=${state.hours}&points=${pts}`);
   } catch (e) {
-    if (e.message !== "auth" && req === state.histReq) {
-      st.textContent = cached ? `Pi-ul nu a răspuns; afișat: ${hm(cached.at)}.` : "Pi-ul nu a răspuns. Încearcă din nou.";
-      if (!cached) $$("#charts .when").forEach((el) => (el.textContent = "Pi-ul nu a răspuns. Încearcă din nou."));
-    }
+    if (e.message !== "auth" && req === state.histReq && !cached)
+      $$("#charts .when").forEach((el) => (el.textContent = "Pi-ul nu a răspuns. Încearcă din nou."));
     return;
   }
   if (req !== state.histReq) return;                     // între timp s-a ales alt interval
-  const total = (performance.now() - t0) / 1000, srv = (data.ms || 0) / 1000;
-  // cât a durat: pe Pi (citirea de pe card) și pe drum (internet) — ca să știm ce e lent
-  st.textContent = `Încărcat în ${num(total, 1)} s (Pi ${num(srv, 1)} s, rețea ${num(Math.max(0, total - srv), 1)} s)`;
   histCache.put(key, data);
   drawHistory(data, pk, inv);
 }
@@ -1245,7 +1238,6 @@ const histCache = {
     } catch {}
   },
 };
-const hm = (t) => new Date(t).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
 
 function drawHistory(data, pk, inv) {
   const S = data.series || {}, rowsOf = (d) => S[d.id]?.rows || [];

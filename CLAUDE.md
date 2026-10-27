@@ -307,9 +307,10 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 
 ## UI 2026-10-27 (seara, beta.8)
 - Istoric: `histCache` (memorie + localStorage `hist:<ore>|<ids>`) → desenat instant, apoi `/api/history/all`;
-  `#hist-status` = „Încărcat în X s (Pi Y s, rețea Z s)”; serverul întoarce `ms` și scrie în jurnal peste 1,5 s.
+  serverul întoarce `ms` și scrie în jurnal peste 1,5 s (durata NU se afișează: utilizatorul n-o vrea).
   Măsurat local (14 zile × 7 dispozitive, 185 MB): <0,1 s pe orice interval; fără medii 5 min, 7 zile ≈ 0,9 s.
-  Cauza lentorii pe Pi-ul utilizatorului: NEAFLATĂ — de citit `#hist-status` de pe telefonul lui.
+  Cauza lentorii la utilizator: conexiunea 4G (trafic limitat), aflată de el printr-un test local. Nu schimba
+  graficele până nu cere.
 - Dispozitive: `renderDaly` = doar cele care comunică (`connected && !stale`); restul în panoul `devoff`.
 - WiFi: panoul `wifi` se deschide din Info (`#info-wifi`, „înapoi” → info); scos din Conectare.
 - `sysinfo`: peer-ii `funnel-ingress-node*` / `ShareeNode` nu se mai listează.
