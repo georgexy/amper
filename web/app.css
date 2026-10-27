@@ -366,29 +366,21 @@ nav.tabs .badge[data-n]::after { content: attr(data-n); position: absolute; top:
 .en-total { font-size: 13.5px; color: var(--muted); margin: 4px 0 2px; }
 .en-total b { color: var(--text); font-weight: 600; }
 
-/* ---------- setări: meniul cu butoane (plăci pe două coloane, fără explicații) ---------- */
-.set-menu { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.set-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; width: 100%;
-  min-height: 124px; padding: 18px 8px 16px; color: inherit; text-align: center; cursor: pointer; position: relative;
-  overflow: hidden; transition: transform .15s ease, border-color .2s ease, background .2s ease;
-  animation: set-in .38s cubic-bezier(.2, .8, .3, 1.2) both; }
-.set-btn::before { content: ""; position: absolute; inset: -40% -40% auto; height: 120%; pointer-events: none;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--ic) 14%, transparent), transparent); opacity: .7; }
-.set-btn:hover { border-color: color-mix(in srgb, var(--ic) 45%, var(--line)); }
-.set-btn:active { transform: scale(.95); }
-.set-btn .ic { width: 60px; height: 60px; border-radius: 19px; flex: none; display: flex; align-items: center; justify-content: center;
-  color: var(--ic); background: color-mix(in srgb, var(--ic) 17%, transparent); position: relative;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ic) 22%, transparent), 0 6px 18px -8px var(--ic); }
-.set-btn .ic svg { width: 32px; height: 32px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
-.set-btn > span:nth-child(2) { min-width: 0; position: relative; }
-.set-btn b { display: block; font: 600 18px/1.15 "Barlow Condensed", sans-serif; }
-.set-btn > span:nth-child(2) > span, .set-btn i { display: none; }     /* fără explicații și fără săgeată */
-.set-menu > .set-btn:last-child:nth-child(odd) { grid-column: 1 / -1; min-height: 96px; flex-direction: row; gap: 14px; }
-/* plăcile apar pe rând la deschiderea setărilor */
-.set-menu > .set-btn:nth-child(2) { animation-delay: .04s; } .set-menu > .set-btn:nth-child(3) { animation-delay: .08s; }
-.set-menu > .set-btn:nth-child(4) { animation-delay: .12s; } .set-menu > .set-btn:nth-child(5) { animation-delay: .16s; }
-.set-menu > .set-btn:nth-child(6) { animation-delay: .2s; }  .set-menu > .set-btn:nth-child(7) { animation-delay: .24s; }
-@keyframes set-in { from { opacity: 0; transform: translateY(14px) scale(.94); } }
+/* ---------- setări: meniul — listă grupată, ca Setările de pe iPhone, fără explicații ---------- */
+.set-menu { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; margin-bottom: 14px; }
+.set-menu:not(:has(> .set-btn:not([hidden]))) { display: none; }          /* grup cu toate butoanele ascunse */
+.set-menu > .set-btn.card { background: none; border: 0; border-radius: 0; }
+.set-btn { display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px 14px; color: inherit; text-align: left;
+  cursor: pointer; transition: background .15s ease; }
+.set-menu > .set-btn:not([hidden]) ~ .set-btn:not([hidden]) { border-top: 1px solid var(--line); }
+.set-btn:active { background: var(--panel-2); }
+.set-btn .ic { width: 36px; height: 36px; border-radius: 10px; flex: none; display: flex; align-items: center; justify-content: center;
+  color: #0E1A22; background: var(--ic); }
+.set-btn .ic svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
+.set-btn > span:nth-child(2) { flex: 1; min-width: 0; }
+.set-btn b { display: block; font: 600 19px "Barlow Condensed", sans-serif; }
+.set-btn > span:nth-child(2) > span { display: none; }                   /* fără explicații sub butoane */
+.set-btn i { font-style: normal; font-size: 22px; color: var(--faint); }
 
 /* ---------- setări: iconițe animate (mișcare scurtă, din câteva în câteva secunde; la apăsare se joacă imediat) ---------- */
 .ai * { transform-box: fill-box; }
@@ -430,7 +422,7 @@ nav.tabs .badge[data-n]::after { content: attr(data-n); position: absolute; top:
 @keyframes a-fade { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 @keyframes a-strike { 0% { stroke-dashoffset: 19; } 35%, 85% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 0; } }
 @keyframes a-press { 40% { transform: scale(.82) rotate(-6deg); } 75% { transform: scale(1.08); } }
-@media (prefers-reduced-motion: reduce) { .set-btn, .set-btn .ic, .ai * { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .set-btn .ic, .ai * { animation: none !important; } }
 .set-panel .pk-top { margin-bottom: 8px; }
 
 /* ---------- istoric: ordinea graficelor ---------- */
