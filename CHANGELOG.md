@@ -10,6 +10,12 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Parola uitată: pui pe card (partiția „bootfs”, din calculator) un fișier `resetare-parola.txt` și pornești Pi-ul;
   parola se șterge, primești notificare, iar aplicația cere una nouă — doar din rețeaua de acasă, nu prin adresa
   de oriunde.
+- Paznic pe Pi: dacă Amper nu răspunde 5 minute, e repornit; dacă nici așa nu merge și a fost actualizat în ultima
+  săptămână, Pi-ul revine singur la versiunea anterioară (cu datele) și te anunță.
+- În loc de ecran negru, aplicația scrie „Amper nu răspunde” și ce se întâmplă.
+- Revenire de pe card: fișierul `revenire.txt` pus pe partiția „bootfs” → la pornire, versiunea anterioară.
+- Actualizări urgente: o versiune marcată „urgentă” se instalează singură pe toate Pi-urile (în câteva ore), cu
+  aceleași verificări și revenire automată. Pi-ul caută versiuni noi la 6 ore (anunță tot o singură dată).
 - Documentație nouă, simplă, pentru cei care primesc Amper (README): ce trebuie cumpărat, scrierea cardului,
   prima pornire, ce faci dacă nu apare „Amper-Setup”. Instalarea manuală a trecut în docs/instalare-avansata.md.
 

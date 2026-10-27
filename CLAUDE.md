@@ -217,6 +217,10 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   lansează ca stabilă (`x.y.z`) — abia atunci o primesc cunoscuții. Lansare: workflow-ul `release.yml`
   (`actions_run_trigger`, `run_workflow`, ref `main`); verificare: `Updater.check()` real pe GitHub.
 - Utilizatorul nu lucrează cu git/PR; explică-i pe scurt, în română, ce s-a schimbat.
+- Lansare urgentă (`release.yml` cu input `urgent: true` → `release.py build --urgent` → `"urgent": true` în
+  manifestul semnat): Pi-urile o instalează SINGURE. Doar pentru reparații care nu pot aștepta, doar stabile testate
+  pe beta, și tot doar după „publică”. Dacă după o urgentă vine repede altă versiune, marcheaz-o și pe ea urgentă
+  (un Pi offline la momentul urgentei vede doar ultima versiune).
 - **NU publica (merge + release) până nu spune explicit „publică”** (cerut 2026-10-27, după ce beta.5 a ieșit prea
   devreme). Lucrul se adună pe ramură; CHANGELOG are secțiunea „— în pregătire” până la publicare.
 
@@ -287,3 +291,16 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   proxy (Tailscale serve/Funnel) la /api/* primesc 403 `reset_local`. Parola nouă (`/api/setup/password`) șterge
   `password_reset`. `app.js`: `openSetup(false, "password", true)` = doar ecranul „Parolă nouă”; `showResetLocal`.
 - Utilizatorul NU vrea (deocamdată) butonul de feedback din 3.7.
+
+## Siguranță la actualizări: paznic, revenire de pe card, urgente (0.3.0-beta.8, 2026-10-27)
+- Motiv: utilizatorul a avut „ecran negru” (Pi online în Tailscale, Amper nu răspundea; cauza neaflată, fără SSH).
+- `Updater.watchdog_tick` (fir în amper-update, la 60 s, după 120 s de la pornire): `systemctl is-active amper` +
+  `/api/health`; „inactive” = oprit de mână → ignorat; 5 min fără răspuns → `systemctl restart amper` (o notificare
+  pe incident; după 3 reporniri, la 30 min); încă 5 min și instalarea e din ultimele 7 zile cu versiune anterioară
+  păstrată → `rollback()`, `state.bad_version`, notificare, amper-update se repornește.
+- `card_rollback()` la pornirea amper-update: `revenire*`/`rollback*` în /boot/firmware → șters, `rollback()`.
+  `password_reset.find_files(boot_dirs, names)` e comun.
+- Urgente: `state.latest.urgent`; `due()` = la 6 ore (`URGENT_EVERY`); `urgent_pending()` (mai nouă, nu
+  `bad_version`) → `install()` singur în `loop`. Notificare „⬆️ Actualizare urgentă…”.
+- `app.js` `showDown()`: după 5 s fără /api/info, mesaj „Amper nu răspunde…” în locul ecranului negru.
+- ATENȚIE: protecțiile ajută doar Pi-urile care le au instalate (de la beta.8). Pi-ul utilizatorului pe beta.7 nu le are.

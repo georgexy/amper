@@ -82,6 +82,13 @@ Android (Chrome) → ⋮ → *Instalează aplicația*. Pe iPhone, notificările 
 - Ledul verde al Pi-ului nu clipește deloc? Rescrie cardul (pasul 2) sau încearcă alt card.
 - Alimentatorul: cu unul slab, WiFi-ul și Bluetooth-ul se poartă ciudat.
 
+**Aplicația scrie „Amper nu răspunde”:** Pi-ul are grijă singur. Dacă Amper nu răspunde 5 minute, îl repornește;
+dacă problema a venit cu o actualizare din ultima săptămână, revine singur la versiunea anterioară (datele rămân) și
+te anunță pe telefon. Dacă tot nu merge:
+1. Scoate alimentarea Pi-ului câteva secunde și pornește-l din nou.
+2. Revenire de pe card: oprește Pi-ul, pune cardul în calculator și fă pe partiția **bootfs** un fișier text gol
+   **`revenire.txt`**. Pune cardul la loc și pornește: Pi-ul revine la versiunea anterioară a aplicației.
+
 **Am pierdut adresa de acasă:** conectează-te din nou la routerul tău și caută dispozitivul „amper”, sau încearcă
 **http://amper.local:8080** (merge pe iPhone și pe calculator; pe unele telefoane Android nu).
 

@@ -87,9 +87,10 @@ async function boot() {
   try {
     state.info = await api("/api/info");
   } catch (e) {
-    if (e.message !== "auth" && e.message !== "reset") setTimeout(boot, 3000);
+    if (e.message !== "auth" && e.message !== "reset") { showDown(); setTimeout(boot, 3000); }
     return;
   }
+  bootDown = 0;
   $("#login").hidden = true;
   if (state.info.setup_needed) return openSetup(false);
   if (state.info.password_reset) return openSetup(false, "password", true);
@@ -112,6 +113,8 @@ async function boot() {
 function showLogin() {
   $("#app").hidden = true;
   $("#login").hidden = false;
+  $("#pw").hidden = $("#pwgo").hidden = $('label[for="pw"]').hidden = false;    // după mesajul „nu răspunde”
+  $("#pwerr").textContent = "";
   $("#pw").focus();
 }
 $("#pwgo").onclick = async () => {
@@ -1655,6 +1658,21 @@ const SU_STEPS = [
 ];
 const DEV_NAME = { daly: "Daly", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
 const su = { i: 0, d: null, chosen: null, keep: false, again: false, pollT: 0 };
+
+// Pi-ul nu răspunde (Amper oprit sau blocat, Pi fără curent/internet): un mesaj în loc de ecran negru.
+// Paznicul de pe Pi repornește Amper după 5 minute și, dacă o actualizare recentă e de vină, revine singur.
+let bootDown = 0;
+function showDown() {
+  if (!bootDown) bootDown = Date.now();
+  if (Date.now() - bootDown < 5000) return;              // o clipă (repornire): nu speria pe nimeni
+  const min = Math.floor((Date.now() - bootDown) / 60000);
+  $("#app").hidden = true; $("#setup").hidden = true; $("#login").hidden = false;
+  $("#pw").hidden = true; $("#pwgo").hidden = true; $('label[for="pw"]').hidden = true;
+  $("#pwerr").innerHTML = `<b>Amper nu răspunde${min ? ` de ${min} min` : ""}.</b> Reîncerc singur…<br><br>
+    Dacă Pi-ul are curent și internet, Amper se repornește singur în câteva minute; după o actualizare care nu
+    merge, Pi-ul revine singur la versiunea anterioară. Dacă durează mult, scoate alimentarea Pi-ului câteva
+    secunde și pornește-l din nou.`;
+}
 
 // parola ștearsă cu fișierul de pe card, iar telefonul e pe adresa publică: parola nouă se alege doar de acasă
 function showResetLocal(msg) {

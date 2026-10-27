@@ -20,16 +20,16 @@ BOOT_DIRS = ("/boot/firmware", "/boot")
 NAMES = ("resetare-parola", "reset-parola", "reset-password")
 
 
-def find_files(boot_dirs=BOOT_DIRS) -> list[str]:
+def find_files(boot_dirs=BOOT_DIRS, names=NAMES) -> list[str]:
     """Fișierele de resetare (orice extensie, orice majuscule: Windows ascunde „.txt”)."""
     out = []
     for d in boot_dirs:
         try:
-            names = os.listdir(d)
+            listing = os.listdir(d)
         except OSError:
             continue
-        for n in names:
-            if n.lower().split(".")[0].strip() in NAMES:            # și „resetare-parola.txt.txt”
+        for n in listing:
+            if n.lower().split(".")[0].strip() in names:            # și „resetare-parola.txt.txt”
                 out.append(os.path.join(d, n))
     return out
 
