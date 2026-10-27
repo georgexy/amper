@@ -67,7 +67,8 @@ mkdir -p "$ROOT"
 mount "${LOOP}p2" "$ROOT"
 mkdir -p "$ROOT/boot/firmware"
 mount "${LOOP}p1" "$ROOT/boot/firmware"
-for m in dev dev/pts proc sys run; do mount --bind "/$m" "$ROOT/$m"; done
+for m in dev dev/pts proc sys; do mount --bind "/$m" "$ROOT/$m"; done
+mount -t tmpfs tmpfs "$ROOT/run"          # nu /run al gazdei: systemctl ar vorbi cu systemd-ul ei
 in_root() { chroot "$ROOT" /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root LANG=C.UTF-8 \
   DEBIAN_FRONTEND=noninteractive "$@"; }
 . "$ROOT/etc/os-release"
@@ -78,7 +79,8 @@ if [ "$(uname -m)" != "aarch64" ]; then
 fi
 
 # DNS în chroot; serviciile nu pornesc în timpul instalării pachetelor
-cp --remove-destination /etc/resolv.conf "$ROOT/etc/resolv.conf.amper"
+RC=/run/systemd/resolve/resolv.conf; [ -s "$RC" ] || RC=/etc/resolv.conf
+cp -L "$RC" "$ROOT/etc/resolv.conf.amper"
 mv "$ROOT/etc/resolv.conf" "$ROOT/etc/resolv.conf.orig" 2>/dev/null || true
 mv "$ROOT/etc/resolv.conf.amper" "$ROOT/etc/resolv.conf"
 printf '#!/bin/sh\nexit 101\n' > "$ROOT/usr/sbin/policy-rc.d" && chmod +x "$ROOT/usr/sbin/policy-rc.d"
@@ -130,7 +132,7 @@ mv "$ROOT/etc/resolv.conf.orig" "$ROOT/etc/resolv.conf" 2>/dev/null || rm -f "$R
 
 # verificări: ce trebuie să fie și ce nu trebuie să fie
 say "Verific imaginea"
-fail() { echo "::error::$*"; exit 1; }
+fail() { echo "::error::$*"; ls -la "$ROOT/etc/systemd/system" "$ROOT/etc/systemd/system/multi-user.target.wants" || true; exit 1; }
 [ -L "$ROOT/opt/amper" ] && [ -f "$ROOT/opt/amper-$VER/amper/__init__.py" ] || fail "programul lipsește"
 for u in amper amper-update amper-wifi amper-firstboot amper-grow-root; do
   [ -e "$ROOT/etc/systemd/system/multi-user.target.wants/$u.service" ] || fail "$u.service nu e activat"
