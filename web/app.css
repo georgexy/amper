@@ -602,3 +602,4 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
   background: var(--panel-2); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,.45); font-size: 14.5px; }
 .su-rej { margin: -2px 0 8px 14px; }
 small.warnc { color: var(--warn); }
+#daly-list + .set-menu { margin-top: 14px; }
