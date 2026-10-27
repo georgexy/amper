@@ -282,6 +282,35 @@ const kv = (v, u, d = 0) => (v == null ? "–" : `${num(v, d)}<span class="u">${
 function put(root, k, html) { root.querySelectorAll(`[data-k="${k}"]`).forEach((e) => { if (e._h !== html) e.innerHTML = e._h = html; }); }
 function modeClass(el, h, extra = "") { el.className = `${extra} mode-${h.mode} ${h.health.cls === "fault" ? "fault" : ""}`.trim(); }
 
+/* ---------- butonul „i” de la panouri (toate temele): tensiunea și curentul PV de acum ---------- */
+const PV_I = `<button class="pv-i" data-pvinfo aria-label="Tensiunea și curentul panourilor">i</button>`;
+function pvInfoHtml() {
+  const ir = homeData().ir;
+  if (!ir) return "Invertorul nu trimite date acum.";
+  const row = (name, v, a) => `<div><span>${name}</span><b>${v == null ? "–" : num(v, 1) + " V"}</b><b>${a == null ? "–" : num(a, 1) + " A"}</b></div>`;
+  const two = ir.pv2_voltage >= 10;
+  return `<div class="pvp-h"><span></span><span>Tensiune</span><span>Curent</span></div>
+    ${row(two ? "PV1" : "Panouri", ir.pv_voltage, ir.pv_current)}${two ? row("PV2", ir.pv2_voltage, ir.pv2_current) : ""}
+    <small>Curentul e calculat: putere ÷ tensiune.</small>`;
+}
+function pvInfoShow(btn) {
+  const pop = $("#pvpop");
+  if (!pop.hidden && pop._btn === btn) { pop.hidden = true; return; }
+  pop._btn = btn;
+  pop.innerHTML = pvInfoHtml();
+  pop.hidden = false;
+  const r = btn.getBoundingClientRect(), w = pop.offsetWidth;
+  pop.style.left = `${Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2))}px`;
+  // dedesubt, dacă are loc deasupra barei de jos; altfel deasupra butonului
+  const below = r.bottom + 8 + pop.offsetHeight < innerHeight - 110;
+  pop.style.top = `${(below ? r.bottom + 8 : r.top - 8 - pop.offsetHeight) + scrollY}px`;
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-pvinfo]");
+  if (b) { e.preventDefault(); e.stopPropagation(); return pvInfoShow(b); }
+  if (!e.target.closest("#pvpop")) $("#pvpop").hidden = true;
+}, true);
+
 /* ---------- tema Cadrane ---------- */
 const ARC = Math.PI * 56, RING = 2 * Math.PI * 62;
 const GAUGES = [["pv", "Panouri", "--sun"], ["load", "Consum", "--load"], ["bat", "Baterie", "--charge"], ["temp", "Invertor", "--cell"]];
@@ -296,7 +325,7 @@ const cadrane = {
     <div class="k-gauges">${GAUGES.map(([k, l, c]) => `
       <div class="card k-g" style="--gc:var(${c})"${k === "temp" ? ' data-open="inverter" role="button" tabindex="0"' : ""}><svg viewBox="0 0 140 78"><path class="trk" d="M14 72 A56 56 0 0 1 126 72"/>
         <path class="arc" data-g="${k}" d="M14 72 A56 56 0 0 1 126 72" stroke-dasharray="0 ${ARC}"/></svg>
-        <div class="val num" data-k="g-${k}">–</div><div class="lbl" data-k="l-${k}">${l}</div></div>`).join("")}</div>
+        <div class="val num" data-k="g-${k}">–</div><div class="lbl"><span data-k="l-${k}">${l}</span>${k === "pv" ? PV_I : ""}</div></div>`).join("")}</div>
     <section class="card k-day"><h3><span>Azi</span><span data-k="day"></span></h3><svg data-k="chart" viewBox="0 0 330 92" preserveAspectRatio="none"></svg></section>
     <div class="inv-line" data-k="inv" data-open="inverter" role="button" tabindex="0"></div>`,
   update(root, h) {
@@ -374,7 +403,7 @@ const flux = {
     <div class="f-diag">
       <svg class="lines" viewBox="0 0 360 330">${Object.entries(FLUX).map(([k, d]) =>
         `<path class="ln" data-ln="${k}" d="${d}"/><path class="dots" data-dots="${k}" d="${d}"/>`).join("")}</svg>
-      <div class="f-node" style="left:20%;top:19%;--c:var(--sun)"><div class="disc">${icon("sun")}</div><div class="w" data-k="pv">–</div><div class="l">Panouri</div></div>
+      <div class="f-node" style="left:20%;top:19%;--c:var(--sun)"><div class="disc">${icon("sun")}</div><div class="w" data-k="pv">–</div><div class="l">Panouri ${PV_I}</div></div>
       <div class="f-node" style="left:80%;top:19%;--c:var(--load)"><div class="disc">${icon("home")}</div><div class="w" data-k="load">–</div><div class="l">Consum casă</div></div>
       <div class="f-node sm" data-open="inverter" role="button" tabindex="0" aria-label="Invertor" style="left:50%;top:69%;--c:var(--cell)"><div class="disc" style="width:64px;height:64px">${icon("inv")}</div></div>
       <div class="f-node sm" data-k-cls="grid" style="left:11%;top:88%;--c:var(--muted)"><div class="disc">${icon("grid")}</div><div class="l" data-k="grid">Rețea</div></div>
@@ -441,7 +470,7 @@ const carduri = {
     <section class="card c-list">${[["pv", "Panouri solare", "--sun", "sun"], ["load", "Consum casă", "--load", "home"],
       ["bat", "Baterie", "--charge", "batt"], ["grid", "Rețea", "--muted", "grid"]].map(([k, l, c, i]) => `
       <div class="c-it" style="--ic:var(${c})" data-it="${k}"><div class="c-ico">${icon(i)}</div>
-        <div class="m"><div class="k" data-k="l-${k}">${l}</div><div class="tr"><i data-bar="${k}"></i></div></div><div class="v" data-k="v-${k}">–</div></div>`).join("")}</section>`,
+        <div class="m"><div class="k"><span data-k="l-${k}">${l}</span>${k === "pv" ? PV_I : ""}</div><div class="tr"><i data-bar="${k}"></i></div></div><div class="v" data-k="v-${k}">–</div></div>`).join("")}</section>`,
   update(root, h) {
     const { b, ir, bp } = h;
     put(root, "st", `${h.ir ? esc(ir.status || "") : "Invertor: fără date"}${ir ? ` · ${num(ir.inverter_temp, 0)} °C` : ""} ›`);
@@ -495,6 +524,7 @@ function renderNow() {
     $$("[data-open=inverter]", home).forEach((el) => (el.onclick = () => show("inverter")));
   }
   L.update(home, homeData());
+  if (!$("#pvpop").hidden) $("#pvpop").innerHTML = pvInfoHtml();            // valorile se schimbă la fiecare citire
   if (state.view === "packs") renderPacks();
   if (state.view === "inverter") renderInverterLive();
   if (state.view === "settings") renderDaly();
@@ -1180,6 +1210,7 @@ function show(v) {
   const tab = ["packs", "inverter", "bms"].includes(v) ? "now" : v;      // se deschid din „Acum”
   $$("nav.tabs button").forEach((b) => b.dataset.view === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
   for (const k of ["now", "hist", "alerts", "packs", "inverter", "bms", "settings"]) $("#view-" + k).hidden = v !== k;
+  $("#pvpop").hidden = true;
   if (v === "bms") loadBms();
   if (v === "packs") renderPacks();
   if (v === "inverter") { renderInverterLive(); loadInverter(); }

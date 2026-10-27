@@ -192,6 +192,8 @@ def test_growatt_decode():
     assert r.status_code == 5 and r.status == "Încărcare din PV"
     assert r.pv_voltage == 285.3
     assert r.pv_power == 2500.0
+    assert r.pv_current == 8.76          # 2500 W ÷ 285,3 V
+    assert r.pv2_current == 0.0          # PV2 fără tensiune
     assert r.load_power == 850.0
     assert r.battery_voltage == 53.2
     assert r.battery_soc == 71

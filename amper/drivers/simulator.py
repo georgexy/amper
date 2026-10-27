@@ -139,9 +139,10 @@ class SimWorld:
             code = 12
         else:
             code = 2
+        pv_v = round(280 + self.rnd.uniform(-8, 8), 1) if self.pv > 0 else 0.0
         return InverterReading(
             device_id=iid, ts=self.t, status_code=code, status=f"{code}", pv_power=round(self.pv, 0),
-            pv_voltage=round(280 + self.rnd.uniform(-8, 8), 1) if self.pv > 0 else 0.0,
+            pv_voltage=pv_v, pv_current=round(self.pv / pv_v, 2) if pv_v else 0.0,
             load_power=round(self.load, 0), load_percent=round(self.load / 50, 1),
             battery_voltage=round(bv, 2), battery_power=round(self.bat_power, 0), battery_soc=round(soc),
             ac_in_power=0.0, output_voltage=230.0, output_freq=50.0, inverter_temp=round(32 + self.load / 300, 1),
