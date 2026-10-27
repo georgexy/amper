@@ -862,7 +862,7 @@ async function loadInfo() {
       <button class="row row-link" id="info-wifi"><span>WiFi: <b class="lnk">${w ? esc(w.ssid) : "neconectat"}</b>${x.wifi_job?.hotspot ? " · hotspot Amper-Setup pornit" : ""}</span>
         <span class="t">${w ? `semnal ${bars4(w.signal)} ${w.signal}% · ${esc(w.freq)} · canal ${esc(w.channel)} · ` : ""}schimbă rețeaua ›</span></button>
       <div class="row"><span>Adrese locale</span><span class="t">${Object.entries(n.ip || {}).filter(([k]) => k !== "lo")
-        .map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(" · ") || "–"}</span></div>
+        .map(([k, v]) => `${esc(k.startsWith("tailscale") ? "server" : k)}: ${esc(v)}`).join(" · ") || "–"}</span></div>
       <div class="row"><span>Cablu de rețea</span><span class="t">${eth ? (eth.state === "connected" ? "legat" : "nelegat") : "–"}</span></div>
       <div class="row"><span>Server: <b>${ts.state === "Running" ? "conectat" : ts.state ? "neconectat" : "–"}</b></span>
         <span class="t">${esc(ts.ip || "")} · ${esc(ts.name || "")}</span></div>
