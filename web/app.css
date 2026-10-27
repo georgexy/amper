@@ -446,3 +446,12 @@ nav.tabs .badge[data-n]::after { content: attr(data-n); position: absolute; top:
 .login-h { margin: 0; font-size: 30px; display: flex; align-items: center; }
 /* alerte: textul principal + detaliile (ce era în paranteze) */
 .det { display: block; font-size: 13px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+
+/* actualizare: bara de progres (descărcare și verificare) */
+#up-prog { margin: 14px 0; }
+.up-prog-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 14px; color: var(--muted); }
+.up-prog-top b { font: 700 22px "Barlow Condensed", sans-serif; color: var(--text); }
+.up-bar { height: 10px; border-radius: 99px; background: var(--panel-2); overflow: hidden; margin-top: 6px; }
+.up-bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #4FC3F7, #5BE08F);
+  transition: width .6s ease; }
+.up-ok { color: var(--charge); font-weight: 600; margin: 14px 0 4px; }

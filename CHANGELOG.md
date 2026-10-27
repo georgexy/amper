@@ -2,6 +2,10 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 0.3.0-beta.4 — în pregătire
+- Actualizare în doi pași: „Descarcă și verifică”, cu bară de progres și procente pentru descărcare și verificare,
+  apoi butonul „Instalează acum”. Arhiva descărcată se verifică din nou la instalare.
+
 ## 0.3.0-beta.3 — 2026-10-27
 - Sigla Amper (bateria cu fulger) sus, înaintea numelui.
 - Notificările pe telefon arată doar textul principal; atingerea lor deschide Alerte, unde apar și detaliile

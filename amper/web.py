@@ -364,6 +364,11 @@ def make_app(engine) -> web.Application:
         data, status = await update_api("POST", "/check")
         return _json({**data, "running": __version__}, status)
 
+    async def update_download(request):
+        # doar descarcă și verifică (nu schimbă nimic pe Pi): ajunge logarea
+        data, status = await update_api("POST", "/download")
+        return _json(data, status)
+
     async def update_action(request):
         # actualizarea și revenirea cer parola aplicației, introdusă din nou — și de pe ecranul
         # HDMI (localhost, fără cookie); de pe telefon, middleware-ul `auth` cere în plus cookie-ul
@@ -628,6 +633,7 @@ def make_app(engine) -> web.Application:
     app.router.add_post("/api/update/channel", update_channel)
     app.router.add_get("/api/update/status", update_status)
     app.router.add_post("/api/update/check", update_check)
+    app.router.add_post("/api/update/download", update_download)
     app.router.add_post("/api/update/{action:install|rollback}", update_action)
     app.router.add_get("/api/push/key", push_key)
     app.router.add_post("/api/push/subscribe", push_subscribe)

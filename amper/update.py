@@ -43,7 +43,7 @@ TOKEN_PATH = "/run/amper-update/token"
 KEEP_BACKUPS = 3          # copii pre-update păstrate
 KEEP_VERSIONS = 3         # foldere /opt/amper-<ver> păstrate (curentă, anterioară și încă una)
 HEALTH_TIMEOUT = 60
-STEPS = ("verify", "space", "download", "backup", "install", "restart", "health")
+STEPS = ("verify", "space", "download", "check", "backup", "install", "restart", "health")
 
 
 class UpdateError(Exception):
@@ -292,7 +292,93 @@ class Updater:
                     check_error=self.state.get("check_error"), latest=latest, available=avail,
                     previous=prev if prev_ok else None, history=(self.state.get("history") or [])[-20:][::-1],
                     job=self.job, last_job=self.state.get("last_job"), can_install=bool(self.keys),
-                    steps=list(STEPS))
+                    steps=list(STEPS), staged=self._staged(latest["version"]) if latest else None)
+
+    # ---------- versiunea descărcată și verificată, care așteaptă „Instalează acum” ----------
+    def _staged(self, version: str) -> dict | None:
+        st = self.state.get("staged") or {}
+        if st.get("version") == version and os.path.isfile(st.get("path") or ""):
+            return {k: st.get(k) for k in ("version", "size", "at")}
+        return None
+
+    def _progress(self, step: str, label: str):
+        def cb(done: int, total: int):
+            pct = int(done * 100 / total) if total else None
+            self.job.update(step=step, done=done, total=total, progress=pct,
+                            message=f"{label}… {pct}%" if pct is not None else f"{label}… {done / 1e6:.1f} MB")
+        return cb
+
+    def _check_sha(self, tar: bytes, expected: str) -> None:
+        h = hashlib.sha256()
+        cb = self._progress("check", "Verific arhiva")
+        step = max(1, len(tar) // 50)
+        for i in range(0, len(tar), step):
+            h.update(tar[i:i + step])
+            cb(min(len(tar), i + step), len(tar))
+        if h.hexdigest() != expected:
+            raise UpdateError("Arhiva descărcată nu corespunde semnăturii (sha256 diferit). Actualizarea a fost refuzată.")
+
+    def _prepare(self, cur: str | None) -> tuple[dict, bytes]:
+        """Manifest + semnătură, spațiu, arhiva (din cea deja descărcată, dacă e aceeași versiune), sha256."""
+        self._step("verify", "Descarc informațiile versiunii și verific semnătura…")
+        rel = self._release()
+        m = self._manifest(rel)
+        ver = m["version"]
+        self.job["version"] = ver
+        self.state["latest"] = {k: m.get(k) for k in ("version", "notes", "date", "size")}
+        if cur and not newer(ver, cur):
+            raise UpdateError(f"Ai deja ultima versiune ({cur}).")
+        need = (m.get("size") or 5e6) * 4 / 1e6 + (os.path.getsize(self.db_path) / 1e6 if os.path.exists(self.db_path) else 0) + 50
+        self._step("space", "Verific spațiul liber…")
+        for p in (self.opt_dir, self.data_dir):
+            if self._free_mb(p) < need:
+                raise UpdateError(f"Spațiu insuficient pe card (trebuie ~{need:.0f} MB liberi). Șterge ceva și încearcă din nou.")
+        st = self.state.get("staged") or {}
+        tar = None
+        if st.get("version") == ver and st.get("sha256") == m["sha256"]:
+            try:
+                with open(st["path"], "rb") as f:
+                    tar = f.read()
+                self.job.update(step="download", progress=100, message="Arhiva e deja descărcată.")
+            except OSError:
+                tar = None
+        if tar is None:
+            self._step("download", f"Descarc Amper {ver}…")
+            tar = self.fetch(rel["assets"][m["tarball"]], progress=self._progress("download", f"Descarc Amper {ver}"))
+        self._check_sha(tar, m["sha256"])
+        return m, tar
+
+    def download(self) -> bool:
+        """„Descarcă și verifică”: arhiva ajunge pe card, verificată; instalarea așteaptă confirmarea."""
+        if not self.lock.acquire(blocking=False):
+            raise UpdateError("O actualizare e deja în curs.")
+        cur = self.installed_version()
+        self.job = {"state": "running", "kind": "download", "from": cur, "step": "verify", "message": "Pornesc…",
+                    "started": int(self.clock()), "progress": None}
+        try:
+            m, tar = self._prepare(cur)
+            d = os.path.join(self.state_dir, "staged")
+            shutil.rmtree(d, ignore_errors=True)
+            os.makedirs(d)
+            path = os.path.join(d, m["tarball"])
+            with open(path, "wb") as f:
+                f.write(tar)
+            self.state["staged"] = {"version": m["version"], "sha256": m["sha256"], "size": len(tar),
+                                    "path": path, "at": int(self.clock())}
+            self.save()
+            self.job.update(state="downloaded", step="check", progress=100, finished=int(self.clock()),
+                            message=f"Amper {m['version']} e descărcat și verificat (semnătură validă).")
+            log.info("actualizare: %s descărcată și verificată", m["version"])
+            return True
+        except UpdateError as e:
+            self.job.update(state="failed", message=str(e), finished=int(self.clock()))
+            return False
+        except Exception as e:
+            log.exception("descărcare eșuată")
+            self.job.update(state="failed", message=f"Eroare neprevăzută: {e}", finished=int(self.clock()))
+            return False
+        finally:
+            self.lock.release()
 
     def set_channel(self, channel: str) -> dict:
         if channel not in ("stable", "beta"):
@@ -304,11 +390,23 @@ class Updater:
         return self.status()
 
     # ---------- GitHub ----------
-    def _fetch(self, url: str, accept: str = "application/octet-stream", limit: int = 50 << 20) -> bytes:
+    def _fetch(self, url: str, accept: str = "application/octet-stream", limit: int = 50 << 20,
+               progress=None) -> bytes:
         req = urllib.request.Request(url, headers={"User-Agent": "amper-update", "Accept": accept})
         try:
             with urllib.request.urlopen(req, timeout=60) as r:
-                data = r.read(limit + 1)
+                if progress is None:
+                    data = r.read(limit + 1)
+                else:                                      # pe bucăți, cu procentul pentru aplicație
+                    total = int(r.headers.get("Content-Length") or 0)
+                    buf = bytearray()
+                    while len(buf) <= limit:
+                        chunk = r.read(64 * 1024)
+                        if not chunk:
+                            break
+                        buf += chunk
+                        progress(len(buf), total)
+                    data = bytes(buf)
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 raise UpdateError("Nu există încă nicio versiune publicată pe GitHub.")
@@ -442,24 +540,8 @@ class Updater:
             self.lock.release()
 
     def _install(self, cur: str | None) -> bool:
-        self._step("verify", "Descarc informațiile versiunii și verific semnătura…")
-        rel = self._release()
-        m = self._manifest(rel)
+        m, tar = self._prepare(cur)
         ver = m["version"]
-        self.job["version"] = ver
-        self.state["latest"] = {k: m.get(k) for k in ("version", "notes", "date", "size")}
-        if cur and not newer(ver, cur):
-            raise UpdateError(f"Ai deja ultima versiune ({cur}).")
-        need = (m.get("size") or 5e6) * 4 / 1e6 + (os.path.getsize(self.db_path) / 1e6 if os.path.exists(self.db_path) else 0) + 50
-        self._step("space", "Verific spațiul liber…")
-        for p in (self.opt_dir, self.data_dir):
-            if self._free_mb(p) < need:
-                raise UpdateError(f"Spațiu insuficient pe card (trebuie ~{need:.0f} MB liberi). Șterge ceva și încearcă din nou.")
-        self._step("download", f"Descarc Amper {ver}…")
-        tar = self.fetch(rel["assets"][m["tarball"]])
-        self._step("download", "Verific arhiva (sha256)…")
-        if hashlib.sha256(tar).hexdigest() != m["sha256"]:
-            raise UpdateError("Arhiva descărcată nu corespunde semnăturii (sha256 diferit). Actualizarea a fost refuzată.")
         new_dir = os.path.join(self.opt_dir, f"amper-{ver}")
         old_dir = self.current_dir()
         if os.path.realpath(new_dir) == old_dir:
@@ -500,6 +582,8 @@ class Updater:
         self._step("health", "Verific că Amper pornește…")
         if self.health(ver):
             self.state["installed"] = {"version": ver, "at": int(self.clock()), "dir": new_dir}
+            self.state["staged"] = None
+            shutil.rmtree(os.path.join(self.state_dir, "staged"), ignore_errors=True)
             self.run("systemctl", "restart", "amper-wifi")
             self._prune_versions()
             self._finish("ok", f"Amper {ver} e instalat și funcționează.")
@@ -661,6 +745,13 @@ class Updater:
                         return self._json({**up.status(), "error": str(e)})
                 if up.lock.locked():
                     return self._json({"error": "O actualizare e deja în curs."}, 409)
+                if self.path.startswith("/download"):
+                    if not up.keys:
+                        return self._json({"error": "Lipsește cheia de verificare a actualizărilor."}, 400)
+                    up.job = {"state": "running", "kind": "download", "step": "verify", "message": "Pornesc…",
+                              "started": int(up.clock())}
+                    threading.Thread(target=up.download, daemon=True).start()
+                    return self._json({"ok": True})
                 if self.path.startswith("/install"):
                     if not up.keys:
                         return self._json({"error": "Lipsește cheia de verificare a actualizărilor."}, 400)

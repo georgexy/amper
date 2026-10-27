@@ -172,9 +172,17 @@
         <div id="up-new" hidden>
           <h2 id="up-new-title"></h2>
           <div class="up-notes" id="up-notes"></div>
-          <p class="note">Înainte de actualizare se face o copie a datelor (istoric, alerte, config). Dacă versiunea
-            nouă nu pornește, Pi-ul revine singur la cea de acum. Aplicația se reîncarcă singură la final.</p>
-          <button class="btn ed-go" id="up-go">Actualizează</button>
+          <button class="btn ed-go" id="up-dl">Descarcă și verifică</button>
+          <div id="up-prog" hidden>
+            <div class="up-prog-top"><span id="up-prog-msg"></span><b id="up-prog-pct"></b></div>
+            <div class="up-bar"><i id="up-bar-fill"></i></div>
+          </div>
+          <div id="up-ready" hidden>
+            <p class="up-ok" id="up-ready-txt"></p>
+            <p class="note">La instalare se face întâi o copie a datelor (istoric, alerte, config). Dacă versiunea nouă
+              nu pornește, Pi-ul revine singur la cea de acum. Aplicația se reîncarcă singură la final.</p>
+            <button class="btn ed-go" id="up-go">Instalează acum</button>
+          </div>
         </div>
         <div id="up-job" hidden>
           <div class="list up-steps" id="up-steps"></div>

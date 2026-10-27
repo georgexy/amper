@@ -71,6 +71,7 @@ class Env:
         (self.data / "settings.yaml").write_text("site_name: Casa\n")
         self.files: dict[str, bytes] = {}
         self.cmds: list[tuple] = []
+        self.fetched: list[str] = []
         self.healthy: dict[str, bool] = {}
         self.on_restart = None
         self.notes: list[str] = []
@@ -97,10 +98,15 @@ class Env:
         self.files[API + "?per_page=15"] = json.dumps([rel] + lst).encode()
         return m
 
-    def fetch(self, url, accept="", limit=0):
+    def fetch(self, url, accept="", limit=0, progress=None):
         if url not in self.files:
             raise up.UpdateError("Nu există încă nicio versiune publicată pe GitHub.")
-        return self.files[url]
+        data = self.files[url]
+        if progress:                                   # ca descărcarea reală: pe bucăți
+            self.fetched.append(url)
+            for i in range(1, 5):
+                progress(len(data) * i // 4, len(data))
+        return data
 
     def run(self, *cmd):
         self.cmds.append(cmd)
@@ -412,3 +418,55 @@ def test_local_api_token(tmp_path):
         assert json.loads(r.read())["version"] == "0.2.0"
     finally:
         srv.shutdown()
+
+
+# ---------------------------------------------------------------- descarcă și verifică, apoi „Instalează acum”
+def test_download_then_install_now(tmp_path):
+    e = Env(tmp_path)
+    e.publish("0.3.0")
+    before = e.snapshot()
+    u = e.updater()
+    seen = []
+    orig = u._progress
+
+    def spy(step, label):
+        cb = orig(step, label)
+        return lambda d, t: (cb(d, t), seen.append((step, u.job["progress"])))
+    u._progress = spy
+    assert u.download(), u.job
+    assert u.job["state"] == "downloaded" and u.job["progress"] == 100
+    dl = [p for s_, p in seen if s_ == "download"]
+    ck = [p for s_, p in seen if s_ == "check"]
+    assert len(dl) == 4 and dl == sorted(dl) and dl[0] < 50 and dl[-1] == 100      # procentul crește până la 100
+    assert ck == sorted(ck) and ck[-1] == 100
+    assert not e.cmds and os.path.realpath(e.link).endswith("amper-0.2.0")     # nimic instalat încă
+    st = u.status()
+    assert st["staged"]["version"] == "0.3.0" and st["available"]
+    # „Instalează acum”: arhiva nu se mai descarcă, doar se reverifică
+    n = len(e.fetched)
+    assert u.install(), u.job
+    assert len(e.fetched) == n and os.path.realpath(e.link).endswith("amper-0.3.0")
+    assert e.snapshot() == before and u.status()["staged"] is None
+    assert not (tmp_path / "state" / "staged").exists()
+
+
+def test_staged_file_tampered_is_refused(tmp_path):
+    e = Env(tmp_path)
+    e.publish("0.3.0")
+    u = e.updater()
+    assert u.download()
+    path = u.state["staged"]["path"]
+    with open(path, "r+b") as f:                   # cineva modifică arhiva de pe card
+        f.seek(100)
+        f.write(b"XXXX")
+    assert not u.install()
+    assert "sha256" in u.job["message"] and os.path.realpath(e.link).endswith("amper-0.2.0")
+
+
+def test_download_failure_keeps_everything(tmp_path):
+    e = Env(tmp_path)
+    e.publish("0.3.0", tamper=True)
+    u = e.updater()
+    assert not u.download()
+    assert u.job["state"] == "failed" and "sha256" in u.job["message"]
+    assert u.status()["staged"] is None and not e.cmds

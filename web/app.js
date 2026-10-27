@@ -864,7 +864,7 @@ $("#wifi-go").onclick = async () => {
 };
 
 /* ---------- Setări → Actualizări (serviciul amper-update: GitHub, semnătură, copie a datelor, revenire) ---------- */
-const UP_STEPS = { verify: "Verificarea semnăturii", space: "Spațiu liber", download: "Descărcare și verificare",
+const UP_STEPS = { verify: "Verificarea semnăturii", space: "Spațiu liber", download: "Descărcare", check: "Verificarea arhivei",
   backup: "Copia de siguranță a datelor", install: "Instalare", restart: "Repornire", health: "Verificare: pornește?" };
 const UP_RESULT = { ok: "reușit", failed: "eșuat", rolled_back: "revenit automat la versiunea veche" };
 const upd = { data: null, timer: 0, busy: false };
@@ -880,7 +880,7 @@ async function loadUpdate() {
   }
   upd.data = r;
   renderUpdate();
-  if (r.job?.state === "running" && !$("#set-update").hidden) upd.timer = setTimeout(loadUpdate, 2000);
+  if (r.job?.state === "running" && !$("#set-update").hidden) upd.timer = setTimeout(loadUpdate, 1000);
 }
 function renderUpdate() {
   const r = upd.data || {}, inst = r.installed || {};
@@ -902,13 +902,29 @@ function renderUpdate() {
       <span class="t">${r.check_error ? esc(r.check_error) : r.latest && !r.available ? "Ai ultima versiune." : ""}</span></div>`;
   $("#set-update-sub").textContent = r.available ? `Versiune nouă: ${r.latest.version}` : `Versiunea ${r.version || ""}`;
   const job = r.job || {}, running = job.state === "running";
-  $("#up-new").hidden = !r.available || running || !r.can_install;
+  const dl = job.kind === "download", dlRun = running && dl, instRun = running && !dl;
+  $("#up-new").hidden = !r.available || instRun || !r.can_install;
+  // 1) „Descarcă și verifică” → 2) bara cu procente → 3) „Instalează acum”
+  $("#up-dl").hidden = !!r.staged || dlRun;
+  $("#up-prog").hidden = !dlRun;
+  $("#up-ready").hidden = !r.staged || dlRun;
+  if (dlRun) {
+    // întreaga etapă pe o singură bară: semnătura și spațiul 0–5%, descărcarea 5–90%, verificarea 90–100%
+    const p = job.progress ?? 0, base = { verify: 0, space: 4, download: 5, check: 90 }[job.step] ?? 0;
+    const span = { download: 85, check: 10 }[job.step] ?? 0;
+    const pct = Math.min(100, Math.round(base + span * p / 100));
+    $("#up-bar-fill").style.width = `${pct}%`;
+    $("#up-prog-pct").textContent = `${pct}%`;
+    $("#up-prog-msg").textContent = (job.message || "").replace(/…\s*\d+%$/, "…");
+  }
+  if (r.staged) $("#up-ready-txt").textContent = `✓ Amper ${r.staged.version} e descărcat și verificat (semnătură validă).`;
+  if (!running && dl && job.state === "failed") $("#up-msg").textContent = job.message;
   if (r.available) {
     $("#up-new-title").textContent = `Versiune nouă: ${r.latest.version}`;
     $("#up-notes").innerHTML = esc(r.latest.notes || "").replace(/^- /gm, "• ").replace(/\n/g, "<br>");
   }
   if (r.available && !r.can_install) $("#up-msg").textContent = "Versiunea instalată nu are cheia de verificare: actualizează manual o dată, cu install.sh.";
-  const shown = running ? job : (r.last_job && r.last_job.finished && Date.now() / 1000 - r.last_job.finished < 600 ? r.last_job : null);
+  const shown = instRun ? job : dl ? null : (r.last_job && r.last_job.finished && Date.now() / 1000 - r.last_job.finished < 600 ? r.last_job : null);
   $("#up-job").hidden = !shown;
   if (shown) {
     const steps = r.steps || Object.keys(UP_STEPS), cur = steps.indexOf(shown.step);
@@ -939,7 +955,7 @@ $("#up-check").onclick = async () => {
   b.disabled = false; b.textContent = "Caută actualizări acum";
 };
 async function updateAction(action, btn) {
-  const q = action === "install" ? `Instalez Amper ${upd.data?.latest?.version}? Amper se oprește un minut.`
+  const q = action === "install" ? `Instalez acum Amper ${upd.data?.latest?.version}? Amper se oprește un minut.`
     : `Revin la Amper ${upd.data?.previous?.version}? Amper se oprește un minut.`;
   if (!confirm(q)) return;
   btn.disabled = true; $("#up-msg").textContent = "";
@@ -951,6 +967,16 @@ async function updateAction(action, btn) {
   btn.disabled = false;
 }
 $("#up-go").onclick = () => updateAction("install", $("#up-go"));
+$("#up-dl").onclick = async () => {
+  const b = $("#up-dl");
+  b.disabled = true; $("#up-msg").textContent = "";
+  try {
+    const r = await api("/api/update/download", { method: "POST" });
+    if (r.error) $("#up-msg").textContent = r.error;
+    setTimeout(loadUpdate, 300);
+  } catch (e) { if (e.message !== "auth") $("#up-msg").textContent = "Pi-ul nu răspunde."; }
+  b.disabled = false;
+};
 $("#up-back").onclick = () => updateAction("rollback", $("#up-back"));
 $("#up-beta").onchange = async (e) => {
   const on = e.target.checked;
