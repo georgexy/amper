@@ -2,6 +2,13 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 0.3.0-beta.6 — în pregătire
+- Setări: meniul nou „Despre” cuprinde Actualizări și Info.
+- Acces de oriunde: în loc de pagină goală, „Verific starea Tailscale…” și un mesaj clar dacă Pi-ul nu răspunde;
+  fiecare comandă Tailscale are o limită de 10 secunde.
+- Prima pornire: după ce Pi-ul se conectează la WiFi-ul ales, „Amper-Setup” reapare 3 minute cu adresa Pi-ului
+  din rețeaua de acasă (http://192.168.x.y:8080), ca telefonul s-o găsească.
+
 ## 0.3.0-beta.5 — 2026-10-27
 - Alerte: doar textul scurt; detaliile (ce era în paranteză) apar când atingi alerta.
 - „Alertele mele” s-au mutat în Setări → Automatizări („+ Adaugă automatizare”).
