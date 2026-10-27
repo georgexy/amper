@@ -225,7 +225,7 @@ def test_check_notifies_once_and_channels(tmp_path):
     st = u.check()
     assert st["available"] and st["latest"]["version"] == "0.3.0" and "ceva nou în 0.3.0" in st["latest"]["notes"]
     u.check()
-    assert len(e.notes) == 1 and "0.3.0" in e.notes[0]
+    assert e.notes == ["Versiune nouă detectată. Atinge pentru a actualiza."]      # o singură dată, text scurt
     assert e.updater(channel="beta").check()["latest"]["version"] == "0.4.0-beta.1"
 
 

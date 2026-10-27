@@ -330,3 +330,9 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   nume, fără cele din config și din `daly-auto.json`; `guess` = daly după nume; `types` = `BLE_TYPES`).
   `POST /api/devices/add {device}` → `setup_scan.add_device` (id/nume unice, `ble_name`), overlay `devices` = cele
   reale + cel nou, notificare, repornire (nu în simulator). Doar Daly e suportat; JK/JBD/ANT = `supported: False`.
+
+## Actualizări: ecran și notificare (0.3.0-beta.10, în pregătire)
+- `Notifier.send(..., url=)` → `item.url` → Web Push `url` (implicit `/?v=alerts`); `amper notify --url`.
+  `Updater._notify(msg, url="/?v=update")`, titlul „Amper”; versiune nouă = „Versiune nouă detectată. Atinge pentru a
+  actualiza.” `app.js`: `?v=update` și mesajul SW deschid Setări → Actualizări.
+- Ecran: beta sus, `#up-check` „Caută actualizări”, `.up-new-head` (titlu + „Descarcă”), bara/instalarea înaintea notelor.

@@ -487,9 +487,9 @@ class Updater:
             self.state["notified"] = m["version"]
             self.save()
             if self.urgent_pending():
-                self.notify(f"⬆️ Actualizare urgentă Amper {m['version']} (acum ai {cur}): se instalează singură.")
+                self.notify("Actualizare urgentă detectată. Se instalează singură.")
             else:
-                self.notify(f"Versiune nouă Amper: {m['version']} (acum ai {cur}). Setări → Actualizări.")
+                self.notify("Versiune nouă detectată. Atinge pentru a actualiza.")
         return self.status()
 
     def urgent_pending(self) -> bool:
@@ -533,10 +533,11 @@ class Updater:
             return "unknown"
 
     @staticmethod
-    def _notify(msg: str) -> None:
+    def _notify(msg: str, url: str = "/?v=update") -> None:
+        """Notificările actualizărilor: titlul „Amper”; atinse, deschid Setări → Actualizări."""
         try:                              # ca utilizatorul amper (cheile Web Push, baza de date)
             subprocess.run(["runuser", "-u", "amper", "--", "env", "PYTHONPATH=/opt/amper", "python3", "-m",
-                            "amper", "notify", "--title", "Amper: actualizare", msg],
+                            "amper", "notify", "--title", "Amper", "--url", url, msg],
                            timeout=60, capture_output=True)
         except Exception as e:
             log.warning("notificarea nu a plecat: %s", e)

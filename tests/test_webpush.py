@@ -168,3 +168,30 @@ def test_app_files_are_never_stale_after_update():
     v = eng.app_version()
     assert f'src="app.js?v={v}"' in html and f'href="app.css?v={v}"' in html
     assert page_cc == "no-cache" and js_cc == "no-cache" and font_cc is None
+
+
+def test_notification_url_for_updates(monkeypatch):
+    """Notificarea de actualizare deschide Setări → Actualizări; restul, Alerte."""
+    import json as _json
+    from amper import webpush as W
+    sent = []
+    monkeypatch.setattr(W, "encrypt", lambda payload, p, a: sent.append(_json.loads(payload)) or b"x")
+
+    class DB:
+        def push_subs(self):
+            return [{"endpoint": "https://push.example/x", "p256dh": "p", "auth": "a"}]
+
+    class R:
+        status = 201
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+
+    class Http:
+        def post(self, *a, **k): return R()
+
+    import asyncio, tempfile
+    wp = W.WebPush(DB(), tempfile.mkdtemp())
+    asyncio.run(wp.send(Http(), {"message": "Versiune nouă detectată. Atinge pentru a actualiza.", "title": "Amper",
+                                 "priority": "default", "url": "/?v=update"}))
+    asyncio.run(wp.send(Http(), {"message": "Daly 2 NU se încarcă", "title": "Amper", "priority": "high"}))
+    assert sent[0]["title"] == "Amper" and sent[0]["url"] == "/?v=update" and sent[1]["url"] == "/?v=alerts"
