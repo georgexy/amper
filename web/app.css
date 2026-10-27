@@ -488,3 +488,13 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .ua-act { display: flex; align-items: center; gap: 10px; }
 .list .row.ua-rule { grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; }
 .ua-rule .ua-act { flex-direction: column; align-items: flex-end; gap: 6px; }
+
+/* glisoarele: mereu în dreapta; textul în stânga, până la glisor (pe mai multe rânduri dacă e nevoie).
+   Un singur text → glisorul la mijlocul lui; titlu + descriere mică → glisorul în dreptul titlului. */
+.row-check, .ed-ack { align-items: center; }
+.row-check > span, .ed-ack > span { flex: 1; min-width: 0; }
+.row-check:has(> span small) { align-items: flex-start; }
+.row-check:has(> span small) input[type=checkbox] { margin-top: -4px; }
+.row-check > span b { line-height: 1.4; }
+.list .row.ua-rule { align-items: start; }
+.ua-rule .ua-act input[type=checkbox] { margin-top: -4px; }
