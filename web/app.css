@@ -42,7 +42,7 @@ body {
   font: 400 16px/1.45 "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-variant-numeric: tabular-nums;
   -webkit-text-size-adjust: 100%;
-  padding: env(safe-area-inset-top) 0 calc(104px + env(safe-area-inset-bottom));
+  padding: env(safe-area-inset-top) 0 calc(84px + env(safe-area-inset-bottom));
   min-height: 100vh;
 }
 button { font: inherit; color: inherit; }
@@ -298,17 +298,26 @@ dialog .close { border: 0; background: var(--panel); border-radius: 999px; paddi
 .alarms .prot { color: var(--alarm); font-weight: 600; }
 
 /* ---------- navigație jos ---------- */
-nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(3, 1fr);
-  background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(10px);
-  border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); z-index: 5; }
-nav.tabs button { border: 0; background: none; padding: 10px 0 12px; display: grid; justify-items: center; gap: 2px;
-  font-size: 13px; color: var(--muted); cursor: pointer; }
-nav.tabs svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.8; }
-nav.tabs button[aria-current="page"] { color: var(--text); }
-nav.tabs button[aria-current="page"] svg { stroke: var(--acc); }
-nav.tabs .badge { position: relative; }
-nav.tabs .badge[data-n]::after { content: attr(data-n); position: absolute; top: -4px; right: -10px; background: var(--alarm);
-  color: #fff; font-size: 11px; font-weight: 600; border-radius: 999px; padding: 0 5px; line-height: 16px; }
+/* bara de jos: capsulă plutitoare, aceeași pe toate temele; fiecare buton are culoarea lui,
+   cel activ se umple și își arată numele */
+nav.tabs { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom));
+  width: min(290px, calc(100% - 32px)); display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 5px;
+  border-radius: 999px; background: color-mix(in srgb, #1D3040 92%, transparent); backdrop-filter: blur(10px);
+  border: 1px solid #2A4255; box-shadow: 0 8px 24px rgb(0 0 0 / .45); z-index: 5; }
+nav.tabs button { border: 0; background: none; height: 40px; border-radius: 999px; display: flex; align-items: center;
+  justify-content: center; gap: 6px; font-size: 13px; font-weight: 600; color: #0B1418; cursor: pointer;
+  transition: background .2s; }
+nav.tabs svg { width: 20px; height: 20px; fill: none; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+nav.tabs button[data-view="now"] { --tc: #4FC3F7; } nav.tabs button[data-view="hist"] { --tc: #5BE08F; }
+nav.tabs button[data-view="alerts"] { --tc: #FFB547; }
+nav.tabs svg { stroke: var(--tc); }
+nav.tabs .lb { display: none; }
+nav.tabs button[aria-current="page"] { background: var(--tc); }
+nav.tabs button[aria-current="page"] svg { stroke: #0B1418; }
+nav.tabs button[aria-current="page"] .lb { display: inline; }
+nav.tabs .badge { position: relative; display: flex; }
+nav.tabs .badge[data-n]::after { content: attr(data-n); position: absolute; top: -7px; right: -9px; background: var(--alarm);
+  color: #fff; font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 0 4px; line-height: 15px; }
 
 /* ---------- autentificare ---------- */
 .login { max-width: 360px; margin: 18vh auto 0; padding: 0 16px; display: grid; gap: 12px; }
@@ -430,3 +439,10 @@ nav.tabs .badge[data-n]::after { content: attr(data-n); position: absolute; top:
 .list .row-check:first-child { border-top: 0; }
 .row-check input { transform: scale(1.3); margin-top: 4px; }
 .row-check span { display: grid; gap: 2px; } .row-check small { color: var(--muted); font-size: 13.5px; }
+
+/* sigla (iconița aplicației) înaintea numelui */
+.logo { width: 1.25em; height: 1.25em; border-radius: 22%; vertical-align: -.27em; margin-right: .38em; }
+.top h1, .setup-top h1 { display: flex; align-items: center; }
+.login-h { margin: 0; font-size: 30px; display: flex; align-items: center; }
+/* alerte: textul principal + detaliile (ce era în paranteze) */
+.det { display: block; font-size: 13px; color: var(--muted); font-weight: 400; margin-top: 2px; }

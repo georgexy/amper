@@ -123,7 +123,9 @@ class WebPush:
         return bool(self.db.push_subs())
 
     async def send(self, http, item: dict) -> None:
-        payload = json.dumps({"title": item["title"], "body": item["message"], "priority": item["priority"]},
+        from .notify import split_detail
+        short, _ = split_detail(item["message"])           # detaliile (parantezele) se văd în aplicație, la Alerte
+        payload = json.dumps({"title": item["title"], "body": short, "priority": item["priority"], "url": "/?v=alerts"},
                              ensure_ascii=False).encode()
         for sub in self.db.push_subs():
             body = encrypt(payload, sub["p256dh"], sub["auth"])

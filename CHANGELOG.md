@@ -2,6 +2,14 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 0.3.0-beta.3 — 2026-10-27
+- Sigla Amper (bateria cu fulger) sus, înaintea numelui.
+- Notificările pe telefon arată doar textul principal; atingerea lor deschide Alerte, unde apar și detaliile
+  (ce era în paranteză).
+- Alertele nu mai apar ca benzi pe ecranul principal, doar la Alerte (cifra roșie de pe buton).
+- Bara de jos: o capsulă mai mică, cu iconițe colorate; butonul activ se colorează și își arată numele. La fel pe
+  toate temele.
+
 ## 0.3.0-beta.2 — 2026-10-27
 - Modulele Daly prin Bluetooth: prima căutare se face imediat și când Amper pornește în primele 30 de secunde
   după alimentarea Pi-ului (înainte se amâna).

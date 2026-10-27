@@ -35,6 +35,24 @@ const FAULT_RULES = { not_charging: "nu se încarcă", charge_mos_off: "încărc
   low_soc: "aproape goală", cell_high: "celulă prea sus", cell_delta: "dezechilibrată", soc_divergence: "rămâne în urmă",
   bms_alarm: "avertisment BMS", bms_protection: "protecție BMS" };
 
+/* „Daly 2: BMS-ul a OPRIT încărcarea (MOSFET încărcare OFF)” → textul principal + detaliile (ce e în paranteze) */
+function splitDetail(m) {
+  const short = [], det = [];
+  let cur = [], depth = 0;
+  for (const ch of String(m || "")) {
+    if (ch === "(" && ++depth === 1) { cur = []; continue; }
+    if (ch === ")" && depth) { if (--depth === 0) { det.push(cur.join("").trim()); continue; } }
+    (depth ? cur : short).push(ch);
+  }
+  if (depth) return [m, ""];
+  const text = short.join("").replace(/\s{2,}/g, " ").replace(/ :/g, ":").trim();
+  return [text || m, det.filter(Boolean).join("; ")];
+}
+function alertText(m) {
+  const [short, det] = splitDetail(m);
+  return `<span><b>${esc(short)}</b>${det ? `<small class="det">${esc(det)}</small>` : ""}</span>`;
+}
+
 const state = { info: null, snap: null, view: "now", hours: 24, lastMsg: 0, ws: null, sheetDev: null, energy: [],
   look: "cadrane", day: null, dayDrawn: null };
 
@@ -60,12 +78,14 @@ async function boot() {
   if (state.info.setup_needed) return openSetup(false);
   $("#app").hidden = false;
   $("#simnote").hidden = !state.info.simulated;
-  if (state.info.site_name) { $(".top h1").textContent = state.info.site_name; document.title = `Amper · ${state.info.site_name}`; }
+  if (state.info.site_name) { $("#site-name").textContent = state.info.site_name; document.title = `Amper · ${state.info.site_name}`; }
   connect();
   loadEnergy();
   setInterval(loadEnergy, 60000);
   loadDay();
   setInterval(loadDay, 300000);
+  const v = new URLSearchParams(location.search).get("v");
+  if (v === "alerts") { show("alerts"); history.replaceState(null, "", location.pathname); }
   $("#version").textContent = `Amper ${state.info.version || ""} · citire la fiecare ${state.info.poll_interval} s.`;
   setInterval(tickConn, 1000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -457,20 +477,7 @@ function renderNow() {
   if (state.view === "inverter") renderInverterLive();
   if (state.view === "settings") renderDaly();
 
-  // bannere: câte unul pe dispozitiv, cu cauza cea mai probabilă primul
-  const groups = new Map();
-  // „nu mai comunică” nu apare pe prima pagină: vine ca notificare și rămâne în secțiunea Alerte
-  for (const a of [...(s.alerts || [])].filter((x) => x.rule !== "comm_lost" && x.level !== "info").sort(alertOrder)) {
-    const k = a.device || a.rule;
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k).push(a);
-  }
-  const gs = [...groups.values()];
-  $("#banners").innerHTML = gs.slice(0, 3).map((g) => {
-    const a = g[0], more = g.length - 1;
-    return `<div class="banner ${a.level}" role="alert"><b>${esc(a.message)}</b>
-      <small>de ${a.since ? ago(a.since).replace("acum ", "") : ""}${more ? `, plus încă ${more === 1 ? "o alertă" : more + " alerte"} pentru același modul` : ""}</small></div>`;
-  }).join("") + (gs.length > 3 ? `<div class="note">Alte alerte în secțiunea Alerte.</div>` : "");
+  // alertele nu mai apar ca bannere pe ecranul principal: doar la Alerte (cifra roșie de pe buton)
 }
 
 /* ------------------------------------------------------------------ ecranul BATERIILE */
@@ -1368,7 +1375,7 @@ addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => $$(".
 function renderActiveAlerts() {
   const a = state.snap?.alerts || [];
   $("#al-active").innerHTML = a.length ? a.map((x) => `
-    <div class="row ${x.level}"><span>${esc(x.message)}</span><span class="t">de ${x.since ? ago(x.since).replace("acum ", "") : ""}</span></div>`).join("")
+    <div class="row ${x.level}">${alertText(x.message)}<span class="t">de ${x.since ? ago(x.since).replace("acum ", "") : ""}</span></div>`).join("")
     : `<div class="empty">Nicio alertă. Toate modulele funcționează normal.</div>`;
 }
 async function loadAlerts() {
@@ -1376,7 +1383,7 @@ async function loadAlerts() {
   const r = await api("/api/alerts?limit=60");
   const closed = r.history.filter((x) => x.ts_end);
   $("#al-hist").innerHTML = closed.length ? closed.map((x) => `
-    <div class="row ${x.level} closed"><span>${esc(x.message)}</span>
+    <div class="row ${x.level} closed">${alertText(x.message)}
     <span class="t">${dayTime(x.ts_start)} – ${hhmm(x.ts_end)}</span></div>`).join("")
     : `<div class="empty">Nu au fost alerte până acum.</div>`;
 }
@@ -1733,3 +1740,8 @@ $("#su-back").onclick = () => {
   su.i -= SU_STEPS[su.i].k === "notif" && !su.chosen ? 2 : 1;
   suRender();
 };
+
+/* atingerea unei notificări cu aplicația deja deschisă: service worker-ul trimite adresa */
+navigator.serviceWorker?.addEventListener("message", (e) => {
+  if (String(e.data?.open || "").includes("v=alerts") && !$("#app").hidden) show("alerts");
+});

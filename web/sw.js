@@ -1,5 +1,5 @@
 /* Service worker: aplicația se deschide instant și arată ultima versiune salvată dacă Pi-ul nu răspunde. */
-const CACHE = "amper-v14";
+const CACHE = "amper-v15";
 const SHELL = ["/", "/app.css", "/app.js", "/manifest.webmanifest", "/icon.svg", "/icon-192.png",
   "/fonts/barlow-latin-400-normal.woff2", "/fonts/barlow-latin-600-normal.woff2",
   "/fonts/barlow-condensed-latin-600-normal.woff2", "/fonts/barlow-condensed-latin-700-normal.woff2"];
@@ -28,13 +28,17 @@ self.addEventListener("push", (e) => {
   try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data && e.data.text() }; }
   e.waitUntil(self.registration.showNotification(d.title || "Amper", {
     body: d.body || "", icon: "/icon-192.png", badge: "/icon-192.png", tag: d.tag || undefined,
-    requireInteraction: d.priority === "high",
+    requireInteraction: d.priority === "high", data: { url: d.url || "/" },
   }));
 });
+// atingerea notificării deschide Amper la Alerte, unde se văd și detaliile
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || "/";
   e.waitUntil(self.clients.matchAll({ type: "window" }).then((cs) => {
     const c = cs.find((x) => "focus" in x);
-    return c ? c.focus() : self.clients.openWindow("/");
+    if (!c) return self.clients.openWindow(url);
+    c.postMessage({ open: url });
+    return c.focus();
   }));
 });

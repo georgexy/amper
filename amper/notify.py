@@ -7,11 +7,35 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from collections import deque
 
 log = logging.getLogger(__name__)
 
 PRIO = {"low": 2, "default": 3, "high": 5}
+
+
+def split_detail(message: str) -> tuple[str, str]:
+    """„Daly 2: BMS-ul a OPRIT încărcarea (MOSFET încărcare OFF)” → ("Daly 2: BMS-ul a OPRIT încărcarea",
+    "MOSFET încărcare OFF"): pe telefon apare doar textul principal, detaliile în aplicație (Alerte).
+    Doar parantezele de pe primul nivel; cele dinăuntru rămân în detalii."""
+    short, details, cur, depth = [], [], [], 0
+    for ch in message:
+        if ch == "(":
+            depth += 1
+            if depth == 1:
+                cur = []
+                continue
+        elif ch == ")" and depth:
+            depth -= 1
+            if depth == 0:
+                details.append("".join(cur).strip())
+                continue
+        (cur if depth else short).append(ch)
+    if depth:                                        # paranteză neînchisă: mesajul rămâne cum e
+        return message, ""
+    text = re.sub(r"\s{2,}", " ", "".join(short)).replace(" :", ":").strip()
+    return (text or message), "; ".join(d for d in details if d)
 
 
 class Notifier:
