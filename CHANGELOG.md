@@ -21,7 +21,10 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
   „Copiază”, ca s-o dai celor din casă.
 - În aplicație, conexiunea pentru accesul de oriunde se numește „server” (ex. „Conectare la server”).
 - Setări → „Dispozitive conectate” (în loc de „Module Daly”): invertorul și toate BMS-urile, grupate după tip și
-  ordonate după adresă, cu legătura (Bluetooth, cablu, RS485), viteza, capacitatea și dacă comunică acum.
+  ordonate după adresă, cu legătura (Bluetooth, cablu, RS485), viteza, capacitatea și dacă comunică acum. Butonul
+  „+ Adaugă dispozitiv” deschide ghidul direct la căutarea dispozitivelor.
+- Setări reorganizate: meniul „Conectare” (Acces de oriunde, Partajează Amper, Rețeaua WiFi); „Ghid de configurare”
+  în Despre, lângă Actualizări și Info.
 
 ## 0.3.0-beta.6 — 2026-10-27
 - Setări: meniul nou „Despre” cuprinde Actualizări și Info.

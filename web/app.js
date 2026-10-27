@@ -776,8 +776,11 @@ $("#daly-search").onclick = async () => {
 /* meniul setărilor: butoane → secțiuni (Teme, Notificări, Module Daly) */
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "notif", "daly", "info", "update", "security", "remote", "auto", "about"]) $("#set-" + k).hidden = k !== name;
-  if (name === "about") { $("#about-version").textContent = $("#version").textContent; loadShare(); }
+  for (const k of ["teme", "notif", "daly", "info", "update", "security", "remote", "auto", "about", "conn", "share", "wifi"])
+    $("#set-" + k).hidden = k !== name;
+  if (name === "about") $("#about-version").textContent = $("#version").textContent;
+  if (name === "share") loadShare();
+  if (name === "wifi") loadWifiNow();
   if (name === "auto") loadUserAlerts();
   if (name === "remote") renderRemote($("#remote-body"));
   if (name === "security") loadSecurity();
@@ -791,6 +794,14 @@ function showPanel(name) {
 }
 $$(".set-btn[data-panel]").forEach((b) => (b.onclick = () => showPanel(b.dataset.panel)));
 $("#set-wizard").onclick = () => openSetup(true);
+$("#dev-add").onclick = () => openSetup(true, "devices");
+async function loadWifiNow() {
+  try {
+    const r = await api("/api/wifi/status");
+    const a = String(r.active || "").replace(/^wifi-/, "");
+    $("#wifi-now").innerHTML = r.error ? esc(r.error) : a ? `Acum Pi-ul e conectat la <b>${esc(a)}</b>.` : "Pi-ul nu e conectat la nicio rețea WiFi (poate e pe cablu).";
+  } catch {}
+}
 
 async function loadSecurity() {
   let r;
@@ -1640,8 +1651,9 @@ const SU_STEPS = [
 const DEV_NAME = { daly: "Daly", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
 const su = { i: 0, d: null, chosen: null, keep: false, again: false, pollT: 0 };
 
-async function openSetup(again) {
-  su.again = again; su.i = 0; su.chosen = null; su.keep = false;
+async function openSetup(again, step) {
+  su.again = again; su.chosen = null; su.keep = false;
+  su.i = su.start = Math.max(0, SU_STEPS.findIndex((x) => x.k === step));     // „+ Adaugă dispozitiv” → direct la Dispozitive
   try { su.d = await api("/api/setup"); } catch { return; }
   $("#app").hidden = true; $("#login").hidden = true; $("#setup").hidden = false;
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -1656,7 +1668,7 @@ function suRender() {
   $("#su-dots").innerHTML = SU_STEPS.map((x, i) => `<i class="${i < su.i ? "done" : i === su.i ? "on" : ""}"></i>`).join("");
   $("#su-err").textContent = "";
   $("#su-back").hidden = su.i === 0 && !su.again;
-  $("#su-back").textContent = su.i === 0 ? "‹ Renunță" : "‹ Înapoi";
+  $("#su-back").textContent = su.i === su.start ? "‹ Renunță" : "‹ Înapoi";
   $("#su-next").textContent = su.i === SU_STEPS.length - 1 ? "Gata" : "Mai departe";
   $("#su-next").disabled = false;
   const b = $("#su-body");
@@ -1824,7 +1836,7 @@ $("#su-next").onclick = async () => {
   b.disabled = false;
 };
 $("#su-back").onclick = () => {
-  if (su.i === 0) { $("#setup").hidden = true; $("#app").hidden = false; return; }   // reluat din Setări: renunță
+  if (su.i === su.start) { $("#setup").hidden = true; $("#app").hidden = false; return; }   // reluat din Setări: renunță
   su.i -= SU_STEPS[su.i].k === "notif" && !su.chosen ? 2 : 1;
   suRender();
 };
