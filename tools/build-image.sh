@@ -118,7 +118,15 @@ CMD="$ROOT/boot/firmware/cmdline.txt"
 grep -q "ieee80211_regdom" "$CMD" || sed -i "1s/\$/ cfg80211.ieee80211_regdom=$COUNTRY/" "$CMD"
 in_root raspi-config nonint do_wifi_country "$COUNTRY" >/dev/null 2>&1 || true
 
-# cloud-init (Trixie): ce face la prima pornire fără personalizare din Imager — doar afișat, pentru verificare
+# cloud-init (Trixie): implicit poate crea un utilizator la prima pornire; Amper nu are cont de logare
+if [ -f "$ROOT/boot/firmware/user-data" ]; then
+  cat > "$ROOT/boot/firmware/user-data" <<'CI'
+#cloud-config
+# Amper: fără utilizator de logare (SSH e oprit); totul se configurează din aplicație.
+users: []
+ssh_pwauth: false
+CI
+fi
 for f in user-data meta-data network-config; do
   [ -f "$ROOT/boot/firmware/$f" ] && { echo "--- boot/firmware/$f"; grep -v '^\s*$' "$ROOT/boot/firmware/$f" | head -30; }
 done
@@ -153,6 +161,7 @@ in_root python3 -c "import yaml,sys; c=yaml.safe_load(open('/etc/amper/config.ya
 in_root python3 -c "import sys; sys.path.insert(0,'/opt/amper'); import amper.web, amper.update, amper.wifi_setup, amper.drivers.daly" \
   || fail "programul nu se încarcă"
 [ -x "$ROOT/usr/bin/tailscale" ] || fail "lipsește Tailscale"
+[ ! -f "$ROOT/boot/firmware/user-data" ] || grep -q "^users: \[\]" "$ROOT/boot/firmware/user-data" || fail "cloud-init creează un utilizator"
 [ -z "$(ls -A "$ROOT/var/lib/amper")" ] && [ -z "$(ls -A "$ROOT/var/lib/tailscale" 2>/dev/null)" ] || fail "date în imagine"
 ls "$ROOT"/etc/ssh/ssh_host_* >/dev/null 2>&1 && fail "chei SSH în imagine"
 [ -s "$ROOT/etc/machine-id" ] && fail "machine-id în imagine"
