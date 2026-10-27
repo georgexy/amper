@@ -206,7 +206,8 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   (merge și de pe HDMI; de pe telefon middleware-ul cere și cookie). `app_version` include `__version__`.
 - Lansare: `tools/release.py` (keygen/build/verify/notes) + `.github/workflows/release.yml` (workflow_dispatch sau
   tag `v*`; versiunea din `amper/__init__.py`, notele din `CHANGELOG.md`; `-beta` → pre-release).
-  `tests.yml` rulează testele la push/PR. Secretul `AMPER_SIGNING_KEY` și cheia publică le pune utilizatorul.
+  `tests.yml` rulează testele la push/PR. Cheia publică e în `amper/update_key.py` (2026-10-27); privata e doar
+  secretul repo-ului `AMPER_SIGNING_KEY` (pus de utilizator) și copia lui personală.
 
 ## Lucru pe Pi
 - Datele de acces la Pi-ul autorului (utilizator, IP-uri, Tailscale): în `LOCAL.md`.

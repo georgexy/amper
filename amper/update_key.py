@@ -6,4 +6,6 @@ O cheie nouă se generează cu `python tools/release.py keygen`; lista permite s
 cea nouă, se lansează o versiune semnată cu cea veche, apoi se semnează cu cea nouă).
 """
 
-PUBLIC_KEYS: list[str] = []          # base64, 32 de octeți fiecare
+PUBLIC_KEYS: list[str] = [          # base64, 32 de octeți fiecare
+    "yt6lXvC7qWeVWVign02N5znzBxdU01/E40Bfirlcw1k=",      # cheia autorului, 2026-10-27
+]
