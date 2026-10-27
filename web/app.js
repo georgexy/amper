@@ -807,7 +807,7 @@ async function loadInfo() {
       <div class="row"><span>Adrese locale</span><span class="t">${Object.entries(n.ip || {}).filter(([k]) => k !== "lo")
         .map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(" · ") || "–"}</span></div>
       <div class="row"><span>Cablu de rețea</span><span class="t">${eth ? (eth.state === "connected" ? "legat" : "nelegat") : "–"}</span></div>
-      <div class="row"><span>Tailscale: <b>${ts.state === "Running" ? "conectat" : esc(ts.state || "–")}</b></span>
+      <div class="row"><span>Server: <b>${ts.state === "Running" ? "conectat" : ts.state ? "neconectat" : "–"}</b></span>
         <span class="t">${esc(ts.ip || "")} · ${esc(ts.name || "")}</span></div>
       ${(ts.peers || []).map((p) => `<div class="row"><span>${esc(p.name)}</span>
         <span class="t">${p.online ? "online" : "offline"} · ${esc(p.os || "")}</span></div>`).join("")}
@@ -1870,19 +1870,19 @@ function startUpdateOverlay(kind) {
 }
 $("#upov-close").onclick = () => { $("#upov").hidden = true; state.updating = false; loadUpdate(); };
 
-/* ------------------------------------------------------------------ ACCES DE ORIUNDE (Tailscale + Funnel) */
+/* ------------------------------------------------------------------ ACCES DE ORIUNDE (Tailscale + Funnel; în aplicație: „server”) */
 const remote = { timer: 0 };
 async function renderRemote(el) {
   clearTimeout(remote.timer);
   if (!el || el.closest("[hidden]")) return;
-  if (!el.innerHTML.trim()) el.innerHTML = `<p class="note">Verific starea Tailscale pe Pi…</p>`;
+  if (!el.innerHTML.trim()) el.innerHTML = `<p class="note">Verific conexiunea la server…</p>`;
   let r;
   try {
     const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 25000);
     r = await api("/api/remote", { signal: ctl.signal }).finally(() => clearTimeout(t));
   } catch (e) {
     if (e.message === "auth") return;
-    el.innerHTML = `<p class="err">${e.name === "AbortError" ? "Pi-ul nu a răspuns în 25 de secunde (Tailscale nu răspunde)."
+    el.innerHTML = `<p class="err">${e.name === "AbortError" ? "Pi-ul nu a răspuns în 25 de secunde (serverul nu răspunde)."
       : "Pi-ul nu răspunde."}</p><button class="btn" id="rm-retry">Încearcă din nou</button>`;
     $("#rm-retry", el).onclick = () => { el.innerHTML = ""; renderRemote(el); };
     return;
@@ -1890,31 +1890,31 @@ async function renderRemote(el) {
   const job = r.job || {}, waiting = job.state === "running";
   let h = "";
   if (r.error) h = `<p class="note">${esc(r.error)}. Accesul de oriunde se pornește doar pe Pi-ul instalat cu install.sh.</p>`;
-  else if (!r.installed) h = `<p class="note">Tailscale nu e instalat pe acest Pi.</p>`;
+  else if (!r.installed) h = `<p class="note">Programul de conectare la server nu e instalat pe acest Pi.</p>`;
   else if (r.state !== "Running") {
-    h = `<p class="note">Ca să deschizi Amper și când nu ești acasă, Pi-ul se leagă de un cont <b>Tailscale</b> (gratuit,
-      te loghezi cu contul Google). Contul e al tău; nimeni altcineva nu are acces.</p>`;
+    h = `<p class="note">Ca să deschizi Amper și când nu ești acasă, Pi-ul se conectează la un <b>server</b> securizat
+      (gratuit; te conectezi cu contul tău Google). Contul e al tău; nimeni altcineva nu are acces.</p>`;
     h += waiting && (job.url || r.auth_url)
       ? `<p class="note"><b>1.</b> Deschide pagina de mai jos și loghează-te (cu Google). <b>2.</b> Revino aici: pagina se
-           actualizează singură.</p><a class="btn ed-go rm-link" href="${esc(job.url || r.auth_url)}" target="_blank" rel="noopener">Deschide pagina Tailscale</a>
+           actualizează singură.</p><a class="btn ed-go rm-link" href="${esc(job.url || r.auth_url)}" target="_blank" rel="noopener">Deschide pagina de conectare</a>
          <p class="note">Aștept logarea…</p>`
-      : `<button class="btn ed-go" id="rm-login">Conectează-te la Tailscale</button>`;
+      : `<button class="btn ed-go" id="rm-login">Conectare la server</button>`;
   } else {
-    h = `<div class="list"><div class="row"><span>✓ Conectat la Tailscale${r.account ? ` (${esc(r.account)})` : ""}</span>
+    h = `<div class="list"><div class="row"><span>✓ Conectat la server${r.account ? ` (${esc(r.account)})` : ""}</span>
       <span class="t">${esc(r.url || "")}</span></div></div>`;
     if (r.funnel) {
       h += `<p class="up-ok">✓ Accesul de oriunde e pornit.</p>
-        <p class="note">Deschide pe orice telefon, <b>fără aplicația Tailscale</b>:<br><b class="rm-url">${esc(r.url)}</b><br>
+        <p class="note">Deschide pe orice telefon, <b>fără nicio aplicație în plus</b>:<br><b class="rm-url">${esc(r.url)}</b><br>
           apoi adaug-o pe ecranul principal (Partajare → Adaugă pe ecranul principal). Intrarea cere parola aplicației.</p>
         <button class="btn danger" id="rm-off">Oprește accesul de oriunde</button>`;
     } else if (waiting && job.kind === "funnel" && job.url) {
-      h += `<p class="note">Tailscale cere o singură dată aprobarea ta pentru adresa publică (HTTPS și Funnel).
+      h += `<p class="note">Serverul cere o singură dată aprobarea ta pentru adresa publică.
           Deschide pagina, apasă „Enable” / „Approve”, apoi revino aici.</p>
-        <a class="btn ed-go rm-link" href="${esc(job.url)}" target="_blank" rel="noopener">Aprobă în Tailscale</a>
+        <a class="btn ed-go rm-link" href="${esc(job.url)}" target="_blank" rel="noopener">Aprobă pe server</a>
         <p class="note">Aștept aprobarea…</p>`;
     } else {
-      h += `<p class="note">Acum adresa merge doar pe telefoanele cu Tailscale. <b>Accesul de oriunde</b> o face să meargă pe
-          orice telefon, fără aplicația Tailscale. Adresa devine publică: o protejează parola aplicației, blocarea după
+      h += `<p class="note">Acum adresa merge doar pe telefoanele conectate la server (cu aplicația lui). <b>Accesul de
+          oriunde</b> o face să meargă pe orice telefon, fără nicio aplicație în plus. Adresa devine publică: o protejează parola aplicației, blocarea după
           parole greșite și notificarea la fiecare dispozitiv nou.</p>
         <button class="btn ed-go" id="rm-on" ${waiting ? "disabled" : ""}>${waiting ? "Pornesc…" : "Pornește accesul de oriunde"}</button>`;
     }
@@ -1931,7 +1931,7 @@ async function renderRemote(el) {
   if ($("#rm-login", el)) $("#rm-login", el).onclick = () => act("/api/remote/login", {});
   if ($("#rm-on", el)) $("#rm-on", el).onclick = () => act("/api/remote/funnel", { on: true });
   if ($("#rm-off", el)) $("#rm-off", el).onclick = () =>
-    confirm("Opresc accesul de oriunde? Telefoanele fără Tailscale nu vor mai putea deschide Amper.") && act("/api/remote/funnel", { on: false });
+    confirm("Opresc accesul de oriunde? De la distanță, Amper se va deschide doar pe telefoanele conectate la server.") && act("/api/remote/funnel", { on: false });
   if (waiting) remote.timer = setTimeout(() => renderRemote(el), 2500);
 }
 
@@ -1942,7 +1942,7 @@ async function loadShare() {
   if (rm.url && rm.funnel)
     out.push({ t: "De oriunde", d: "Merge pe orice telefon, acasă sau oriunde, fără altă aplicație.", url: rm.url });
   else if (rm.url && rm.state === "Running")
-    out.push({ t: "De oriunde (doar cu Tailscale)", d: "Merge doar pe telefoanele cu aplicația Tailscale în contul tău. " +
+    out.push({ t: "De oriunde (doar telefoanele conectate la server)", d: "Merge doar pe telefoanele cu aplicația serverului, în contul tău. " +
       "Pornește „Acces de oriunde” din Setări ca să meargă pentru oricine.", url: rm.url });
   const port = state.info?.port || 8080;
   const ips = Object.entries(sys.network?.ip || {}).filter(([k, ip]) => k !== "lo" && !k.startsWith("tailscale") &&

@@ -409,7 +409,7 @@ def make_app(engine) -> web.Application:
 
     async def remote_login(request):
         body = await request.json() if request.can_read_body else {}
-        if auth_.enabled and (err := await confirm(request, body, "Tailscale")) is not None:
+        if auth_.enabled and (err := await confirm(request, body, "conectare la server")) is not None:
             return err
         data, status = await update_api("POST", "/remote/login")
         return _json(remote_seen(data), status)
