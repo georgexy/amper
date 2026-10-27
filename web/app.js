@@ -477,20 +477,7 @@ function renderNow() {
   if (state.view === "inverter") renderInverterLive();
   if (state.view === "settings") renderDaly();
 
-  // bannere: câte unul pe dispozitiv, cu cauza cea mai probabilă primul
-  const groups = new Map();
-  // „nu mai comunică” nu apare pe prima pagină: vine ca notificare și rămâne în secțiunea Alerte
-  for (const a of [...(s.alerts || [])].filter((x) => x.rule !== "comm_lost" && x.level !== "info").sort(alertOrder)) {
-    const k = a.device || a.rule;
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k).push(a);
-  }
-  const gs = [...groups.values()];
-  $("#banners").innerHTML = gs.slice(0, 3).map((g) => {
-    const a = g[0], more = g.length - 1;
-    return `<div class="banner ${a.level}" role="alert" data-go="alerts"><b>${esc(splitDetail(a.message)[0])}</b>
-      <small>de ${a.since ? ago(a.since).replace("acum ", "") : ""}${more ? `, plus încă ${more === 1 ? "o alertă" : more + " alerte"} pentru același modul` : ""}</small></div>`;
-  }).join("") + (gs.length > 3 ? `<div class="note">Alte alerte în secțiunea Alerte.</div>` : "");
+  // alertele nu mai apar ca bannere pe ecranul principal: doar la Alerte (cifra roșie de pe buton)
 }
 
 /* ------------------------------------------------------------------ ecranul BATERIILE */
@@ -1758,4 +1745,3 @@ $("#su-back").onclick = () => {
 navigator.serviceWorker?.addEventListener("message", (e) => {
   if (String(e.data?.open || "").includes("v=alerts") && !$("#app").hidden) show("alerts");
 });
-$("#banners").addEventListener("click", (e) => { if (e.target.closest("[data-go=alerts]")) show("alerts"); });

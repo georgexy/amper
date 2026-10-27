@@ -52,7 +52,6 @@
 
     <!-- ====================== ACUM ====================== -->
     <main id="view-now" class="wrap">
-      <div id="banners"></div>
       <!-- conținutul depinde de tema aleasă (app.js, LOOKS) -->
       <div id="home"></div>
     </main>
@@ -250,12 +249,12 @@
     </main>
 
     <nav class="tabs" aria-label="Secțiuni">
-      <button data-view="now" aria-current="page">
-        <svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 2h6M8.5 14h7M8.5 10.5h7"/></svg>Acum</button>
-      <button data-view="hist">
-        <svg viewBox="0 0 24 24"><path d="M3 20h18M5 16l4-6 4 3 6-9"/></svg>Istoric</button>
-      <button data-view="alerts"><span class="badge" id="badge">
-        <svg viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4"/></svg></span>Alerte</button>
+      <button data-view="now" aria-current="page" aria-label="Acum">
+        <svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 2h6M8.5 14h7M8.5 10.5h7"/></svg><span class="lb">Acum</span></button>
+      <button data-view="hist" aria-label="Istoric">
+        <svg viewBox="0 0 24 24"><path d="M3 20h18M5 16l4-6 4 3 6-9"/></svg><span class="lb">Istoric</span></button>
+      <button data-view="alerts" aria-label="Alerte"><span class="badge" id="badge">
+        <svg viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4"/></svg></span><span class="lb">Alerte</span></button>
     </nav>
   </div>
 
