@@ -148,7 +148,7 @@ mv "$ROOT/etc/resolv.conf.orig" "$ROOT/etc/resolv.conf" 2>/dev/null || rm -f "$R
 say "Verific imaginea"
 fail() { echo "::error::$*"; ls -la "$ROOT/etc/systemd/system" "$ROOT/etc/systemd/system/multi-user.target.wants" || true; exit 1; }
 [ -L "$ROOT/opt/amper" ] && [ -f "$ROOT/opt/amper-$VER/amper/__init__.py" ] || fail "programul lipsește"
-for u in amper amper-update amper-wifi amper-firstboot amper-grow-root; do
+for u in amper amper-update amper-wifi amper-firstboot amper-grow-root amper-password-reset; do
   [ -L "$ROOT/etc/systemd/system/multi-user.target.wants/$u.service" ] || fail "$u.service nu e activat"
 done
 for f in multi-user.target.wants/ssh.service sockets.target.wants/ssh.socket; do

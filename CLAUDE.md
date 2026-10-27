@@ -277,3 +277,13 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   machine-id. Cheile VAPID, cookie.key și DB le face amper la pornire.
 - `.github/workflows/image.yml`: pe `ubuntu-24.04-arm`; la PR doar construiește + verifică (Artifacts 3 zile);
   „Run workflow” o adaugă la versiunea publicată v<ver>. NEVERIFICAT: pornirea imaginii pe un Pi real.
+
+## Parola uitată (0.3.0-beta.8, 2026-10-27)
+- `amper/password_reset.py` + `amper-password-reset.service` (root, la fiecare pornire, înaintea amper): fișier
+  `resetare-parola*` (orice extensie/majuscule) în /boot/firmware → overlay `web.password=""`, `password_hash=""`,
+  `password_reset=<ts>` (settings.yaml dat înapoi lui amper), fișierul șters. `post-update.sh` instalează și activează
+  unitatea pe Pi-urile existente.
+- `web.py`: `reset_pending()` → `/api/info.password_reset`, notificare la pornire; cât e în așteptare, cererile prin
+  proxy (Tailscale serve/Funnel) la /api/* primesc 403 `reset_local`. Parola nouă (`/api/setup/password`) șterge
+  `password_reset`. `app.js`: `openSetup(false, "password", true)` = doar ecranul „Parolă nouă”; `showResetLocal`.
+- Utilizatorul NU vrea (deocamdată) butonul de feedback din 3.7.

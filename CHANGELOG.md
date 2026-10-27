@@ -7,6 +7,9 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
   „Amper-Setup”, apoi ghidul de configurare. Imaginea e aceeași pentru toți; ce trebuie să fie unic (topicul de
   notificări, cheile, baza de date) se face la prima pornire. SSH e oprit, numele în rețea e „amper”.
 - Hotspotul deblochează singur WiFi-ul la pornire (pe un card nou Raspberry Pi OS îl ține blocat).
+- Parola uitată: pui pe card (partiția „bootfs”, din calculator) un fișier `resetare-parola.txt` și pornești Pi-ul;
+  parola se șterge, primești notificare, iar aplicația cere una nouă — doar din rețeaua de acasă, nu prin adresa
+  de oriunde.
 - Documentație nouă, simplă, pentru cei care primesc Amper (README): ce trebuie cumpărat, scrierea cardului,
   prima pornire, ce faci dacă nu apare „Amper-Setup”. Instalarea manuală a trecut în docs/instalare-avansata.md.
 

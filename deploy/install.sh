@@ -149,6 +149,10 @@ restart amper
 cp "$SRC/deploy/amper-backup.service" "$SRC/deploy/amper-backup.timer" "$SRC/deploy/amper-grow-root.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable amper-grow-root.service >/dev/null 2>&1
+# parola uitată: fișierul resetare-parola.txt pus pe card (partiția bootfs) o șterge la pornire
+cp "$SRC/deploy/amper-password-reset.service" /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable amper-password-reset.service >/dev/null 2>&1
 if [ -f "$ETC/.firstboot" ]; then
   cp "$SRC/deploy/amper-firstboot.service" /etc/systemd/system/
   systemctl enable amper-firstboot.service >/dev/null 2>&1

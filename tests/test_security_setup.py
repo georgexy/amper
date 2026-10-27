@@ -209,3 +209,37 @@ def test_update_channel_saved(tmp_path):
     u = e.updater()
     assert u.set_channel("beta")["channel"] == "beta"
     assert e.updater().channel == "beta"                      # păstrat după repornire
+
+
+# ---------------------------------------------------------------- parola uitată (fișierul de pe card)
+def test_password_reset_from_card(tmp_path):
+    from amper.password_reset import reset
+    boot = tmp_path / "boot"
+    boot.mkdir()
+    cfg_path = write_cfg(tmp_path, "web:\n  password: veche-din-config\n")
+    (tmp_path / "settings.yaml").write_text(yaml.safe_dump({"setup_done": True,
+                                                            "web": {"password_hash": A.hash_password("parola-buna")}}))
+    assert not reset(cfg_path, boot_dirs=[str(boot)], owner=None)          # fără fișier: nimic
+    (boot / "Resetare-Parola.txt.txt").write_text("")                     # Windows ascunde „.txt”
+    assert reset(cfg_path, boot_dirs=[str(boot)], owner=None)
+    assert not list(boot.iterdir())
+    cfg = load_config(cfg_path)
+    assert not A.Auth(cfg).enabled and cfg["password_reset"] and not setup_needed(cfg)
+
+
+def test_password_reset_only_from_home_network(tmp_path):
+    async def steps(c, eng, n):
+        info = await (await c.get("/api/info")).json()
+        remote = await c.get("/api/info", headers={**PHONE, "Tailscale-Funnel-Request": "?1"})
+        remote_set = await c.post("/api/setup/password", json={"password": "hacker-pw1", "repeat": "hacker-pw1"},
+                                  headers=PHONE)
+        home = {"User-Agent": PHONE["User-Agent"]}                         # din rețeaua de acasă: fără proxy
+        ok = await c.post("/api/setup/password", json={"password": "parola-noua", "repeat": "parola-noua"}, headers=home)
+        after = await (await c.get("/api/info")).json()
+        return info, remote.status, (await remote.json()), remote_set.status, ok.status, after, n.sent
+    info, rs, rj, rset, ok, after, sent = run({"password_reset": 1, "setup_done": True}, steps, tmp_path)
+    assert info["password_reset"] and not info["setup_needed"]
+    assert rs == 403 and rj["reset_local"] and rset == 403 and ok == 200
+    assert not after["password_reset"] and after["auth"]
+    assert not (yaml.safe_load((tmp_path / "settings.yaml").read_text()) or {}).get("password_reset")
+    assert any("ștearsă cu fișierul de pe card" in m for m in sent)

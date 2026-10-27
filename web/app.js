@@ -72,6 +72,10 @@ const state = { histReq: 0, info: null, snap: null, view: "now", hours: 24, last
 async function api(path, opts) {
   const r = await fetch(path, { credentials: "same-origin", ...opts });
   if (r.status === 401) { showLogin(); throw new Error("auth"); }
+  if (r.status === 403) {
+    const j = await r.clone().json().catch(() => ({}));
+    if (j.reset_local) { showResetLocal(j.error); throw new Error("reset"); }
+  }
   return r.json();
 }
 
@@ -83,11 +87,12 @@ async function boot() {
   try {
     state.info = await api("/api/info");
   } catch (e) {
-    if (e.message !== "auth") setTimeout(boot, 3000);
+    if (e.message !== "auth" && e.message !== "reset") setTimeout(boot, 3000);
     return;
   }
   $("#login").hidden = true;
   if (state.info.setup_needed) return openSetup(false);
+  if (state.info.password_reset) return openSetup(false, "password", true);
   $("#app").hidden = false;
   $("#simnote").hidden = !state.info.simulated;
   if (state.info.site_name) { $("#site-name").textContent = state.info.site_name; document.title = `Amper · ${state.info.site_name}`; }
@@ -1651,8 +1656,15 @@ const SU_STEPS = [
 const DEV_NAME = { daly: "Daly", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
 const su = { i: 0, d: null, chosen: null, keep: false, again: false, pollT: 0 };
 
-async function openSetup(again, step) {
-  su.again = again; su.chosen = null; su.keep = false;
+// parola ștearsă cu fișierul de pe card, iar telefonul e pe adresa publică: parola nouă se alege doar de acasă
+function showResetLocal(msg) {
+  $("#app").hidden = true; $("#setup").hidden = true; $("#login").hidden = false;
+  $("#pw").hidden = true; $("#pwgo").hidden = true; $('label[for="pw"]').hidden = true;
+  $("#pwerr").textContent = msg;
+}
+
+async function openSetup(again, step, reset = false) {
+  su.again = again; su.chosen = null; su.keep = false; su.reset = reset;
   su.i = su.start = Math.max(0, SU_STEPS.findIndex((x) => x.k === step));     // „+ Adaugă dispozitiv” → direct la Dispozitive
   try { su.d = await api("/api/setup"); } catch { return; }
   $("#app").hidden = true; $("#login").hidden = true; $("#setup").hidden = false;
@@ -1667,7 +1679,8 @@ function suRender() {
   $("#su-step").textContent = `Pasul ${su.i + 1} din ${SU_STEPS.length}`;
   $("#su-dots").innerHTML = SU_STEPS.map((x, i) => `<i class="${i < su.i ? "done" : i === su.i ? "on" : ""}"></i>`).join("");
   $("#su-err").textContent = "";
-  $("#su-back").hidden = su.i === 0 && !su.again;
+  $("#su-back").hidden = (su.i === 0 && !su.again) || su.reset;
+  $("#su-step").hidden = $("#su-dots").hidden = su.reset;
   $("#su-back").textContent = su.i === su.start ? "‹ Renunță" : "‹ Înapoi";
   $("#su-next").textContent = su.i === SU_STEPS.length - 1 ? "Gata" : "Mai departe";
   $("#su-next").disabled = false;
@@ -1678,6 +1691,13 @@ function suRender() {
         "Câțiva pași și Amper începe să-ți urmărească bateriile și invertorul."}</p>
       ${suField("su-name", "Cum se numește instalația?", `maxlength="60" placeholder="de ex. Casa de la munte" value="${esc(d.site_name)}"`)}
       <p class="note">Apare sus în aplicație și te ajută să deosebești instalațiile, dacă ai mai multe.</p>`;
+  } else if (st.k === "password" && su.reset) {
+    b.innerHTML = `<h2>Parolă nouă</h2>
+      <p class="note">Parola a fost ștearsă cu fișierul de pe card. Alege una nouă (minim 8 caractere); telefoanele
+        logate până acum o vor cere din nou.</p>
+      ${suField("su-pw", "Parola nouă", 'type="password" autocomplete="new-password"')}
+      ${suField("su-pw2", "Scrie-o încă o dată", 'type="password" autocomplete="new-password"')}`;
+    $("#su-next").textContent = "Salvează";
   } else if (st.k === "password") {
     b.innerHTML = `<h2>Parola aplicației</h2>
       <p class="note">O vei scrie o singură dată pe fiecare telefon. E cerută din nou la schimbarea setărilor
@@ -1788,6 +1808,7 @@ async function suNext() {
       await post("/api/setup/password", { password: pw, repeat: pw2, old: $("#su-old")?.value || "" });
       su.d.has_password = true;
       pwCache.v = pw; pwCache.until = Date.now() + 5 * 60000;
+      if (su.reset) { location.reload(); return; }
     }
   } else if (st.k === "devices") {
     if (su.keep) { su.chosen = null; su.i += 2; return suRender(); }       // sari peste capacități

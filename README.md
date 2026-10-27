@@ -91,7 +91,12 @@ Android (Chrome) → ⋮ → *Instalează aplicația*. Pe iPhone, notificările 
 - Seplos: adaptorul pe portul **RS485** (nu CAN) al bateriei; adresele din DIP switch diferite pe fiecare pachet.
 - Growatt: încearcă alt cablu USB sau alt port USB al Pi-ului.
 
-**Ai uitat parola aplicației:** scrie-mi.
+**Ai uitat parola aplicației:**
+1. Oprește Pi-ul (scoate alimentarea), scoate cardul și bagă-l în calculator. Apare o partiție numită **bootfs**.
+2. Fă pe ea un fișier text gol numit **`resetare-parola.txt`** (clic dreapta → Nou → Document text).
+3. Pune cardul înapoi în Pi și pornește-l. Pi-ul șterge parola și fișierul și te anunță pe telefon.
+4. Deschide Amper **din rețeaua de acasă** (`http://192.168.x.y:8080` sau `http://amper.local:8080`) și alege o
+   parolă nouă. Prin adresa `https://…` de oriunde nu se poate, ca nimeni din internet să nu apuce s-o aleagă el.
 
 ## 7. Ajutor și feedback
 
