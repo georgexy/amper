@@ -410,3 +410,23 @@ nav.tabs .badge[data-n]::after { content: attr(data-n); position: absolute; top:
 /* Setări → Actualizări */
 .up-notes { background: var(--panel); border-radius: var(--radius-l); padding: 12px 14px; font-size: 14.5px; line-height: 1.5; }
 #set-update .ed-in { margin: 10px 0; }
+
+/* ghidul de configurare */
+.setup { padding-top: calc(16px + env(safe-area-inset-top)); padding-bottom: 40px; }
+.setup-top { display: flex; align-items: baseline; justify-content: space-between; }
+.setup-top h1 { margin: 0; }
+.setup-step { color: var(--muted); font-size: 14px; }
+.su-dots { display: flex; gap: 6px; margin: 10px 0 6px; }
+.su-dots i { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
+.su-dots i.done { background: var(--charge); } .su-dots i.on { background: var(--acc); }
+.su-l { display: block; margin: 14px 0 6px; font-weight: 500; }
+.su-dev { padding: 4px 14px 14px; margin: 10px 0; }
+.su-add { display: flex; align-items: center; gap: 12px; }
+.su-nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 20px; }
+.su-nav .ed-go { flex: 1; max-width: 260px; margin-left: auto; }
+.row-check { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; background: var(--panel);
+  border-radius: var(--radius-l); margin: 10px 0; cursor: pointer; }
+.list .row-check { border-radius: 0; margin: 0; border-top: 1px solid var(--line); }
+.list .row-check:first-child { border-top: 0; }
+.row-check input { transform: scale(1.3); margin-top: 4px; }
+.row-check span { display: grid; gap: 2px; } .row-check small { color: var(--muted); font-size: 13.5px; }

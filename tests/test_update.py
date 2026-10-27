@@ -68,6 +68,7 @@ class Env:
         con.close()
         (self.data / "daly-auto.json").write_text('{"daly1": "ble:DL-TEST"}')
         (self.data / "vapid.json").write_text('{"k": 1}')
+        (self.data / "settings.yaml").write_text("site_name: Casa\n")
         self.files: dict[str, bytes] = {}
         self.cmds: list[tuple] = []
         self.healthy: dict[str, bool] = {}
@@ -118,7 +119,7 @@ class Env:
         rows = con.execute("select * from pack_samples order by ts").fetchall()
         con.close()
         return rows, (self.etc / "config.yaml").read_text(), sorted(p.name for p in self.etc.iterdir()), \
-            {p.name: p.read_text() for p in self.data.glob("*.json")}
+            {p.name: p.read_text() for p in list(self.data.glob("*.json")) + list(self.data.glob("*.yaml"))}
 
 
 # ---------------------------------------------------------------- versiuni
@@ -261,6 +262,7 @@ def test_update_that_does_not_start_rolls_back_code_and_data(tmp_path):
         (e.etc / "config.yaml").write_text("stricat")
         (e.etc / "nou.yaml").write_text("x")
         (e.data / "daly-auto.json").write_text("{}")
+        (e.data / "settings.yaml").write_text("stricat: da\n")
     e.on_restart = broken_version_touches_data
     u = e.updater()
     assert not u.install()
@@ -373,12 +375,12 @@ def test_api_update_requires_password_again(monkeypatch, tmp_path):
         health = await (await c.get("/api/health")).json()          # fără parolă (pentru amper-update)
         st = await c.get("/api/update/status")                     # citirea: ca restul aplicației (kiosk)
         # de pe telefon (prin proxy-ul Tailscale), fără cookie: refuzat înainte de parolă
-        no_login = await c.post("/api/update/install", json={"password": "pw"}, headers={"X-Forwarded-For": "1.2.3.4"})
-        wrong = await c.post("/api/update/install", json={"password": "altceva"})      # ecranul HDMI
+        no_login = await c.post("/api/update/install", json={"app_password": "pw"}, headers={"X-Forwarded-For": "1.2.3.4"})
+        wrong = await c.post("/api/update/install", json={"app_password": "altceva"})      # ecranul HDMI
         empty = await c.post("/api/update/rollback", json={})
         await c.post("/api/login", json={"password": "pw"})
-        ok = await c.post("/api/update/install", json={"password": "pw"}, headers={"X-Forwarded-For": "1.2.3.4"})
-        back = await c.post("/api/update/rollback", json={"password": "pw"})
+        ok = await c.post("/api/update/install", json={"app_password": "pw"}, headers={"X-Forwarded-For": "1.2.3.4"})
+        back = await c.post("/api/update/rollback", json={"app_password": "pw"})
         return health, st.status, (await st.json()), no_login.status, wrong.status, empty.status, ok.status, \
             back.status, list(calls)
     health, st, stj, no_login, wrong, empty, ok, back, calls = run_api("pw", steps, monkeypatch, tmp_path)
@@ -391,7 +393,7 @@ def test_api_update_requires_password_again(monkeypatch, tmp_path):
 
 def test_api_update_without_app_password(monkeypatch, tmp_path):
     async def steps(c, calls):
-        r = await c.post("/api/update/install", json={"password": ""})
+        r = await c.post("/api/update/install", json={"app_password": ""})
         return r.status, list(calls)
     assert run_api("", steps, monkeypatch, tmp_path) == (403, [])
 

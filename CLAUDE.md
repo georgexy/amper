@@ -37,7 +37,8 @@ starea fiecărui modul în timp real și să fie alertat pe telefon când un BMS
 - `notify.py` — ntfy (JSON publish) și Telegram, cu coadă de reîncercare.
 - `db.py` — `pack_samples` / `inverter_samples` (brute, 14 zile) + `*_5m` (agregate permanente), `energy_daily`, `alerts`.
 - `web.py` (aiohttp) + `web/` — PWA în vanilla JS, fără CDN (fonturi Barlow locale), WebSocket `/api/ws`.
-  Parola (`web.password`) protejează `/api/*` cu un cookie; cererile de pe 127.0.0.1/::1 (kiosk-ul) sunt scutite.
+  Parola (`web.password` sau `web.password_hash`, vezi `auth.py`) protejează `/api/*` cu un cookie; cererile de pe
+  127.0.0.1/::1 (kiosk-ul) sunt scutite de cookie, dar scrierile cer parola din nou.
 - Teme (`app.js`, `LOOKS`: `cadrane`, `flux`, `carduri`), toate întunecate (tema luminoasă a fost scoasă): fiecare
   are `html()` (schelet, desenat o dată) și `update(root, homeData())`. Alegerea e în localStorage (`look`), din
   Setări (rotița); `?tema=<nume>` în adresă o impune (pentru kiosk). Bateria deschide ecranul `view-packs`.
@@ -208,6 +209,28 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   tag `v*`; versiunea din `amper/__init__.py`, notele din `CHANGELOG.md`; `-beta` → pre-release).
   `tests.yml` rulează testele la push/PR. Cheia publică e în `amper/update_key.py` (2026-10-27); privata e doar
   secretul repo-ului `AMPER_SIGNING_KEY` (pus de utilizator) și copia lui personală.
+
+## Cum lucrăm (stabilit cu utilizatorul 2026-10-27)
+- Utilizatorul cere modificările; Claude le face, le verifică (teste + simulator/browser), face PR-ul, îl include
+  (merge) când testele trec și **lansează singur** versiunea: întâi **beta** (`x.y.z-beta.N`, pre-release), pe care
+  utilizatorul o testează pe Pi-ul lui (canalul beta, Setări → Actualizări); când spune că merge, aceeași versiune se
+  lansează ca stabilă (`x.y.z`) — abia atunci o primesc cunoscuții. Lansare: workflow-ul `release.yml`
+  (`actions_run_trigger`, `run_workflow`, ref `main`); verificare: `Updater.check()` real pe GitHub.
+- Utilizatorul nu lucrează cu git/PR; explică-i pe scurt, în română, ce s-a schimbat.
+
+## Ghid de configurare + securitate (0.3.0, 2026-10-27)
+- Setările din aplicație stau în `/var/lib/amper/settings.yaml` (scris de serviciul amper, 600), aplicat peste
+  `/etc/amper/config.yaml` (`config.overlay_path/read_overlay/save_overlay`; listele, ex. `devices`, se înlocuiesc).
+  Chei: `site_name`, `setup_done`, `web.password_hash`, `devices`. Intră în copia pre-update și în backup.sh.
+- `config.setup_needed`: ghidul apare doar fără parolă și fără `setup_done` (instalările existente nu-l văd).
+  `amper simulate --ghid` îl arată în demo. API `/api/setup*` (nume, parolă, căutare în fundal cu
+  `setup_scan.scan`, `devices` → `build_devices`, `finish` → repornire prin SIGTERM dacă s-au schimbat dispozitivele).
+- `amper/auth.py`: scrypt; cookie = HMAC(`cookie.key`, amprenta parolei), `HttpOnly`, `SameSite=Strict`, `Secure`
+  pe https; blocare 5 greșeli/IP (30 s, dublu, max 1 h) + global 20/15 min; tabelele `login_log`, `login_devices`;
+  notificări la blocare, dispozitiv nou, parolă schimbată. IP-ul real prin proxy = primul `X-Forwarded-For`.
+- Scrierile (BMS, invertor, WiFi, actualizare) cer `app_password` în corp (`web.confirm`); în pagină `securePost`
+  + dialogul `#pwask`, parola ținută 5 min în memorie. Antete: CSP, X-Frame-Options, nosniff, Referrer-Policy.
+- Roluri admin/vizualizare: NEFĂCUTE (opționale în brief).
 
 ## Lucru pe Pi
 - Datele de acces la Pi-ul autorului (utilizator, IP-uri, Tailscale): în `LOCAL.md`.

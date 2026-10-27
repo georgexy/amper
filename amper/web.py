@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import hmac
 import json
 import logging
+import os
 import re
 import time
 from pathlib import Path
@@ -27,9 +27,45 @@ def _json(data, status=200):
 
 def make_app(engine) -> web.Application:
     cfg = engine.cfg
-    password = (cfg.get("web") or {}).get("password") or ""
-    secret = hashlib.sha256(("amper:" + password).encode()).hexdigest()
-    token = hmac.new(secret.encode(), b"session", "sha256").hexdigest()
+    from .auth import Auth
+    from .config import setup_needed
+    state_dir = None if cfg["database"] == ":memory:" else os.path.dirname(os.path.abspath(cfg["database"]))
+    auth_ = Auth(cfg, engine.db, engine.notifier, state_dir)
+    engine.auth = auth_
+    COOKIE_AGE = 3600 * 24 * 365
+
+    def client_ip(request) -> str:
+        """Adresa reală: prin proxy-ul Tailscale (de pe 127.0.0.1) e primul X-Forwarded-For."""
+        if request.remote in ("127.0.0.1", "::1"):
+            xff = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+            if xff:
+                return xff
+        return request.remote or "?"
+
+    def secure(request) -> bool:
+        return request.secure or request.headers.get("X-Forwarded-Proto", "") == "https"
+
+    def set_cookies(request, resp, quiet=False):
+        resp.set_cookie("amper", auth_.token, max_age=COOKIE_AGE, httponly=True, samesite="Strict",
+                        secure=secure(request))
+        dev = auth_.seen_browser(request.cookies.get("amper_dev"), client_ip(request),
+                                 request.headers.get("User-Agent", ""), quiet=quiet)
+        resp.set_cookie("amper_dev", dev, max_age=COOKIE_AGE * 10, httponly=True, samesite="Strict",
+                        secure=secure(request))
+
+    async def confirm(request, body: dict, what: str):
+        """Scrierile importante (BMS, invertor, WiFi, actualizare) cer parola aplicației din nou, în
+        `app_password` — și de pe ecranul HDMI. Întoarce None dacă e în regulă, altfel răspunsul de eroare."""
+        if not auth_.enabled:
+            return _json({"error": "Setați întâi o parolă pentru aplicație (Setări → Ghid de configurare)."}, 403)
+        ok, wait = await asyncio.to_thread(auth_.attempt, client_ip(request), body.get("app_password", ""),
+                                           request.headers.get("User-Agent", ""), what)
+        if ok:
+            return None
+        if wait:
+            return _json({"error": f"Prea multe parole greșite. Încearcă din nou peste {wait} s.", "wait": wait}, 429)
+        await asyncio.sleep(1)
+        return _json({"error": "Parola nu e corectă.", "bad_password": True}, 403)
 
     def local(request) -> bool:
         # ecranul HDMI (kiosk) rulează pe Pi și nu are tastatură: nu i se cere parola.
@@ -41,11 +77,30 @@ def make_app(engine) -> web.Application:
 
     @web.middleware
     async def auth(request, handler):
-        if password and request.path.startswith("/api/") and request.path not in ("/api/login", "/api/health") \
+        if auth_.enabled and request.path.startswith("/api/") and request.path not in ("/api/login", "/api/health") \
                 and not local(request):
-            if request.cookies.get("amper") != token:
+            if not auth_.valid_cookie(request.cookies.get("amper")):
                 return _json({"error": "autentificare necesară"}, 401)
         return await handler(request)
+
+    @web.middleware
+    async def headers(request, handler):
+        try:
+            resp = await handler(request)
+        except web.HTTPException as e:
+            resp = e
+        h = resp.headers
+        h.setdefault("X-Content-Type-Options", "nosniff")
+        h.setdefault("X-Frame-Options", "DENY")
+        h.setdefault("Referrer-Policy", "no-referrer")
+        h.setdefault("Content-Security-Policy",
+                     "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+                     "connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+        if secure(request):
+            h.setdefault("Strict-Transport-Security", "max-age=31536000")
+        if isinstance(resp, web.HTTPException):
+            raise resp
+        return resp
 
     @web.middleware
     async def no_cache_api(request, handler):
@@ -54,7 +109,7 @@ def make_app(engine) -> web.Application:
             resp.headers["Cache-Control"] = "no-store"
         return resp
 
-    app = web.Application(middlewares=[auth, no_cache_api])
+    app = web.Application(middlewares=[headers, auth, no_cache_api])
     app["engine"] = engine
 
     # Versiunea aplicației = amprenta fișierelor din web/ (nume, mărime, data modificării), recalculată cel mult
@@ -77,10 +132,16 @@ def make_app(engine) -> web.Application:
 
     async def login(request):
         body = await request.json()
-        if not password or hmac.compare_digest(str(body.get("password", "")), password):
+        if not auth_.enabled:
+            return _json({"ok": True})
+        ok, wait = await asyncio.to_thread(auth_.attempt, client_ip(request), body.get("password", ""),
+                                           request.headers.get("User-Agent", ""))
+        if ok:
             resp = _json({"ok": True})
-            resp.set_cookie("amper", token, max_age=3600 * 24 * 365, httponly=True, samesite="Lax")
+            set_cookies(request, resp)
             return resp
+        if wait:
+            return _json({"error": f"Prea multe parole greșite. Încearcă din nou peste {wait} s.", "wait": wait}, 429)
         await asyncio.sleep(1)
         return _json({"error": "parolă greșită"}, 401)
 
@@ -96,7 +157,8 @@ def make_app(engine) -> web.Application:
                      kind=engine.devices[d["id"]].driver.kind, capacity_ah=d.get("capacity_ah"))
                 for d in cfg["devices"]]
         wp = engine.notifier.webpush
-        return _json(dict(devices=devs, auth=bool(password), poll_interval=cfg["poll_interval"], version=__version__,
+        return _json(dict(devices=devs, auth=auth_.enabled, poll_interval=cfg["poll_interval"], version=__version__,
+                          site_name=cfg.get("site_name") or "", setup_needed=setup_needed(cfg),
                           public_url=wp.subject if wp else None,
                           notifications=engine.notifier.enabled,
                           simulated=any(d["type"].startswith("sim_") for d in cfg["devices"])))
@@ -183,14 +245,12 @@ def make_app(engine) -> web.Application:
         log_rows = await asyncio.to_thread(engine.db.settings_log, dev, 20)
         return _json(dict(device=dev, settings=invset.describe(regs), clock=invset.clock(regs),
                           pi_clock=time.strftime("%Y-%m-%d %H:%M:%S"), log=log_rows,
-                          can_write=bool(password)))
+                          can_write=auth_.enabled))
 
-    async def inverter_write(request, fn, what):
-        # scrierea cere ÎNTOTDEAUNA parola, și de pe ecranul HDMI (localhost)
-        if not password:
-            return _json({"error": "Setați întâi o parolă pentru aplicație (web.password în config)."}, 403)
-        if request.cookies.get("amper") != token:
-            return _json({"error": "autentificare necesară"}, 401)
+    async def inverter_write(request, body, fn, what):
+        # scrierea cere ÎNTOTDEAUNA parola din nou, și de pe ecranul HDMI (localhost)
+        if (err := await confirm(request, body, "setare invertor")) is not None:
+            return err
         dev, drv = settings_driver()
         if not drv:
             return _json({"error": "invertorul nu are setări disponibile"}, 404)
@@ -217,10 +277,11 @@ def make_app(engine) -> web.Application:
     async def inverter_set(request):
         body = await request.json()
         key, value = body.get("key"), body.get("value")
-        return await inverter_write(request, lambda drv: invset.write_setting(drv, key, value), str(key))
+        return await inverter_write(request, body, lambda drv: invset.write_setting(drv, key, value), str(key))
 
     async def inverter_clock(request):
-        return await inverter_write(request, invset.sync_clock, "ceas")
+        body = await request.json() if request.can_read_body else {}
+        return await inverter_write(request, body, invset.sync_clock, "ceas")
 
     # ---------------- notificări direct în aplicație (Web Push) ----------------
     async def push_key(request):
@@ -282,12 +343,10 @@ def make_app(engine) -> web.Application:
         return _json(data, status)
 
     async def wifi_connect(request):
-        # schimbarea rețelei cere ÎNTOTDEAUNA parola aplicației (și de pe ecranul HDMI)
-        if not password:
-            return _json({"error": "Setați întâi o parolă pentru aplicație (web.password în config)."}, 403)
-        if request.cookies.get("amper") != token:
-            return _json({"error": "autentificare necesară"}, 401)
+        # schimbarea rețelei cere ÎNTOTDEAUNA parola aplicației din nou (și de pe ecranul HDMI)
         body = await request.json()
+        if (err := await confirm(request, body, "schimbare WiFi")) is not None:
+            return err
         data, status = await wifi_api("POST", "/connect", {"ssid": body.get("ssid"), "password": body.get("password", "")})
         if status == 200:
             log.warning("schimbare rețea WiFi cerută din aplicație: „%s” (de la %s)", body.get("ssid"), request.remote)
@@ -306,19 +365,118 @@ def make_app(engine) -> web.Application:
         return _json({**data, "running": __version__}, status)
 
     async def update_action(request):
-        # actualizarea și revenirea cer parola aplicației, introdusă din nou la fiecare cerere — și de pe ecranul
+        # actualizarea și revenirea cer parola aplicației, introdusă din nou — și de pe ecranul
         # HDMI (localhost, fără cookie); de pe telefon, middleware-ul `auth` cere în plus cookie-ul
-        if not password:
-            return _json({"error": "Setați întâi o parolă pentru aplicație (web.password în config)."}, 403)
         body = await request.json()
-        if not hmac.compare_digest(str(body.get("password", "")), password):
-            await asyncio.sleep(1)
-            return _json({"error": "Parola nu e corectă."}, 403)
+        if (err := await confirm(request, body, "actualizare")) is not None:
+            return err
         action = request.match_info["action"]
         data, status = await update_api("POST", "/" + action)
         if status == 200:
             log.warning("%s cerută din aplicație (de la %s)",
                         "actualizare" if action == "install" else "revenire la versiunea anterioară", request.remote)
+        return _json(data, status)
+
+    # ---------------- ghidul de configurare (prima pornire; se poate relua din Setări) ----------------
+    from . import setup_scan
+    from .config import ConfigError, save_overlay, validate
+    scan_job: dict = {"state": "idle"}
+
+    async def setup_get(request):
+        return _json(dict(needed=setup_needed(cfg), done=bool(cfg.get("setup_done")), site_name=cfg.get("site_name") or "",
+                          has_password=auth_.enabled, simulated=any(d["type"].startswith("sim_") for d in cfg["devices"]),
+                          devices=[{k: d.get(k) for k in ("id", "name", "type", "port", "ble", "capacity_ah",
+                                                          "baudrate", "address")} for d in cfg["devices"]],
+                          scan=scan_job))
+
+    async def setup_name(request):
+        body = await request.json()
+        name = str(body.get("name") or "").strip()[:60]
+        await asyncio.to_thread(save_overlay, cfg, {"site_name": name})
+        cfg["site_name"] = name
+        return _json({"ok": True, "site_name": name})
+
+    async def setup_password(request):
+        body = await request.json()
+        if auth_.enabled and (err := await confirm(request, {"app_password": body.get("old", "")}, "schimbare parolă")):
+            return err
+        if str(body.get("password", "")) != str(body.get("repeat", "")):
+            return _json({"error": "Parolele nu sunt la fel."}, 400)
+        try:
+            await asyncio.to_thread(auth_.set_password, str(body.get("password", "")))
+        except ValueError as e:
+            return _json({"error": str(e)}, 400)
+        engine.notifier.send(f"🔐 Parola aplicației a fost schimbată (de la {client_ip(request)}).",
+                             title="Amper: securitate", priority="high")
+        resp = _json({"ok": True})
+        set_cookies(request, resp, quiet=True)          # browserul care a pus parola rămâne logat
+        return resp
+
+    async def setup_scan_start(request):
+        if scan_job.get("state") == "running":
+            return _json(scan_job)
+        scan_job.clear()
+        scan_job.update(state="running", message="Pornesc căutarea…", started=time.time())
+
+        def progress(msg):
+            scan_job["message"] = msg
+
+        async def run():
+            try:
+                res = await asyncio.to_thread(setup_scan.scan, cfg, progress)
+                scan_job.update(state="done", message="", **res)
+            except Exception as e:
+                log.exception("căutarea dispozitivelor")
+                scan_job.update(state="failed", message=f"Căutarea a eșuat: {e}")
+        asyncio.get_running_loop().create_task(run())
+        return _json(scan_job)
+
+    async def setup_scan_get(request):
+        return _json(scan_job)
+
+    async def setup_devices(request):
+        body = await request.json()
+        try:
+            devs = setup_scan.build_devices(list(body.get("devices") or []))
+            validate({**cfg, "devices": [dict(d) for d in devs]})
+        except (ValueError, TypeError, ConfigError) as e:
+            return _json({"error": str(e)}, 400)
+        await asyncio.to_thread(save_overlay, cfg, {"devices": devs})
+        cfg["pending_devices"] = devs                   # se aplică la repornire (finish)
+        log.warning("dispozitive noi din ghidul de configurare: %s", ", ".join(d["id"] for d in devs))
+        return _json({"ok": True, "devices": devs})
+
+    def restart_soon():
+        """Serviciul se oprește curat; systemd îl repornește (Restart=always) cu config-ul nou."""
+        import signal
+        asyncio.get_running_loop().call_later(1.5, os.kill, os.getpid(), signal.SIGTERM)
+
+    async def setup_finish(request):
+        if not auth_.enabled:
+            return _json({"error": "Alege întâi o parolă pentru aplicație."}, 400)
+        await asyncio.to_thread(save_overlay, cfg, {"setup_done": True})
+        cfg["setup_done"] = True
+        restart = bool(cfg.pop("pending_devices", None)) and not any(d["type"].startswith("sim_") for d in cfg["devices"])
+        if restart:
+            restart_soon()
+        log.warning("ghidul de configurare terminat%s", " — repornesc cu dispozitivele noi" if restart else "")
+        return _json({"ok": True, "restart": restart})
+
+    async def security_get(request):
+        rows = await asyncio.to_thread(engine.db.login_log, 30)
+        devs = await asyncio.to_thread(engine.db.login_devices)
+        from .auth import short_ua
+        return _json(dict(log=[{**r, "ua": short_ua(r.get("ua") or "")} for r in rows],
+                          devices=[{"first": d["first_ts"], "last": d["last_ts"], "ip": d["ip"],
+                                    "ua": short_ua(d.get("ua") or ""), "this": d["id"] == request.cookies.get("amper_dev")}
+                                   for d in devs]))
+
+    async def update_channel(request):
+        body = await request.json()
+        ch = body.get("channel")
+        if ch not in ("stable", "beta"):
+            return _json({"error": "canal necunoscut"}, 400)
+        data, status = await update_api("POST", "/channel", {"channel": ch})
         return _json(data, status)
 
     async def daly_params_raw(request):
@@ -353,17 +511,15 @@ def make_app(engine) -> web.Application:
             return _json({"error": "BMS-ul nu răspunde acum (adormit sau departe)"}, 502)
         log_rows = await asyncio.to_thread(engine.db.settings_log, st.cfg["id"], 20)
         return _json(dict(device=st.cfg["id"], name=st.cfg.get("name"), settings=daly_params.describe(blocks),
-                          log=log_rows, can_write=bool(password)))
+                          log=log_rows, can_write=auth_.enabled))
 
     async def daly_settings_set(request):
-        if not password:
-            return _json({"error": "Setați întâi o parolă pentru aplicație (web.password în config)."}, 403)
-        if request.cookies.get("amper") != token:
-            return _json({"error": "autentificare necesară"}, 401)
+        body = await request.json()
+        if (err := await confirm(request, body, "setare BMS")) is not None:
+            return err
         st, drv = daly_driver(request.match_info["device"])
         if not drv:
             return _json({"error": "BMS-ul nu e legat"}, 404)
-        body = await request.json()
         key = str(body.get("key"))
         name = st.cfg.get("name", st.cfg["id"])
         async with daly_lock:
@@ -461,6 +617,15 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/api/wifi/scan", wifi_scan)
     app.router.add_get("/api/wifi/status", wifi_status)
     app.router.add_post("/api/wifi/connect", wifi_connect)
+    app.router.add_get("/api/setup", setup_get)
+    app.router.add_post("/api/setup/name", setup_name)
+    app.router.add_post("/api/setup/password", setup_password)
+    app.router.add_post("/api/setup/scan", setup_scan_start)
+    app.router.add_get("/api/setup/scan", setup_scan_get)
+    app.router.add_post("/api/setup/devices", setup_devices)
+    app.router.add_post("/api/setup/finish", setup_finish)
+    app.router.add_get("/api/security", security_get)
+    app.router.add_post("/api/update/channel", update_channel)
     app.router.add_get("/api/update/status", update_status)
     app.router.add_post("/api/update/check", update_check)
     app.router.add_post("/api/update/{action:install|rollback}", update_action)

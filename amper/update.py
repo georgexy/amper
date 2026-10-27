@@ -168,8 +168,14 @@ def _chown_like(path: str, ref: str) -> None:
         os.chown(path, st.st_uid, st.st_gid)
 
 
+def _state_files(d: str) -> list[str]:
+    return glob.glob(os.path.join(d, "*.json")) + [p for p in (os.path.join(d, "settings.yaml"),
+                                                              os.path.join(d, "cookie.key")) if os.path.isfile(p)]
+
+
 def backup_data(dest: str, db_path: str, etc_dir: str, data_dir: str, meta: dict) -> None:
-    """Copia datelor înainte de actualizare: baza de date (API-ul sqlite3 de backup), config, *.json."""
+    """Copia datelor înainte de actualizare: baza de date (API-ul sqlite3 de backup), config, fișierele de stare
+    (*.json, settings.yaml = setările din aplicație, cookie.key)."""
     shutil.rmtree(dest, ignore_errors=True)
     os.makedirs(dest)
     os.chmod(dest, 0o700)
@@ -185,7 +191,7 @@ def backup_data(dest: str, db_path: str, etc_dir: str, data_dir: str, meta: dict
     if os.path.isdir(etc_dir):
         _copy_tree(etc_dir, os.path.join(dest, "etc"))
     os.makedirs(os.path.join(dest, "json"))
-    for f in glob.glob(os.path.join(data_dir, "*.json")):
+    for f in _state_files(data_dir):
         shutil.copy2(f, os.path.join(dest, "json"))
     with open(os.path.join(dest, "meta.json"), "w", encoding="utf-8") as f:
         json.dump({**meta, "db": os.path.exists(db_path), "time": int(time.time())}, f, ensure_ascii=False)
@@ -210,7 +216,7 @@ def restore_data(src: str, db_path: str, etc_dir: str, data_dir: str) -> None:
                 p = os.path.join(etc_dir, n)
                 shutil.rmtree(p) if os.path.isdir(p) and not os.path.islink(p) else os.remove(p)
         _copy_tree(os.path.join(src, "etc"), etc_dir)
-    for f in glob.glob(os.path.join(src, "json", "*.json")):
+    for f in _state_files(os.path.join(src, "json")):
         d = os.path.join(data_dir, os.path.basename(f))
         shutil.copy2(f, d)
         _chown_like(d, data_dir)
@@ -242,6 +248,8 @@ class Updater:
         self.lock = threading.Lock()
         self.job: dict = {"state": "idle"}
         self.state = self._load_state()
+        if self.state.get("channel") in ("stable", "beta"):     # ales din aplicație (Setări → Actualizări)
+            self.channel = self.state["channel"]
         self._sync_installed()
 
     # ---------- starea ----------
@@ -285,6 +293,15 @@ class Updater:
                     previous=prev if prev_ok else None, history=(self.state.get("history") or [])[-20:][::-1],
                     job=self.job, last_job=self.state.get("last_job"), can_install=bool(self.keys),
                     steps=list(STEPS))
+
+    def set_channel(self, channel: str) -> dict:
+        if channel not in ("stable", "beta"):
+            raise UpdateError("Canal necunoscut.")
+        self.channel = self.state["channel"] = channel
+        self.state["latest"] = None                 # altă listă de versiuni: se caută din nou
+        self.save()
+        log.info("canal de actualizări: %s", channel)
+        return self.status()
 
     # ---------- GitHub ----------
     def _fetch(self, url: str, accept: str = "application/octet-stream", limit: int = 50 << 20) -> bytes:
@@ -630,6 +647,13 @@ class Updater:
             def do_POST(self):
                 if self.headers.get("X-Token") != token:
                     return self._json({"error": "neautorizat"}, 403)
+                if self.path.startswith("/channel"):
+                    n = int(self.headers.get("Content-Length") or 0)
+                    try:
+                        body = json.loads(self.rfile.read(min(n, 4096)) or b"{}")
+                        return self._json(up.set_channel(str(body.get("channel"))))
+                    except (UpdateError, ValueError) as e:
+                        return self._json({"error": str(e)}, 400)
                 if self.path.startswith("/check"):
                     try:
                         return self._json(up.check())

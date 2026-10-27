@@ -23,6 +23,21 @@
     <div class="err" id="pwerr"></div>
   </div>
 
+  <!-- ghidul de configurare: la prima pornire (fără parolă) sau reluat din Setări -->
+  <div id="setup" class="wrap setup" hidden>
+    <header class="setup-top">
+      <h1>Amper</h1>
+      <span class="setup-step" id="su-step"></span>
+    </header>
+    <div class="su-dots" id="su-dots"></div>
+    <section id="su-body"></section>
+    <p class="err" id="su-err"></p>
+    <div class="su-nav">
+      <button class="btn" id="su-back">‹ Înapoi</button>
+      <button class="btn ed-go" id="su-next">Mai departe</button>
+    </div>
+  </div>
+
   <div id="app" hidden>
     <div class="wrap">
       <header class="top">
@@ -102,6 +117,12 @@
           <button class="card set-btn" data-panel="daly"><span class="ic" style="--ic:var(--charge)">
             <svg viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 10.5v3M7 10v4M11 10v4M15 10v4"/></svg></span>
             <span><b>Module Daly</b><span id="set-daly-sub">Cablu USB sau Bluetooth</span></span><i>›</i></button>
+          <button class="card set-btn" data-panel="security"><span class="ic" style="--ic:var(--warn)">
+            <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+            <span><b>Securitate</b><span>Parola, dispozitivele conectate</span></span><i>›</i></button>
+          <button class="card set-btn" id="set-wizard"><span class="ic" style="--ic:var(--charge)">
+            <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="18" cy="16" r="3"/></svg></span>
+            <span><b>Ghid de configurare</b><span>Nume, parolă, dispozitive, capacități, notificări</span></span><i>›</i></button>
           <button class="card set-btn" data-panel="update"><span class="ic" style="--ic:var(--acc)">
             <svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></span>
             <span><b>Actualizări</b><span id="set-update-sub">Versiunea Amper</span></span><i>›</i></button>
@@ -145,13 +166,15 @@
         <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Actualizări</h2></div>
         <div class="list" id="up-now"></div>
         <button class="btn" id="up-check">Caută actualizări acum</button>
+        <label class="row-check" id="up-beta-row" hidden><input type="checkbox" id="up-beta">
+          <span><b>Primește versiunile de test (beta)</b><small>Versiuni noi, încă în probă. Pentru cine vrea să le
+            încerce primul; poți reveni oricând la versiunea anterioară.</small></span></label>
         <p class="note" id="up-msg"></p>
         <div id="up-new" hidden>
           <h2 id="up-new-title"></h2>
           <div class="up-notes" id="up-notes"></div>
           <p class="note">Înainte de actualizare se face o copie a datelor (istoric, alerte, config). Dacă versiunea
             nouă nu pornește, Pi-ul revine singur la cea de acum. Aplicația se reîncarcă singură la final.</p>
-          <input class="ed-in" type="password" id="up-pw" placeholder="parola aplicației" autocomplete="current-password">
           <button class="btn ed-go" id="up-go">Actualizează</button>
         </div>
         <div id="up-job" hidden>
@@ -161,11 +184,21 @@
         <div id="up-prev" hidden>
           <h2>Versiunea anterioară</h2>
           <p class="note" id="up-prev-txt"></p>
-          <input class="ed-in" type="password" id="up-prev-pw" placeholder="parola aplicației" autocomplete="current-password">
           <button class="btn danger" id="up-back">Revino la versiunea anterioară</button>
         </div>
         <h2>Istoric</h2>
         <div class="list" id="up-hist"></div>
+      </section>
+
+      <section class="set-panel" id="set-security" hidden>
+        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Securitate</h2></div>
+        <p class="note">Parola se schimbă din <b>Ghid de configurare</b>. După 5 parole greșite de la aceeași adresă,
+          încercările sunt încetinite, iar tu primești o notificare. La fiecare telefon sau calculator nou care intră în
+          aplicație primești notificarea „Dispozitiv nou conectat”.</p>
+        <h2>Dispozitive care au intrat</h2>
+        <div class="list" id="sec-devs"></div>
+        <h2>Ultimele încercări de logare</h2>
+        <div class="list" id="sec-log"></div>
       </section>
 
       <section class="set-panel" id="set-daly" hidden>
@@ -251,6 +284,16 @@
       <p class="ed-diff" id="ed-diff"></p>
       <button class="btn ed-go" id="ed-go">Scrie în invertor</button>
       <p class="err" id="ed-err"></p>
+    </div>
+  </dialog>
+
+  <dialog id="pwask" aria-labelledby="pwask-title">
+    <div class="sheet">
+      <div class="grab"></div>
+      <header><h2 id="pwask-title">Confirmă cu parola</h2><button class="close" id="pwask-no">Renunță</button></header>
+      <p class="note" id="pwask-msg"></p>
+      <input class="ed-in" type="password" id="pwask-in" autocomplete="current-password" placeholder="parola aplicației">
+      <button class="btn ed-go" id="pwask-ok">Confirmă</button>
     </div>
   </dialog>
 
