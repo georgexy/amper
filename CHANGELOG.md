@@ -2,6 +2,10 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 0.3.0-beta.5 — 2026-10-27
+- Alerte: doar textul scurt; detaliile (ce era în paranteză) apar când atingi alerta.
+- „Alertele mele” s-au mutat în Setări → Automatizări („+ Adaugă automatizare”).
+
 ## 0.3.0-beta.4 — 2026-10-27
 - Actualizare în doi pași: „Descarcă și verifică”, cu bară de progres și procente pentru descărcare și verificare,
   apoi butonul „Instalează acum”. Arhiva descărcată se verifică din nou la instalare.

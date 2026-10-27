@@ -116,6 +116,9 @@
           <button class="card set-btn" data-panel="daly"><span class="ic" style="--ic:var(--charge)">
             <svg viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 10.5v3M7 10v4M11 10v4M15 10v4"/></svg></span>
             <span><b>Module Daly</b><span id="set-daly-sub">Cablu USB sau Bluetooth</span></span><i>›</i></button>
+          <button class="card set-btn" data-panel="auto"><span class="ic" style="--ic:var(--sun)">
+            <svg viewBox="0 0 24 24"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg></span>
+            <span><b>Automatizări</b><span id="set-auto-sub">Anunță-mă când…</span></span><i>›</i></button>
           <button class="card set-btn" data-panel="remote"><span class="ic" style="--ic:var(--cell)">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>
             <span><b>Acces de oriunde</b><span>Fără Tailscale pe telefon</span></span><i>›</i></button>
@@ -200,6 +203,14 @@
         <div class="list" id="up-hist"></div>
       </section>
 
+      <section class="set-panel" id="set-auto" hidden>
+        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Automatizări</h2></div>
+        <p class="note">Notificări setate de tine, de ex. „bateria sub 25%” sau „bateria încărcată complet”. Vin pe toate
+          telefoanele și apar la Alerte.</p>
+        <button class="btn ed-go" id="ua-add">+ Adaugă automatizare</button>
+        <div class="list" id="ua-list"></div>
+      </section>
+
       <section class="set-panel" id="set-remote" hidden>
         <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Acces de oriunde</h2></div>
         <div id="remote-body"></div>
@@ -256,9 +267,6 @@
     <main id="view-alerts" class="wrap" hidden>
       <h2>Alerte active</h2>
       <div class="list" id="al-active"></div>
-      <div class="hist-head"><h2>Alertele mele</h2><button class="btn sm" id="ua-add">+ Adaugă alertă</button></div>
-      <p class="note">Alerte setate de tine (de ex. „bateria sub 25%”, „bateria încărcată complet”). Vin pe toate telefoanele.</p>
-      <div class="list" id="ua-list"></div>
       <h2>Istoric alerte</h2>
       <div class="list" id="al-hist"></div>
       <p class="note">Notificările pe telefon se pornesc din Setări (rotița de sus) → Notificări.</p>
@@ -327,7 +335,7 @@
   <dialog id="ua" aria-labelledby="ua-title">
     <div class="sheet">
       <div class="grab"></div>
-      <header><h2 id="ua-title">Alertă nouă</h2><button class="close" id="ua-close">Renunță</button></header>
+      <header><h2 id="ua-title">Automatizare nouă</h2><button class="close" id="ua-close">Renunță</button></header>
       <label class="ua-l">Pornește de la<select id="ua-tpl" class="ed-in"></select></label>
       <label class="ua-l">Ce urmărești<select id="ua-metric" class="ed-in"></select></label>
       <div class="ua-row">
@@ -342,7 +350,7 @@
       <label class="ua-l">Nume (opțional)<input id="ua-name" class="ed-in" type="text" maxlength="80" placeholder="ex. Bateria e aproape goală"></label>
       <label class="ed-ack"><input type="checkbox" id="ua-clear" checked> Anunță-mă și când trece</label>
       <p class="ed-diff" id="ua-preview"></p>
-      <button class="btn ed-go" id="ua-save">Salvează alerta</button>
+      <button class="btn ed-go" id="ua-save">Salvează automatizarea</button>
       <p class="err" id="ua-err"></p>
     </div>
   </dialog>
