@@ -12,10 +12,13 @@ from pathlib import Path
 
 from aiohttp import WSMsgType, web
 
+from . import __version__
 from .drivers.base import DriverError
 
 log = logging.getLogger(__name__)
 STATIC = Path(__file__).resolve().parent.parent / "web"
+# serviciul amper-update (root): API local cu token
+UPDATE_API, UPDATE_TOKEN = "http://127.0.0.1:8092", "/run/amper-update/token"
 
 
 def _json(data, status=200):
@@ -38,7 +41,8 @@ def make_app(engine) -> web.Application:
 
     @web.middleware
     async def auth(request, handler):
-        if password and request.path.startswith("/api/") and request.path != "/api/login" and not local(request):
+        if password and request.path.startswith("/api/") and request.path not in ("/api/login", "/api/health") \
+                and not local(request):
             if request.cookies.get("amper") != token:
                 return _json({"error": "autentificare necesară"}, 401)
         return await handler(request)
@@ -59,7 +63,7 @@ def make_app(engine) -> web.Application:
 
     def app_version() -> str:
         if time.monotonic() - ver["t"] > 30:
-            h = hashlib.sha1()
+            h = hashlib.sha1(__version__.encode())          # și o versiune nouă a programului reîncarcă aplicația
             for p in sorted(STATIC.rglob("*")):
                 if p.is_file():
                     st = p.stat()
@@ -80,6 +84,10 @@ def make_app(engine) -> web.Application:
         await asyncio.sleep(1)
         return _json({"error": "parolă greșită"}, 401)
 
+    async def health(request):
+        """Pentru amper-update: serviciul a pornit și rulează versiunea așteptată."""
+        return _json({"ok": True, "version": __version__})
+
     async def live(request):
         return _json(engine.snapshot())
 
@@ -88,7 +96,7 @@ def make_app(engine) -> web.Application:
                      kind=engine.devices[d["id"]].driver.kind, capacity_ah=d.get("capacity_ah"))
                 for d in cfg["devices"]]
         wp = engine.notifier.webpush
-        return _json(dict(devices=devs, auth=bool(password), poll_interval=cfg["poll_interval"],
+        return _json(dict(devices=devs, auth=bool(password), poll_interval=cfg["poll_interval"], version=__version__,
                           public_url=wp.subject if wp else None,
                           notifications=engine.notifier.enabled,
                           simulated=any(d["type"].startswith("sim_") for d in cfg["devices"])))
@@ -241,20 +249,24 @@ def make_app(engine) -> web.Application:
     from . import sysinfo
     WIFI_API, WIFI_TOKEN = "http://127.0.0.1:8091", "/run/amper-wifi/token"
 
-    async def wifi_api(method: str, path: str, body=None):
-        """Cererile către serviciul amper-wifi (rulează ca root, singurul care poate schimba rețeaua)."""
+    async def root_api(base: str, token_path: str, what: str, method: str, path: str, body=None, timeout=40):
+        """Cererile către serviciile care rulează ca root (amper-wifi, amper-update), cu token."""
         import aiohttp
         try:
-            with open(WIFI_TOKEN) as f:
+            with open(token_path) as f:
                 token = f.read().strip()
         except OSError:
-            return {"error": "serviciul WiFi (amper-wifi) nu rulează"}, 503
+            return {"error": f"serviciul {what} nu rulează"}, 503
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=40)) as s:
-                async with s.request(method, WIFI_API + path, json=body, headers={"X-Token": token}) as r:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as s:
+                async with s.request(method, base + path, json=body, headers={"X-Token": token}) as r:
                     return await r.json(), r.status
         except Exception as e:
-            return {"error": f"serviciul WiFi nu răspunde ({e.__class__.__name__})"}, 503
+            return {"error": f"serviciul {what} nu răspunde ({e.__class__.__name__})"}, 503
+
+    async def wifi_api(method: str, path: str, body=None):
+        """Serviciul amper-wifi (root, singurul care poate schimba rețeaua)."""
+        return await root_api(WIFI_API, WIFI_TOKEN, "WiFi (amper-wifi)", method, path, body)
 
     async def system_info(request):
         info = await asyncio.to_thread(sysinfo.gather, engine)
@@ -279,6 +291,34 @@ def make_app(engine) -> web.Application:
         data, status = await wifi_api("POST", "/connect", {"ssid": body.get("ssid"), "password": body.get("password", "")})
         if status == 200:
             log.warning("schimbare rețea WiFi cerută din aplicație: „%s” (de la %s)", body.get("ssid"), request.remote)
+        return _json(data, status)
+
+    # ---------------- actualizări (serviciul amper-update, root) ----------------
+    def update_api(method: str, path: str, body=None):
+        return root_api(UPDATE_API, UPDATE_TOKEN, "de actualizare (amper-update)", method, path, body, timeout=90)
+
+    async def update_status(request):
+        data, status = await update_api("GET", "/status")
+        return _json({**data, "running": __version__}, status)
+
+    async def update_check(request):
+        data, status = await update_api("POST", "/check")
+        return _json({**data, "running": __version__}, status)
+
+    async def update_action(request):
+        # actualizarea și revenirea cer parola aplicației, introdusă din nou la fiecare cerere — și de pe ecranul
+        # HDMI (localhost, fără cookie); de pe telefon, middleware-ul `auth` cere în plus cookie-ul
+        if not password:
+            return _json({"error": "Setați întâi o parolă pentru aplicație (web.password în config)."}, 403)
+        body = await request.json()
+        if not hmac.compare_digest(str(body.get("password", "")), password):
+            await asyncio.sleep(1)
+            return _json({"error": "Parola nu e corectă."}, 403)
+        action = request.match_info["action"]
+        data, status = await update_api("POST", "/" + action)
+        if status == 200:
+            log.warning("%s cerută din aplicație (de la %s)",
+                        "actualizare" if action == "install" else "revenire la versiunea anterioară", request.remote)
         return _json(data, status)
 
     async def daly_params_raw(request):
@@ -399,6 +439,7 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/", index)
     app.router.add_post("/api/login", login)
     app.router.add_get("/api/info", info)
+    app.router.add_get("/api/health", health)
     app.router.add_get("/api/live", live)
     app.router.add_get("/api/history", history)
     app.router.add_get("/api/energy", energy)
@@ -420,6 +461,9 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/api/wifi/scan", wifi_scan)
     app.router.add_get("/api/wifi/status", wifi_status)
     app.router.add_post("/api/wifi/connect", wifi_connect)
+    app.router.add_get("/api/update/status", update_status)
+    app.router.add_post("/api/update/check", update_check)
+    app.router.add_post("/api/update/{action:install|rollback}", update_action)
     app.router.add_get("/api/push/key", push_key)
     app.router.add_post("/api/push/subscribe", push_subscribe)
     app.router.add_post("/api/push/unsubscribe", push_unsubscribe)

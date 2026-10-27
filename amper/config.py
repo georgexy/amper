@@ -15,6 +15,8 @@ DEFAULTS = {
     # hotspot pentru configurarea WiFi de pe telefon, pornit doar când nu e internet (amper/wifi_setup.py)
     "wifi_setup": {"enabled": True, "ssid": "Amper-Setup", "password": "", "offline_minutes": 2},
     "devices": [],
+    # actualizări din GitHub Releases (amper/update.py): stable = doar versiunile finale, beta = și cele de test
+    "update": {"repo": "georgexy/amper", "channel": "stable", "check_days": 7},
     "alerts": {
         "not_charging_minutes": 10,
         "bank_charging_amps": 5,

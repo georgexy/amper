@@ -118,3 +118,11 @@ notify:
     enabled: false
     bot_token: ""
     chat_id: ""
+
+# ------------------------------------------------------------
+#  Actualizări (Setări → Actualizări). Caută singur la `check_days` zile și doar anunță.
+#  channel: stable = versiunile finale; beta = și versiunile de test
+# ------------------------------------------------------------
+update:
+  channel: stable
+  check_days: 7

@@ -102,6 +102,9 @@
           <button class="card set-btn" data-panel="daly"><span class="ic" style="--ic:var(--charge)">
             <svg viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 10.5v3M7 10v4M11 10v4M15 10v4"/></svg></span>
             <span><b>Module Daly</b><span id="set-daly-sub">Cablu USB sau Bluetooth</span></span><i>›</i></button>
+          <button class="card set-btn" data-panel="update"><span class="ic" style="--ic:var(--acc)">
+            <svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></span>
+            <span><b>Actualizări</b><span id="set-update-sub">Versiunea Amper</span></span><i>›</i></button>
         </div>
         <p class="note" id="version"></p>
       </div>
@@ -136,6 +139,33 @@
           <button class="btn ed-go" id="wifi-go">Conectează Pi-ul la această rețea</button>
         </div>
         <p class="note" id="wifi-msg"></p>
+      </section>
+
+      <section class="set-panel" id="set-update" hidden>
+        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Actualizări</h2></div>
+        <div class="list" id="up-now"></div>
+        <button class="btn" id="up-check">Caută actualizări acum</button>
+        <p class="note" id="up-msg"></p>
+        <div id="up-new" hidden>
+          <h2 id="up-new-title"></h2>
+          <div class="up-notes" id="up-notes"></div>
+          <p class="note">Înainte de actualizare se face o copie a datelor (istoric, alerte, config). Dacă versiunea
+            nouă nu pornește, Pi-ul revine singur la cea de acum. Aplicația se reîncarcă singură la final.</p>
+          <input class="ed-in" type="password" id="up-pw" placeholder="parola aplicației" autocomplete="current-password">
+          <button class="btn ed-go" id="up-go">Actualizează</button>
+        </div>
+        <div id="up-job" hidden>
+          <div class="list up-steps" id="up-steps"></div>
+          <p class="note" id="up-job-msg"></p>
+        </div>
+        <div id="up-prev" hidden>
+          <h2>Versiunea anterioară</h2>
+          <p class="note" id="up-prev-txt"></p>
+          <input class="ed-in" type="password" id="up-prev-pw" placeholder="parola aplicației" autocomplete="current-password">
+          <button class="btn danger" id="up-back">Revino la versiunea anterioară</button>
+        </div>
+        <h2>Istoric</h2>
+        <div class="list" id="up-hist"></div>
       </section>
 
       <section class="set-panel" id="set-daly" hidden>

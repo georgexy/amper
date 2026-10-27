@@ -406,3 +406,7 @@ nav.tabs .badge[data-n]::after { content: attr(data-n); position: absolute; top:
 .btn.danger { color: var(--alarm); }
 .ua-l { display: grid; gap: 4px; font-size: 13.5px; color: var(--muted); margin-top: 10px; }
 .ua-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* Setări → Actualizări */
+.up-notes { background: var(--panel); border-radius: var(--radius-l); padding: 12px 14px; font-size: 14.5px; line-height: 1.5; }
+#set-update .ed-in { margin: 10px 0; }

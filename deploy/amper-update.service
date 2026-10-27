@@ -1,0 +1,19 @@
+[Unit]
+Description=amper - actualizari din GitHub (semnate), cu copie a datelor si revenire automata
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=PYTHONPATH=/opt/amper
+Environment=PYTHONUNBUFFERED=1
+# ca root: schimbă /opt/amper, oprește/pornește serviciul amper, pune datele la loc la revenire
+ExecStart=/usr/bin/python3 -m amper.update -c /etc/amper/config.yaml
+Restart=always
+RestartSec=5
+# token pentru API-ul local folosit de Setări → Actualizări (citibil de grupul amper)
+RuntimeDirectory=amper-update
+RuntimeDirectoryMode=0750
+
+[Install]
+WantedBy=multi-user.target
