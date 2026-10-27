@@ -108,6 +108,10 @@ def make_app(engine) -> web.Application:
         resp = await handler(request)
         if request.path.startswith("/api/"):
             resp.headers["Cache-Control"] = "no-store"
+        elif "Cache-Control" not in resp.headers and not request.path.startswith("/fonts/"):
+            # fișierele aplicației: telefonul verifică mereu dacă s-au schimbat (altfel Safari păstrează un timp
+            # app.js vechi după o actualizare); fonturile nu se schimbă
+            resp.headers["Cache-Control"] = "no-cache"
         return resp
 
     app = web.Application(middlewares=[headers, auth, no_cache_api])
@@ -129,7 +133,11 @@ def make_app(engine) -> web.Application:
     engine.app_version = app_version
 
     async def index(request):
-        return web.FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
+        # app.js / app.css cu versiunea în adresă: după o actualizare, telefonul nu poate folosi fișierele vechi
+        v = app_version()
+        html = (STATIC / "index.html").read_text(encoding="utf-8")
+        html = html.replace('href="app.css"', f'href="app.css?v={v}"').replace('src="app.js"', f'src="app.js?v={v}"')
+        return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-cache"})
 
     async def login(request):
         body = await request.json()
@@ -155,10 +163,12 @@ def make_app(engine) -> web.Application:
 
     async def info(request):
         devs = [dict(id=d["id"], name=d.get("name", d["id"]), type=d["type"],
-                     kind=engine.devices[d["id"]].driver.kind, capacity_ah=d.get("capacity_ah"))
+                     kind=engine.devices[d["id"]].driver.kind, capacity_ah=d.get("capacity_ah"),
+                     port=d.get("port"), ble=d.get("ble"), address=d.get("address"), baudrate=d.get("baudrate"))
                 for d in cfg["devices"]]
         wp = engine.notifier.webpush
         return _json(dict(devices=devs, auth=auth_.enabled, poll_interval=cfg["poll_interval"], version=__version__,
+                          port=int((cfg.get("web") or {}).get("port") or 8080),
                           site_name=cfg.get("site_name") or "", setup_needed=setup_needed(cfg),
                           public_url=wp.subject if wp else None,
                           notifications=engine.notifier.enabled,
@@ -175,6 +185,26 @@ def make_app(engine) -> web.Application:
         rows = await asyncio.to_thread(engine.db.history, kind, device, start, end,
                                        int(request.query.get("points", 300)), cfg["raw_retention_days"])
         return _json(dict(device=device, kind=kind, start=start, end=end, rows=rows))
+
+    async def history_many(request):
+        """Toate graficele din Istoric într-o singură cerere (prin internet contează numărul de cereri)."""
+        ids = [d for d in request.query.get("devices", "").split(",") if d in engine.devices][:20]
+        hours = min(float(request.query.get("hours", 24)), 24 * 400)
+        points = min(int(request.query.get("points", 300)), 1000)
+        end = int(time.time())
+        start = end - int(hours * 3600)
+
+        def read():
+            out = {}
+            for d in ids:
+                kind = engine.devices[d].driver.kind
+                try:
+                    out[d] = dict(kind=kind, rows=engine.db.history(kind, d, start, end, points, cfg["raw_retention_days"]))
+                except Exception as e:                       # un dispozitiv cu probleme nu strică restul
+                    log.warning("istoric %s: %s", d, e)
+                    out[d] = dict(kind=kind, rows=[], error=str(e))
+            return out
+        return _json(dict(start=start, end=end, series=await asyncio.to_thread(read)))
 
     async def energy(request):
         inv = [k for k, v in engine.devices.items() if v.driver.kind == "inverter"]
@@ -380,7 +410,7 @@ def make_app(engine) -> web.Application:
 
     async def remote_login(request):
         body = await request.json() if request.can_read_body else {}
-        if auth_.enabled and (err := await confirm(request, body, "Tailscale")) is not None:
+        if auth_.enabled and (err := await confirm(request, body, "conectare la server")) is not None:
             return err
         data, status = await update_api("POST", "/remote/login")
         return _json(remote_seen(data), status)
@@ -638,6 +668,7 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/api/health", health)
     app.router.add_get("/api/live", live)
     app.router.add_get("/api/history", history)
+    app.router.add_get("/api/history/all", history_many)
     app.router.add_get("/api/energy", energy)
     app.router.add_get("/api/alerts", alerts)
     app.router.add_post("/api/test-notification", test_notification)

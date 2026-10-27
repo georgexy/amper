@@ -109,8 +109,8 @@ if [ "$DEMO" -eq 0 ] && grep -q "by-id/REPLACE-" "$ETC/config.yaml"; then
   for svc in solar-assistant solarassistant; do systemctl stop "$svc" 2>/dev/null || true; done
   amper autoconfig -c "$ETC/config.yaml" || true
 fi
-# parola hotspotului de configurare WiFi (Amper-Setup): generată o dată, păstrată la actualizări
-WIFI_PW="amper-$(python3 -c 'import secrets, string; a = string.ascii_lowercase + string.digits; print("".join(secrets.choice(a) for _ in range(8)))')"
+# parola comună a hotspotului (scrisă în instrucțiuni); instalările vechi își păstrează parola lor
+WIFI_PW="amper-setup"
 if ! grep -q "^wifi_setup:" "$ETC/config.yaml"; then
   printf '\n# Configurarea WiFi de pe telefon (hotspot pornit doar când nu e internet), vezi README\nwifi_setup:\n  enabled: true\n  ssid: Amper-Setup\n  password: %s\n  offline_minutes: 2\n' "$WIFI_PW" >> "$ETC/config.yaml"
 fi

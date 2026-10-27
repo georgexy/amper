@@ -1,4 +1,4 @@
-"""Acces de oriunde: Tailscale (logare cu contul utilizatorului) + Funnel (adresa https publică, telefoanele nu
+"""Acces de oriunde (în aplicație: „server”, cuvântul Tailscale nu apare utilizatorului): Tailscale (logare cu contul utilizatorului) + Funnel (adresa https publică, telefoanele nu
 au nevoie de Tailscale). Rulează în serviciul amper-update (root), API-ul lui local: /remote/*.
 
 Pașii utilizatorului, din aplicație (ghidul de configurare sau Setări → Acces de oriunde):
@@ -71,7 +71,7 @@ class Remote:
             proc = self.popen(*args)
         except OSError as e:
             self.lock.release()
-            self.job = {"state": "failed", "kind": kind, "message": f"Tailscale nu a pornit: {e}"}
+            self.job = {"state": "failed", "kind": kind, "message": f"Conexiunea la server nu a pornit: {e}"}
             return self.job
         found = threading.Event()
 
@@ -89,7 +89,7 @@ class Remote:
                     self.job.update(state="ok", url=None, message=done_msg)
                 else:
                     tail = "".join(out[-3:]).strip()
-                    self.job.update(state="failed", message=f"Tailscale a răspuns cu o eroare: {tail[-300:]}")
+                    self.job.update(state="failed", message=f"Serverul a răspuns cu o eroare: {tail[-300:]}")
                 log.info("tailscale %s: %s", kind, self.job["state"])
             finally:
                 found.set()
@@ -101,7 +101,7 @@ class Remote:
     def login(self) -> dict:
         """Leagă Pi-ul de contul Tailscale al utilizatorului (linkul de logare îl deschide el)."""
         return self._background("login", ("tailscale", "up", f"--hostname={self.hostname}"),
-                                "Pi-ul e conectat la contul tău Tailscale.")
+                                "Pi-ul e conectat la server.")
 
     def funnel(self, on: bool) -> dict:
         if on:
@@ -112,9 +112,9 @@ class Remote:
             self.run("tailscale", "funnel", "reset")
             r = self.run("tailscale", "serve", "--bg", "--https=443", f"http://127.0.0.1:{self.port}")
         except (OSError, subprocess.SubprocessError) as e:
-            self.job = {"state": "failed", "kind": "funnel-off", "message": f"Tailscale nu răspunde: {e}"}
+            self.job = {"state": "failed", "kind": "funnel-off", "message": f"Serverul nu răspunde: {e}"}
             return self.job
         self.job = {"state": "ok" if r.returncode == 0 else "failed", "kind": "funnel-off",
-                    "message": "Accesul public e oprit; adresa merge doar cu Tailscale pe telefon."
+                    "message": "Accesul public e oprit; adresa merge doar pe telefoanele conectate la server."
                     if r.returncode == 0 else f"Nu am putut opri: {(r.stdout or '')[-200:]}"}
         return self.job

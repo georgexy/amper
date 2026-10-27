@@ -142,3 +142,29 @@ def test_notification_shows_short_text_details_in_app(tmp_path, monkeypatch):
                                  "message": "Daly 2: BMS-ul a OPRIT încărcarea (MOSFET încărcare OFF)"}))
     assert sent == [{"title": "Amper", "body": "Daly 2: BMS-ul a OPRIT încărcarea", "priority": "high",
                      "url": "/?v=alerts"}]
+
+
+def test_app_files_are_never_stale_after_update():
+    """După o actualizare, telefonul trebuie să ia app.js/app.css noi (Safari le păstra din cache)."""
+    from aiohttp.test_utils import TestClient, TestServer
+
+    from amper.config import DEFAULTS, _merge
+    from amper.db import Database
+    from amper.drivers.simulator import SimWorld
+    from amper.engine import Engine
+    from amper.web import make_app
+    SimWorld._instance = None
+    cfg = _merge(DEFAULTS, {"database": ":memory:", "devices": [{"id": "inv", "type": "sim_growatt"}]})
+    eng = Engine(cfg, Database(":memory:"), Notifier({}))
+
+    async def go():
+        async with TestClient(TestServer(make_app(eng))) as c:
+            page = await c.get("/")
+            html = await page.text()
+            js = await c.get("/app.js")
+            font = await c.get("/fonts/barlow-latin-400-normal.woff2")
+            return html, page.headers.get("Cache-Control"), js.headers.get("Cache-Control"), font.headers.get("Cache-Control")
+    html, page_cc, js_cc, font_cc = asyncio.run(go())
+    v = eng.app_version()
+    assert f'src="app.js?v={v}"' in html and f'href="app.css?v={v}"' in html
+    assert page_cc == "no-cache" and js_cc == "no-cache" and font_cc is None

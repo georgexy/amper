@@ -223,6 +223,14 @@ Dacă ceva nu se potrivește, deschizi proiectul în Claude Code pe un calculato
   fiecare actualizare se face o copie în `/var/lib/amper/pre-update/` (ultimele 3).
 - Canalul de test (versiunile „beta”): în config, `update: channel: beta`.
 
+**Cale de rezervă, dacă aplicația nu merge** (prin SSH, pe Pi), cu aceleași verificări (semnătură, copia datelor,
+revenire automată):
+```
+sudo amper update --check       # ce versiune nouă există
+sudo amper update --install     # o instalează acum
+sudo amper update --rollback    # revine la versiunea anterioară
+```
+
 Manual (sau de pe un Pi cu o versiune fără butonul de actualizare): copiezi folderul `amper` pe Pi, apoi
 ```
 sudo bash ~/amper/deploy/install.sh

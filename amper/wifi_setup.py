@@ -73,12 +73,18 @@ def split_terse(line: str) -> list[str]:
     return out
 
 
+def ap_name(base: str, ip: str) -> str:
+    """Numele rețelei cu adresa în el (max. 32 de octeți la WiFi): „Amper-Setup 10.42.0.1”."""
+    name = f"{base} {ip}"
+    return name if len(name.encode()) <= 32 else base
+
+
 def parse_scan(text: str) -> list[dict]:
     """Rețelele din `nmcli -t -f SSID,SIGNAL,SECURITY device wifi list`: una pe SSID, cu semnalul cel mai bun."""
     best: dict[str, dict] = {}
     for line in text.splitlines():
         f = split_terse(line)
-        if len(f) < 3 or not f[0] or f[0] == "Amper-Setup":
+        if len(f) < 3 or not f[0] or f[0].startswith(("Amper-Setup", "Amper gata")):     # propriul hotspot
             continue
         ssid, sig, sec = f[0], int(f[1] or 0), f[2].strip()
         if ssid not in best or sig > best[ssid]["signal"]:
@@ -119,6 +125,13 @@ class WifiSetup:
             return 0
 
     # ---------- hotspot ----------
+    def ap_ssid(self) -> str:
+        """Numele hotspotului arată adresa: „Amper-Setup 10.42.0.1” (pagina de configurare); după conectarea
+        reușită „Amper gata 192.168.1.57” (adresa de acasă, citită direct din lista de rețele a telefonului)."""
+        if self.result:
+            return ap_name("Amper gata", self.result["ip"])
+        return ap_name(self.ssid, AP_IP)
+
     def start_ap(self) -> None:
         if len(self.password) < 8:
             raise RuntimeError("parola hotspotului (wifi_setup.password) trebuie să aibă cel puțin 8 caractere")
@@ -131,13 +144,13 @@ class WifiSetup:
             f.write(f"address=/#/{AP_IP}\n")
         nmcli("connection", "delete", AP_CON, timeout=15)
         nmcli("connection", "add", "type", "wifi", "ifname", IFACE, "con-name", AP_CON, "autoconnect", "no",
-              "ssid", self.ssid, "802-11-wireless.mode", "ap", "802-11-wireless.band", "bg",
+              "ssid", self.ap_ssid(), "802-11-wireless.mode", "ap", "802-11-wireless.band", "bg",
               "ipv4.method", "shared", "ipv4.addresses", f"{AP_IP}/24", "ipv6.method", "disabled",
               "wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.psk", self.password, check=True)
         nmcli("connection", "up", AP_CON, timeout=40, check=True)
         self.ap_on = True
         self.start_portal()
-        log.warning("fără internet: am pornit hotspotul %s (pagina: http://%s)", self.ssid, AP_IP)
+        log.warning("am pornit hotspotul „%s” (pagina: http://%s)", self.ap_ssid(), AP_IP)
 
     def stop_ap(self) -> None:
         nmcli("connection", "down", AP_CON, timeout=20)
@@ -494,8 +507,10 @@ def done_page(ssid: str) -> str:
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Amper — WiFi</title><style>{STYLE}</style></head>
 <body><main><h1>Mă conectez la „{html.escape(ssid)}”…</h1>
 <p>Rețeaua „Amper-Setup” dispare acum, cam un minut, cât Pi-ul încearcă rețeaua aleasă.</p>
-<p><b>Apoi „Amper-Setup” reapare.</b> Conectează-te din nou la ea: pagina îți arată fie <b>adresa Pi-ului din rețeaua
-ta</b> (dacă a mers), fie ce nu a mers (de obicei parola), ca să încerci din nou.</p></main></body></html>"""
+<p><b>Dacă a mers</b>, în lista de rețele WiFi a telefonului apare <b>„Amper gata 192.168.…”</b>: numărul din nume
+e adresa Pi-ului în rețeaua ta. Deschide-o în browser (de pe WiFi-ul tău): <b>http://192.168.…:8080</b>.</p>
+<p><b>Dacă nu a mers</b> (de obicei parola), reapare „Amper-Setup”: conectează-te din nou, pagina îți spune ce s-a
+întâmplat.</p></main></body></html>"""
 
 
 def result_page(r: dict, port: int) -> str:
@@ -510,7 +525,7 @@ def result_page(r: dict, port: int) -> str:
 <p><b>Ce urmează:</b> apasă butonul de mai jos, conectează telefonul înapoi la WiFi-ul „{html.escape(r["ssid"])}” și
 deschide adresa în browser. Acolo te așteaptă ghidul de configurare (parola, dispozitivele, accesul de oriunde).</p>
 <form method="post" action="/gata"><button type="submit">Am notat — mă întorc pe WiFi-ul meu</button></form>
-<p>Rețeaua „Amper-Setup” se oprește singură în 3 minute.</p></main></body></html>"""
+<p>Această rețea („Amper gata …”) se oprește singură în 3 minute.</p></main></body></html>"""
 
 
 def bye_page(r: dict, port: int) -> str:

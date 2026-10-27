@@ -5,6 +5,7 @@
   amper scan                                        caută pe ce port e fiecare dispozitiv
   amper autoconfig [-c config]                     completează singur porturile în config (după scan)
   amper read <id> [-c config]                       citește o dată un dispozitiv și afișează tot
+  sudo amper update --check | --install | --rollback   actualizare fără aplicație (cale de rezervă)
 """
 from __future__ import annotations
 
@@ -297,6 +298,10 @@ def cmd_notify(args) -> None:
 
 
 def main(argv=None) -> None:
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if argv[:1] == ["update"]:               # sudo amper update --install: totul merge mai departe la amper.update
+        from .update import main as update_main
+        return update_main(argv[1:])
     p = argparse.ArgumentParser(prog="amper", description="Monitorizare baterii și invertor")
     p.add_argument("-v", "--verbose", action="store_true")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -319,6 +324,7 @@ def main(argv=None) -> None:
     nt.add_argument("--title", default="Amper")
     nt.add_argument("--priority", default="default", choices=["low", "default", "high"])
     nt.add_argument("-c", "--config", default="/etc/amper/config.yaml")
+    sub.add_parser("update", help="actualizări fără aplicație: --check, --install, --rollback (cu sudo)")
     args = p.parse_args(argv)
     _setup_logging(args.verbose)
     {"run": cmd_run, "simulate": cmd_simulate, "scan": cmd_scan, "read": cmd_read,

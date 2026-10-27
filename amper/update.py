@@ -805,9 +805,28 @@ def main(argv=None) -> None:
     p = argparse.ArgumentParser(prog="amper-update")
     p.add_argument("-c", "--config", default="/etc/amper/config.yaml")
     p.add_argument("--check", action="store_true", help="caută o dată o versiune nouă și afișează rezultatul")
+    p.add_argument("--install", action="store_true",
+                   help="instalează acum ultima versiune, fără aplicație (cale de rezervă, prin SSH)")
+    p.add_argument("--rollback", action="store_true", help="revine la versiunea anterioară, fără aplicație")
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     up = Updater(load_config(args.config))
+    if args.install or args.rollback:
+        # Cale de rezervă dacă aplicația nu merge: aceleași verificări (semnătură, copia datelor, revenire automată).
+        # Serviciul amper-update se oprește cât timp lucrează comanda (nu două actualizări odată).
+        up.run("systemctl", "stop", "amper-update")
+        try:
+            if args.install:
+                up.check()
+                ok = up.install()
+            else:
+                ok = up.rollback()
+        except UpdateError as e:
+            ok, up.job["message"] = False, str(e)
+        finally:
+            up.run("systemctl", "start", "amper-update")
+        print(up.job.get("message") or ("gata" if ok else "nu a mers"))
+        raise SystemExit(0 if ok else 1)
     if args.check:
         try:
             print(json.dumps(up.check(), ensure_ascii=False, indent=1))

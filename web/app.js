@@ -65,7 +65,7 @@ document.addEventListener("click", (e) => {
   row.classList.toggle("open", !det.hidden);
 });
 
-const state = { info: null, snap: null, view: "now", hours: 24, lastMsg: 0, ws: null, sheetDev: null, energy: [],
+const state = { histReq: 0, info: null, snap: null, view: "now", hours: 24, lastMsg: 0, ws: null, sheetDev: null, energy: [],
   look: "cadrane", day: null, dayDrawn: null };
 
 /* ------------------------------------------------------------------ pornire */
@@ -722,32 +722,65 @@ function renderLooks() {
     $("#set-teme-sub").textContent = `Acum: ${LOOKS[state.look].name}`;
   }));
 }
-function renderDaly() {
-  const ds = Object.values(state.snap?.devices || {}).filter((d) => d.type === "daly");
-  const on = ds.filter((d) => d.connected && !d.stale).length;
-  $("#set-daly-sub").textContent = ds.length ? `${on} din ${ds.length} conectate` : "Niciun modul Daly în config";
-  $("#daly-list").innerHTML = ds.length ? "" : `<div class="empty">Niciun modul Daly în configurare.</div>`;
-  $("#daly-list").innerHTML += ds.map((d) => {
-    const link = d.reading?.raw?.link;
-    const txt = d.connected ? (d.stale ? `nu răspunde acum${link ? " · " + link : ""}` : `conectat${link ? " · " + link : ""}`)
-      : (d.error || "caut…").replace(/^[^:]*: /, "");
-    return `<div class="row ${d.connected && !d.stale ? "" : d.connected ? "warning" : ""}"><span><b>${esc(d.name)}</b></span>
-      <span class="t">${esc(txt)}</span></div>`;
+/* Setări → Dispozitive conectate: Invertoare și BMS-uri (grupate după tip, în ordinea adresei), cu legătura și starea */
+const DEV_TYPE = { daly: "Daly", sim_daly: "Daly (simulat)", seplos: "Seplos V2 (RS485)", sim_seplos: "Seplos (simulat)",
+  growatt_spf: "Growatt SPF", sim_growatt: "Growatt (simulat)" };
+function devLink(info, d) {
+  const live = d.reading?.raw?.link;                          // Daly: legătura găsită („Bluetooth AA:…”, „cablu …”)
+  if (live) return live.replace(/\/dev\/serial\/by-id\//, "");
+  if (info.ble) return `Bluetooth ${info.ble}`;
+  const port = String(info.port || "");
+  if (info.type === "daly" && (!port || port === "auto" || port.includes("REPLACE"))) return "se caută (cablu sau Bluetooth)";
+  if (port.startsWith("/dev/")) return `${info.type.includes("seplos") ? "RS485" : "cablu"} ${port.replace(/^.*\//, "")}`;
+  return info.type.startsWith("sim_") ? "simulare" : "";
+}
+function devRow(x, devs) {
+  const d = devs[x.id] || {};
+  const st = d.connected && !d.stale ? "comunică" : d.connected ? "nu răspunde acum" : "nu a comunicat încă";
+  const cls = d.connected && !d.stale ? "ok" : d.connected ? "warning" : "";
+  const addr = x.address == null ? "" : x.type === "daly" ? `adresa 0x${Number(x.address).toString(16).toUpperCase()}`
+    : `adresa ${x.address}`;
+  const parts = [addr, devLink(x, d), x.baudrate ? `${x.baudrate} baud` : "", x.capacity_ah ? `${num(x.capacity_ah, 0)} Ah` : ""];
+  return `<div class="row bms-row ${cls === "warning" ? "warning" : ""}"><span><b>${esc(x.name)}</b>
+    <small>${esc(parts.filter(Boolean).join(" · "))}</small></span><span class="bms-st ${cls}">${st}</span></div>`;
+}
+function devSection(title, infos, devs) {
+  if (!infos.length) return "";
+  const groups = {};
+  for (const x of infos) (groups[x.type] ||= []).push(x);
+  const many = Object.keys(groups).length > 1;
+  return `<h2>${title}</h2>` + Object.entries(groups).map(([type, list]) => {
+    list.sort((a, b) => (a.address ?? 0) - (b.address ?? 0) || a.name.localeCompare(b.name));
+    return `${many || title === "BMS-uri" ? `<h3 class="bms-h">${esc(DEV_TYPE[type] || type)}</h3>` : ""}
+      <div class="list">${list.map((x) => devRow(x, devs)).join("")}</div>`;
   }).join("");
+}
+function renderDaly() {
+  const all = state.info?.devices || [], devs = state.snap?.devices || {};
+  const inv = all.filter((x) => x.kind === "inverter"), bms = all.filter((x) => x.kind === "pack");
+  const n = inv.length + bms.length;
+  const ok = [...inv, ...bms].filter((x) => devs[x.id]?.connected && !devs[x.id]?.stale).length;
+  $("#set-daly-sub").textContent = n ? `${ok} din ${n} comunică` : "Niciun dispozitiv configurat";
+  $("#daly-list").innerHTML = n ? devSection(inv.length > 1 ? "Invertoare" : "Invertor", inv, devs) + devSection("BMS-uri", bms, devs)
+    : `<div class="empty">Niciun dispozitiv în configurare. Adaugă-le din Ghid de configurare.</div>`;
+  $("#daly-auto-box").hidden = !bms.some((x) => x.type === "daly");
 }
 $("#daly-search").onclick = async () => {
   const b = $("#daly-search");
   b.disabled = true;
   b.textContent = "Caut… (până la un minut)";
   try { await api("/api/daly/search", { method: "POST" }); } catch {}
-  setTimeout(() => { b.disabled = false; b.textContent = "Caută acum"; }, 30000);
+  setTimeout(() => { b.disabled = false; b.textContent = "Caută acum modulele Daly"; }, 30000);
 };
 
 /* meniul setărilor: butoane → secțiuni (Teme, Notificări, Module Daly) */
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "notif", "daly", "info", "update", "security", "remote", "auto", "about"]) $("#set-" + k).hidden = k !== name;
+  for (const k of ["teme", "notif", "daly", "info", "update", "security", "remote", "auto", "about", "conn", "share", "wifi"])
+    $("#set-" + k).hidden = k !== name;
   if (name === "about") $("#about-version").textContent = $("#version").textContent;
+  if (name === "share") loadShare();
+  if (name === "wifi") loadWifiNow();
   if (name === "auto") loadUserAlerts();
   if (name === "remote") renderRemote($("#remote-body"));
   if (name === "security") loadSecurity();
@@ -761,6 +794,14 @@ function showPanel(name) {
 }
 $$(".set-btn[data-panel]").forEach((b) => (b.onclick = () => showPanel(b.dataset.panel)));
 $("#set-wizard").onclick = () => openSetup(true);
+$("#dev-add").onclick = () => openSetup(true, "devices");
+async function loadWifiNow() {
+  try {
+    const r = await api("/api/wifi/status");
+    const a = String(r.active || "").replace(/^wifi-/, "");
+    $("#wifi-now").innerHTML = r.error ? esc(r.error) : a ? `Acum Pi-ul e conectat la <b>${esc(a)}</b>.` : "Pi-ul nu e conectat la nicio rețea WiFi (poate e pe cablu).";
+  } catch {}
+}
 
 async function loadSecurity() {
   let r;
@@ -807,7 +848,7 @@ async function loadInfo() {
       <div class="row"><span>Adrese locale</span><span class="t">${Object.entries(n.ip || {}).filter(([k]) => k !== "lo")
         .map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(" · ") || "–"}</span></div>
       <div class="row"><span>Cablu de rețea</span><span class="t">${eth ? (eth.state === "connected" ? "legat" : "nelegat") : "–"}</span></div>
-      <div class="row"><span>Tailscale: <b>${ts.state === "Running" ? "conectat" : esc(ts.state || "–")}</b></span>
+      <div class="row"><span>Server: <b>${ts.state === "Running" ? "conectat" : ts.state ? "neconectat" : "–"}</b></span>
         <span class="t">${esc(ts.ip || "")} · ${esc(ts.name || "")}</span></div>
       ${(ts.peers || []).map((p) => `<div class="row"><span>${esc(p.name)}</span>
         <span class="t">${p.online ? "online" : "offline"} · ${esc(p.os || "")}</span></div>`).join("")}
@@ -987,10 +1028,10 @@ async function updateAction(action, btn) {
 $("#up-go").onclick = () => updateAction("install", $("#up-go"));
 $("#up-dl").onclick = async () => {
   const b = $("#up-dl");
-  b.disabled = true; $("#up-msg").textContent = "";
+  b.disabled = true; $("#up-msg").textContent = "Pornesc descărcarea…";
   try {
     const r = await api("/api/update/download", { method: "POST" });
-    if (r.error) $("#up-msg").textContent = r.error;
+    $("#up-msg").textContent = r.error || "";
     setTimeout(loadUpdate, 300);
   } catch (e) { if (e.message !== "auth") $("#up-msg").textContent = "Pi-ul nu răspunde."; }
   b.disabled = false;
@@ -1142,8 +1183,21 @@ async function loadHistory() {
   const pk = devs.filter((d) => d.kind === "pack");
   const inv = devs.find((d) => d.kind === "inverter");
   const pts = Math.min(400, Math.round(innerWidth * 1.2));
-  const get = (d) => api(`/api/history?device=${encodeURIComponent(d.id)}&hours=${state.hours}&points=${pts}`);
-  const [ph, ih] = await Promise.all([Promise.all(pk.map(get)), inv ? get(inv) : null]);
+  // toate graficele într-o singură cerere; până vin datele, „Se încarcă…”; o eroare nu lasă ecranul gol
+  const req = ++state.histReq;
+  $$("#charts .when").forEach((el) => (el.textContent = "Se încarcă…"));
+  let data;
+  try {
+    const ids = [...pk, ...(inv ? [inv] : [])].map((d) => encodeURIComponent(d.id)).join(",");
+    data = await api(`/api/history/all?devices=${ids}&hours=${state.hours}&points=${pts}`);
+  } catch (e) {
+    if (e.message !== "auth" && req === state.histReq)
+      $$("#charts .when").forEach((el) => (el.textContent = "Pi-ul nu a răspuns. Încearcă din nou."));
+    return;
+  }
+  if (req !== state.histReq) return;                     // între timp s-a ales alt interval
+  const S = data.series || {}, rowsOf = (d) => S[d.id]?.rows || [];
+  const ph = pk.map((d) => ({ rows: rowsOf(d) })), ih = inv ? { rows: rowsOf(inv) } : null;
   const ser = (rows, key) => rows.map((r) => [r.t, r[key]]).filter((p) => p[1] != null);
   lineChart($("#ch-soc"), pk.map((d, i) => ({ name: d.name, color: SERIES[i % SERIES.length], data: ser(ph[i].rows, "soc") })),
     { min: 0, max: 100, fmt: (v) => num(v, 0) + "%" });
@@ -1309,11 +1363,16 @@ function lineChart(box, series, opt = {}) {
     ctx.lineWidth = 2; ctx.lineJoin = "round";
     // zona de sub linie, plină până jos (sau până la zero, la grafice cu valori negative)
     const base = Y(opt.zero ? 0 : lo);
+    // linia se rupe doar la o pauză reală: mult mai mare decât distanța obișnuită dintre puncte (pe 30 de zile
+    // punctele sunt la ~1 h 45 min; cu doar 2 zile de date, pragul span/60 le rupea pe toate)
+    const diffs = series.flatMap((s) => s.data.slice(1).map((p, i) => p[0] - s.data[i][0])).sort((a, b) => a - b);
+    const typical = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 0;
+    const gapLimit = Math.max(900, span / 60, typical * 3);
     const segments = (s) => {
       const out = [];
       let prev = null;
       for (const p of s.data) {
-        if (prev == null || p[0] - prev > Math.max(900, span / 60)) out.push([]);
+        if (prev == null || p[0] - prev > gapLimit) out.push([]);
         out[out.length - 1].push(p);
         prev = p[0];
       }
@@ -1438,7 +1497,7 @@ const jsonPost = (body) => ({ method: "POST", headers: { "Content-Type": "applic
 
 async function renderPush() {
   const st = $("#push-state"), b = $("#push-on");
-  b.hidden = true;
+  $("#push-row").hidden = true;
   const HTTPS_URL = esc(state.info?.public_url || "adresa https a Pi-ului");
   if (!window.isSecureContext) {
     st.innerHTML = `Ca să primești notificări <b>direct în aplicația Amper</b>, deschide-o de la adresa
@@ -1455,11 +1514,11 @@ async function renderPush() {
     st.textContent = "Notificările sunt blocate pentru Amper. Pornește-le din Setări iPhone → Notificări → Amper.";
     return;
   }
-  b.hidden = false;
+  $("#push-row").hidden = false;
   b.dataset.on = sub && Notification.permission === "granted" ? "1" : "";
+  b.checked = !!b.dataset.on;
   st.textContent = b.dataset.on ? "Acest telefon primește notificările direct în aplicația Amper." :
     "Acest telefon nu primește încă notificări în aplicația Amper.";
-  b.textContent = b.dataset.on ? "Oprește notificările pe acest telefon" : "Pornește notificările pe acest telefon";
 }
 
 $("#push-on").onclick = async () => {
@@ -1521,7 +1580,7 @@ async function loadUserAlerts() {
   $("#ua-list").innerHTML = ua.rules.length ? ua.rules.map((r) => `
     <div class="row ua-rule ${r.enabled ? "" : "off"}"><span><b>${esc(r.name || `${mname(r.metric)} ${r.op === "<" ? "sub" : "peste"} ${num(r.value, r.value % 1 ? 2 : 0)} ${unit(r.metric)}`)}</b>
       <small>${esc(mname(r.metric))} ${r.op === "<" ? "<" : ">"} ${num(r.value, r.value % 1 ? 2 : 0)} ${esc(unit(r.metric))}${r.hold_s ? ` · cel puțin ${Math.round(r.hold_s / 60)} min` : ""} · ${LEVELS[r.level] || r.level}${r.notify_clear ? "" : " · fără „Rezolvat”"}</small></span>
-      <span class="ua-act"><button class="btn sm" data-tog="${r.id}">${r.enabled ? "Oprește" : "Pornește"}</button>
+      <span class="ua-act"><input type="checkbox" data-tog="${r.id}" ${r.enabled ? "checked" : ""} aria-label="Pornită">
       <button class="btn sm danger" data-del="${r.id}">Șterge</button></span></div>`).join("")
     : `<div class="empty">Nicio automatizare încă. Apasă „+ Adaugă automatizare”.</div>`;
   $$("[data-tog]", $("#ua-list")).forEach((b) => (b.onclick = async () => {
@@ -1592,8 +1651,9 @@ const SU_STEPS = [
 const DEV_NAME = { daly: "Daly", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
 const su = { i: 0, d: null, chosen: null, keep: false, again: false, pollT: 0 };
 
-async function openSetup(again) {
-  su.again = again; su.i = 0; su.chosen = null; su.keep = false;
+async function openSetup(again, step) {
+  su.again = again; su.chosen = null; su.keep = false;
+  su.i = su.start = Math.max(0, SU_STEPS.findIndex((x) => x.k === step));     // „+ Adaugă dispozitiv” → direct la Dispozitive
   try { su.d = await api("/api/setup"); } catch { return; }
   $("#app").hidden = true; $("#login").hidden = true; $("#setup").hidden = false;
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -1608,7 +1668,7 @@ function suRender() {
   $("#su-dots").innerHTML = SU_STEPS.map((x, i) => `<i class="${i < su.i ? "done" : i === su.i ? "on" : ""}"></i>`).join("");
   $("#su-err").textContent = "";
   $("#su-back").hidden = su.i === 0 && !su.again;
-  $("#su-back").textContent = su.i === 0 ? "‹ Renunță" : "‹ Înapoi";
+  $("#su-back").textContent = su.i === su.start ? "‹ Renunță" : "‹ Înapoi";
   $("#su-next").textContent = su.i === SU_STEPS.length - 1 ? "Gata" : "Mai departe";
   $("#su-next").disabled = false;
   const b = $("#su-body");
@@ -1776,7 +1836,7 @@ $("#su-next").onclick = async () => {
   b.disabled = false;
 };
 $("#su-back").onclick = () => {
-  if (su.i === 0) { $("#setup").hidden = true; $("#app").hidden = false; return; }   // reluat din Setări: renunță
+  if (su.i === su.start) { $("#setup").hidden = true; $("#app").hidden = false; return; }   // reluat din Setări: renunță
   su.i -= SU_STEPS[su.i].k === "notif" && !su.chosen ? 2 : 1;
   suRender();
 };
@@ -1852,19 +1912,19 @@ function startUpdateOverlay(kind) {
 }
 $("#upov-close").onclick = () => { $("#upov").hidden = true; state.updating = false; loadUpdate(); };
 
-/* ------------------------------------------------------------------ ACCES DE ORIUNDE (Tailscale + Funnel) */
+/* ------------------------------------------------------------------ ACCES DE ORIUNDE (Tailscale + Funnel; în aplicație: „server”) */
 const remote = { timer: 0 };
 async function renderRemote(el) {
   clearTimeout(remote.timer);
   if (!el || el.closest("[hidden]")) return;
-  if (!el.innerHTML.trim()) el.innerHTML = `<p class="note">Verific starea Tailscale pe Pi…</p>`;
+  if (!el.innerHTML.trim()) el.innerHTML = `<p class="note">Verific conexiunea la server…</p>`;
   let r;
   try {
     const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 25000);
     r = await api("/api/remote", { signal: ctl.signal }).finally(() => clearTimeout(t));
   } catch (e) {
     if (e.message === "auth") return;
-    el.innerHTML = `<p class="err">${e.name === "AbortError" ? "Pi-ul nu a răspuns în 25 de secunde (Tailscale nu răspunde)."
+    el.innerHTML = `<p class="err">${e.name === "AbortError" ? "Pi-ul nu a răspuns în 25 de secunde (serverul nu răspunde)."
       : "Pi-ul nu răspunde."}</p><button class="btn" id="rm-retry">Încearcă din nou</button>`;
     $("#rm-retry", el).onclick = () => { el.innerHTML = ""; renderRemote(el); };
     return;
@@ -1872,31 +1932,31 @@ async function renderRemote(el) {
   const job = r.job || {}, waiting = job.state === "running";
   let h = "";
   if (r.error) h = `<p class="note">${esc(r.error)}. Accesul de oriunde se pornește doar pe Pi-ul instalat cu install.sh.</p>`;
-  else if (!r.installed) h = `<p class="note">Tailscale nu e instalat pe acest Pi.</p>`;
+  else if (!r.installed) h = `<p class="note">Programul de conectare la server nu e instalat pe acest Pi.</p>`;
   else if (r.state !== "Running") {
-    h = `<p class="note">Ca să deschizi Amper și când nu ești acasă, Pi-ul se leagă de un cont <b>Tailscale</b> (gratuit,
-      te loghezi cu contul Google). Contul e al tău; nimeni altcineva nu are acces.</p>`;
+    h = `<p class="note">Ca să deschizi Amper și când nu ești acasă, Pi-ul se conectează la un <b>server</b> securizat
+      (gratuit; te conectezi cu contul tău Google). Contul e al tău; nimeni altcineva nu are acces.</p>`;
     h += waiting && (job.url || r.auth_url)
       ? `<p class="note"><b>1.</b> Deschide pagina de mai jos și loghează-te (cu Google). <b>2.</b> Revino aici: pagina se
-           actualizează singură.</p><a class="btn ed-go rm-link" href="${esc(job.url || r.auth_url)}" target="_blank" rel="noopener">Deschide pagina Tailscale</a>
+           actualizează singură.</p><a class="btn ed-go rm-link" href="${esc(job.url || r.auth_url)}" target="_blank" rel="noopener">Deschide pagina de conectare</a>
          <p class="note">Aștept logarea…</p>`
-      : `<button class="btn ed-go" id="rm-login">Conectează-te la Tailscale</button>`;
+      : `<button class="btn ed-go" id="rm-login">Conectare la server</button>`;
   } else {
-    h = `<div class="list"><div class="row"><span>✓ Conectat la Tailscale${r.account ? ` (${esc(r.account)})` : ""}</span>
+    h = `<div class="list"><div class="row"><span>✓ Conectat la server${r.account ? ` (${esc(r.account)})` : ""}</span>
       <span class="t">${esc(r.url || "")}</span></div></div>`;
     if (r.funnel) {
       h += `<p class="up-ok">✓ Accesul de oriunde e pornit.</p>
-        <p class="note">Deschide pe orice telefon, <b>fără aplicația Tailscale</b>:<br><b class="rm-url">${esc(r.url)}</b><br>
+        <p class="note">Deschide pe orice telefon, <b>fără nicio aplicație în plus</b>:<br><b class="rm-url">${esc(r.url)}</b><br>
           apoi adaug-o pe ecranul principal (Partajare → Adaugă pe ecranul principal). Intrarea cere parola aplicației.</p>
         <button class="btn danger" id="rm-off">Oprește accesul de oriunde</button>`;
     } else if (waiting && job.kind === "funnel" && job.url) {
-      h += `<p class="note">Tailscale cere o singură dată aprobarea ta pentru adresa publică (HTTPS și Funnel).
+      h += `<p class="note">Serverul cere o singură dată aprobarea ta pentru adresa publică.
           Deschide pagina, apasă „Enable” / „Approve”, apoi revino aici.</p>
-        <a class="btn ed-go rm-link" href="${esc(job.url)}" target="_blank" rel="noopener">Aprobă în Tailscale</a>
+        <a class="btn ed-go rm-link" href="${esc(job.url)}" target="_blank" rel="noopener">Aprobă pe server</a>
         <p class="note">Aștept aprobarea…</p>`;
     } else {
-      h += `<p class="note">Acum adresa merge doar pe telefoanele cu Tailscale. <b>Accesul de oriunde</b> o face să meargă pe
-          orice telefon, fără aplicația Tailscale. Adresa devine publică: o protejează parola aplicației, blocarea după
+      h += `<p class="note">Acum adresa merge doar pe telefoanele conectate la server (cu aplicația lui). <b>Accesul de
+          oriunde</b> o face să meargă pe orice telefon, fără nicio aplicație în plus. Adresa devine publică: o protejează parola aplicației, blocarea după
           parole greșite și notificarea la fiecare dispozitiv nou.</p>
         <button class="btn ed-go" id="rm-on" ${waiting ? "disabled" : ""}>${waiting ? "Pornesc…" : "Pornește accesul de oriunde"}</button>`;
     }
@@ -1913,6 +1973,43 @@ async function renderRemote(el) {
   if ($("#rm-login", el)) $("#rm-login", el).onclick = () => act("/api/remote/login", {});
   if ($("#rm-on", el)) $("#rm-on", el).onclick = () => act("/api/remote/funnel", { on: true });
   if ($("#rm-off", el)) $("#rm-off", el).onclick = () =>
-    confirm("Opresc accesul de oriunde? Telefoanele fără Tailscale nu vor mai putea deschide Amper.") && act("/api/remote/funnel", { on: false });
+    confirm("Opresc accesul de oriunde? De la distanță, Amper se va deschide doar pe telefoanele conectate la server.") && act("/api/remote/funnel", { on: false });
   if (waiting) remote.timer = setTimeout(() => renderRemote(el), 2500);
+}
+
+/* ------------------------------------------------------------------ PARTAJEAZĂ AMPER (Setări → Despre) */
+async function loadShare() {
+  const out = [];
+  const [rm, sys] = await Promise.all([api("/api/remote").catch(() => ({})), api("/api/system").catch(() => ({}))]);
+  if (rm.url && rm.funnel)
+    out.push({ t: "De oriunde", d: "Merge pe orice telefon, acasă sau oriunde, fără altă aplicație.", url: rm.url });
+  else if (rm.url && rm.state === "Running")
+    out.push({ t: "De oriunde (doar telefoanele conectate la server)", d: "Merge doar pe telefoanele cu aplicația serverului, în contul tău. " +
+      "Pornește „Acces de oriunde” din Setări ca să meargă pentru oricine.", url: rm.url });
+  const port = state.info?.port || 8080;
+  const ips = Object.entries(sys.network?.ip || {}).filter(([k, ip]) => k !== "lo" && !k.startsWith("tailscale") &&
+    !ip.startsWith("100.") && !ip.startsWith("10.42.") && !ip.startsWith("127."));
+  for (const [, ip] of ips.slice(0, 2))
+    out.push({ t: "Acasă", d: "Merge doar pe telefoanele conectate la rețeaua de acasă.", url: `http://${ip}:${port}` });
+  if (!out.length) out.push({ t: "Adresa de acum", d: "Adresa la care ai deschis acum aplicația.", url: location.origin });
+  $("#share-list").innerHTML = out.map((x, i) => `<div class="row share-row"><span><b>${esc(x.t)}</b>
+      <small class="share-url">${esc(x.url)}</small><small>${esc(x.d)}</small></span>
+      <span class="share-act"><button class="btn sm" data-share="${i}">Trimite</button>
+      <button class="btn sm" data-copy="${i}">Copiază</button></span></div>`).join("");
+  $$("[data-share]").forEach((b) => (b.onclick = async () => {
+    const x = out[+b.dataset.share];
+    const text = `Amper — bateriile și invertorul: ${x.url}`;
+    if (navigator.share) { try { await navigator.share({ title: "Amper", text, url: x.url }); } catch {} }
+    else copyText(x.url);
+  }));
+  $$("[data-copy]").forEach((b) => (b.onclick = () => copyText(out[+b.dataset.copy].url)));
+}
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); }
+  catch {                                        // fără https: varianta veche
+    const ta = Object.assign(document.createElement("textarea"), { value: t });
+    document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
+  }
+  $("#share-msg").textContent = `Copiat: ${t}`;
+  setTimeout(() => ($("#share-msg").textContent = ""), 4000);
 }

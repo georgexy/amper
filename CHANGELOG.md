@@ -2,6 +2,30 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 0.3.0-beta.7 — 2026-10-27
+- Hotspotul de configurare arată adresa în nume: „Amper-Setup 10.42.0.1”; după ce Pi-ul s-a conectat la WiFi-ul
+  ales, timp de 3 minute „Amper gata 192.168.x.y” — adresa de acasă se citește direct din lista de rețele.
+- Instalările noi folosesc parola comună „amper-setup” pentru hotspot (cele existente își păstrează parola).
+- Comutatoare ca pe iPhone (glisoare) în loc de bife: canalul beta, notificările pe acest telefon, automatizările
+  (pornit/oprit), ghidul de configurare, confirmările.
+- Reparat: după o actualizare, iPhone-ul putea folosi încă fișierele vechi ale aplicației (de ex. alertele își
+  arătau încă detaliile). Acum pagina cere fișierele cu versiunea în adresă, iar telefonul verifică mereu dacă
+  s-au schimbat.
+- Același motiv făcea ca butonul „Descarcă și verifică” să nu reacționeze până la redeschiderea aplicației: pagina
+  nouă cu codul vechi. Acum pagina și codul vin mereu împreună; butonul arată imediat „Pornesc descărcarea…”.
+- Cale de rezervă fără aplicație (prin SSH): `sudo amper update --install` / `--rollback` / `--check`.
+- Istoric mai rapid: peste 6 ore, graficele folosesc mediile la 5 minute (de ~12 ori mai puțin de citit de pe
+  card), iar toate graficele vin într-o singură cerere; „Se încarcă…” până sosesc datele.
+- Reparat: pe 7 și 30 de zile, cu puține zile de date, liniile nu se desenau deloc (erau rupte după fiecare punct).
+- Setări → Despre → „Partajează Amper”: adresa de oriunde și cea de acasă, cu „Trimite” (WhatsApp, Mesaje…) și
+  „Copiază”, ca s-o dai celor din casă.
+- În aplicație, conexiunea pentru accesul de oriunde se numește „server” (ex. „Conectare la server”).
+- Setări → „Dispozitive conectate” (în loc de „Module Daly”): invertorul și toate BMS-urile, grupate după tip și
+  ordonate după adresă, cu legătura (Bluetooth, cablu, RS485), viteza, capacitatea și dacă comunică acum. Butonul
+  „+ Adaugă dispozitiv” deschide ghidul direct la căutarea dispozitivelor.
+- Setări reorganizate: meniul „Conectare” (Acces de oriunde, Partajează Amper, Rețeaua WiFi); „Ghid de configurare”
+  în Despre, lângă Actualizări și Info.
+
 ## 0.3.0-beta.6 — 2026-10-27
 - Setări: meniul nou „Despre” cuprinde Actualizări și Info.
 - Acces de oriunde: în loc de pagină goală, „Verific starea Tailscale…” și un mesaj clar dacă Pi-ul nu răspunde;

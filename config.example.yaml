@@ -24,11 +24,12 @@ web:
 
 # Configurarea WiFi de pe telefon: când Pi-ul nu are internet `offline_minutes` minute, pornește rețeaua
 # WiFi de mai jos; conectați-vă la ea, se deschide o pagină cu rețelele din jur, alegeți una și scrieți parola.
-# Parola e generată la instalare (minim 8 caractere).
+# Parola comună „amper-setup” (scrisă în instrucțiuni); se poate schimba (minim 8 caractere).
+# Numele rețelei arată adresa paginii („Amper-Setup 10.42.0.1”), iar după conectare adresa de acasă.
 wifi_setup:
   enabled: true
   ssid: Amper-Setup
-  password: REPLACE-WIFI-SETUP
+  password: amper-setup
   offline_minutes: 2
 
 # ------------------------------------------------------------

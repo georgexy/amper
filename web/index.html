@@ -112,19 +112,16 @@
             <span><b>Notificări</b><span id="set-notif-sub">Alertele pe telefon</span></span><i>›</i></button>
           <button class="card set-btn" data-panel="daly"><span class="ic" style="--ic:var(--charge)">
             <svg viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 10.5v3M7 10v4M11 10v4M15 10v4"/></svg></span>
-            <span><b>Module Daly</b><span id="set-daly-sub">Cablu USB sau Bluetooth</span></span><i>›</i></button>
+            <span><b>Dispozitive conectate</b><span id="set-daly-sub">Invertoare și BMS-uri</span></span><i>›</i></button>
           <button class="card set-btn" data-panel="auto"><span class="ic" style="--ic:var(--sun)">
             <svg viewBox="0 0 24 24"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg></span>
             <span><b>Automatizări</b><span id="set-auto-sub">Anunță-mă când…</span></span><i>›</i></button>
-          <button class="card set-btn" data-panel="remote"><span class="ic" style="--ic:var(--cell)">
+          <button class="card set-btn" data-panel="conn"><span class="ic" style="--ic:var(--cell)">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>
-            <span><b>Acces de oriunde</b><span>Fără Tailscale pe telefon</span></span><i>›</i></button>
+            <span><b>Conectare</b><span>Acces de oriunde, partajare, rețeaua WiFi</span></span><i>›</i></button>
           <button class="card set-btn" data-panel="security"><span class="ic" style="--ic:var(--warn)">
             <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
-            <span><b>Securitate</b><span>Parola, dispozitivele conectate</span></span><i>›</i></button>
-          <button class="card set-btn" id="set-wizard"><span class="ic" style="--ic:var(--charge)">
-            <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="18" cy="16" r="3"/></svg></span>
-            <span><b>Ghid de configurare</b><span>Nume, parolă, dispozitive, capacități, notificări</span></span><i>›</i></button>
+            <span><b>Securitate</b><span>Parola, telefoanele care au intrat</span></span><i>›</i></button>
           <button class="card set-btn" data-panel="about"><span class="ic" style="--ic:var(--faint)">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg></span>
             <span><b>Despre</b><span id="set-about-sub">Versiunea, actualizări, Pi-ul</span></span><i>›</i></button>
@@ -141,6 +138,9 @@
           <button class="card set-btn" data-panel="info"><span class="ic" style="--ic:var(--cell)">
             <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M8 10h8M8 14h5"/></svg></span>
             <span><b>Info</b><span id="set-info-sub">Pi-ul, rețeaua, porturile</span></span><i>›</i></button>
+          <button class="card set-btn" id="set-wizard"><span class="ic" style="--ic:var(--charge)">
+            <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="18" cy="16" r="3"/></svg></span>
+            <span><b>Ghid de configurare</b><span>Nume, parolă, dispozitive, capacități</span></span><i>›</i></button>
         </div>
         <p class="note" id="about-version"></p>
       </section>
@@ -155,7 +155,8 @@
       <section class="set-panel" id="set-notif" hidden>
         <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Notificări</h2></div>
         <p class="note" id="push-state"></p>
-        <button class="btn" id="push-on" hidden>Pornește notificările pe acest telefon</button>
+        <label class="row-check" id="push-row" hidden><span><b>Notificări pe acest telefon</b>
+          <small>Direct în aplicația Amper</small></span><input type="checkbox" id="push-on"></label>
         <p class="note" id="notif-state"></p>
         <button class="btn" id="test-notif">Trimite o notificare de test</button>
         <p class="note" id="test-res"></p>
@@ -164,17 +165,6 @@
       <section class="set-panel" id="set-info" hidden>
         <div class="pk-top"><button class="back set-back" data-back="about" aria-label="Înapoi la Despre">‹</button><h2>Info</h2></div>
         <div id="info-body"><p class="note">Citesc…</p></div>
-        <h2>Schimbă rețeaua WiFi</h2>
-        <p class="note">Pi-ul trece pe altă rețea din zonă. Dacă rețeaua nouă nu merge (parolă greșită, fără internet),
-          revine singur la cea de acum, în cel mult ~2 minute. Cât timp schimbă, aplicația pierde legătura câteva secunde.</p>
-        <button class="btn" id="wifi-scan">Caută rețele</button>
-        <div class="list" id="wifi-list"></div>
-        <div id="wifi-form" hidden>
-          <p class="note" id="wifi-chosen"></p>
-          <input class="ed-in" type="password" id="wifi-pw" placeholder="parola rețelei" autocomplete="off">
-          <button class="btn ed-go" id="wifi-go">Conectează Pi-ul la această rețea</button>
-        </div>
-        <p class="note" id="wifi-msg"></p>
       </section>
 
       <section class="set-panel" id="set-update" hidden>
@@ -221,8 +211,46 @@
         <div class="list" id="ua-list"></div>
       </section>
 
+      <section class="set-panel" id="set-conn" hidden>
+        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Conectare</h2></div>
+        <div class="set-menu">
+          <button class="card set-btn" data-panel="remote"><span class="ic" style="--ic:var(--cell)">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>
+            <span><b>Acces de oriunde</b><span>Fără aplicație în plus pe telefon</span></span><i>›</i></button>
+          <button class="card set-btn" data-panel="share"><span class="ic" style="--ic:var(--charge)">
+            <svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.9l7.6-3.8M8.2 13.1l7.6 3.8"/></svg></span>
+            <span><b>Partajează Amper</b><span>Adresa pentru cei din casă</span></span><i>›</i></button>
+          <button class="card set-btn" data-panel="wifi"><span class="ic" style="--ic:var(--acc)">
+            <svg viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.7 15.8a5 5 0 0 1 6.6 0"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg></span>
+            <span><b>Rețeaua WiFi</b><span id="set-wifi-sub">Rețeaua la care e legat Pi-ul</span></span><i>›</i></button>
+        </div>
+      </section>
+
+      <section class="set-panel" id="set-share" hidden>
+        <div class="pk-top"><button class="back set-back" data-back="conn" aria-label="Înapoi la Conectare">‹</button><h2>Partajează Amper</h2></div>
+        <p class="note">Trimite adresa celor din casă: o deschid în browser și o adaugă pe ecranul principal
+          (Partajare → Adaugă pe ecranul principal). Intrarea cere parola aplicației — dă-le-o separat.</p>
+        <div class="list" id="share-list"><div class="empty">Caut adresele…</div></div>
+        <p class="note" id="share-msg"></p>
+      </section>
+
+      <section class="set-panel" id="set-wifi" hidden>
+        <div class="pk-top"><button class="back set-back" data-back="conn" aria-label="Înapoi la Conectare">‹</button><h2>Rețeaua WiFi</h2></div>
+        <p class="note" id="wifi-now"></p>
+        <p class="note">Pi-ul trece pe altă rețea din zonă. Dacă rețeaua nouă nu merge (parolă greșită, fără internet),
+          revine singur la cea de acum, în cel mult ~2 minute. Cât timp schimbă, aplicația pierde legătura câteva secunde.</p>
+        <button class="btn" id="wifi-scan">Caută rețele</button>
+        <div class="list" id="wifi-list"></div>
+        <div id="wifi-form" hidden>
+          <p class="note" id="wifi-chosen"></p>
+          <input class="ed-in" type="password" id="wifi-pw" placeholder="parola rețelei" autocomplete="off">
+          <button class="btn ed-go" id="wifi-go">Conectează Pi-ul la această rețea</button>
+        </div>
+        <p class="note" id="wifi-msg"></p>
+      </section>
+
       <section class="set-panel" id="set-remote" hidden>
-        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Acces de oriunde</h2></div>
+        <div class="pk-top"><button class="back set-back" data-back="conn" aria-label="Înapoi la Conectare">‹</button><h2>Acces de oriunde</h2></div>
         <div id="remote-body"></div>
       </section>
 
@@ -231,18 +259,21 @@
         <p class="note">Parola se schimbă din <b>Ghid de configurare</b>. După 5 parole greșite de la aceeași adresă,
           încercările sunt încetinite, iar tu primești o notificare. La fiecare telefon sau calculator nou care intră în
           aplicație primești notificarea „Dispozitiv nou conectat”.</p>
-        <h2>Dispozitive care au intrat</h2>
+        <h2>Telefoane și calculatoare care au intrat</h2>
         <div class="list" id="sec-devs"></div>
         <h2>Ultimele încercări de logare</h2>
         <div class="list" id="sec-log"></div>
       </section>
 
       <section class="set-panel" id="set-daly" hidden>
-        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Module Daly</h2></div>
-        <div class="list" id="daly-list"></div>
-        <p class="note">Modulele Daly se găsesc singure, pe cablu USB sau prin Bluetooth (nume „DL-…”), și apar pe
-          ecranul principal la prima citire. Căutarea se face la 30 s în primele 10 minute, apoi la 3 minute.</p>
-        <button class="btn" id="daly-search">Caută acum</button>
+        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Dispozitive conectate</h2></div>
+        <div id="daly-list"></div>
+        <div id="daly-auto-box">
+          <p class="note">Modulele Daly se găsesc singure, pe cablu USB sau prin Bluetooth (nume „DL-…”). Căutarea se
+            face la 30 s în primele 10 minute după pornire, apoi la 3 minute.</p>
+          <button class="btn" id="daly-search">Caută acum modulele Daly</button>
+        </div>
+        <button class="btn ed-go" id="dev-add">+ Adaugă dispozitiv</button>
       </section>
     </main>
 
@@ -313,7 +344,7 @@
       <p class="note" id="ed-now"></p>
       <div id="ed-field"></div>
       <div class="ed-warn" id="ed-warn" hidden></div>
-      <label class="ed-ack" id="ed-ackbox" hidden><input type="checkbox" id="ed-ack"> Am înțeles riscul</label>
+      <label class="ed-ack" id="ed-ackbox" hidden><input type="checkbox" id="ed-ack"><span>Am înțeles riscul</span></label>
       <p class="ed-diff" id="ed-diff"></p>
       <button class="btn ed-go" id="ed-go">Scrie în invertor</button>
       <p class="err" id="ed-err"></p>
@@ -358,7 +389,7 @@
           <option value="info">🔔 informare</option><option value="warning" selected>🟠 atenție</option><option value="critical">🔴 critic (sunet)</option></select></label>
       </div>
       <label class="ua-l">Nume (opțional)<input id="ua-name" class="ed-in" type="text" maxlength="80" placeholder="ex. Bateria e aproape goală"></label>
-      <label class="ed-ack"><input type="checkbox" id="ua-clear" checked> Anunță-mă și când trece</label>
+      <label class="ed-ack"><input type="checkbox" id="ua-clear" checked><span>Anunță-mă și când trece</span></label>
       <p class="ed-diff" id="ua-preview"></p>
       <button class="btn ed-go" id="ua-save">Salvează automatizarea</button>
       <p class="err" id="ua-err"></p>
