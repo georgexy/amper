@@ -5,6 +5,10 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 ## 0.3.0-beta.4 — în pregătire
 - Actualizare în doi pași: „Descarcă și verifică”, cu bară de progres și procente pentru descărcare și verificare,
   apoi butonul „Instalează acum”. Arhiva descărcată se verifică din nou la instalare.
+- În timpul instalării apare un ecran cu un cerc care se umple pas cu pas; când versiunea nouă răspunde,
+  aplicația se reîncarcă singură.
+- Reparat: după actualizare, aplicația putea rămâne cu ecranul negru (pagina de eroare a Tailscale din timpul
+  repornirii era afișată și ținută minte). Acum se folosește ultima versiune bună până răspunde Pi-ul.
 
 ## 0.3.0-beta.3 — 2026-10-27
 - Sigla Amper (bateria cu fulger) sus, înaintea numelui.

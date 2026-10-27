@@ -294,6 +294,18 @@
     </div>
   </dialog>
 
+  <!-- actualizarea în curs: cerc care se umple; la final aplicația se reîncarcă singură -->
+  <div id="upov" class="upov" hidden>
+    <div class="upov-box">
+      <svg class="upov-ring" viewBox="0 0 120 120"><circle class="bg" cx="60" cy="60" r="52"/>
+        <circle class="fg" id="upov-arc" cx="60" cy="60" r="52"/></svg>
+      <div class="upov-pct" id="upov-pct">0%</div>
+      <h2 id="upov-title">Actualizez Amper</h2>
+      <p class="note" id="upov-msg">Pornesc…</p>
+      <button class="btn" id="upov-close" hidden>Închide</button>
+    </div>
+  </div>
+
   <dialog id="pwask" aria-labelledby="pwask-title">
     <div class="sheet">
       <div class="grab"></div>

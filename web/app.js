@@ -169,14 +169,15 @@ function tickConn() {
 function checkVersion(v) {
   if (!v) return;
   if (!state.appVersion) { state.appVersion = v; return; }
-  if (v === state.appVersion || state.reloading) return;
+  if (v === state.appVersion || state.reloading || state.updating) return;
   if ($("#edit").open || $("#sheet").open || state.view === "bms" || document.activeElement?.matches?.("input, select")) return;
   let last = 0;
   try { last = +sessionStorage.getItem("reloadedAt") || 0; } catch {}
   if (Date.now() - last < 60000) return;
   state.reloading = true;
   try { sessionStorage.setItem("reloadedAt", Date.now()); } catch {}
-  const go = () => location.reload();
+  const go = () => fetch("/api/health", { cache: "no-store" }).then((r) => (r.ok ? location.reload() : (state.reloading = false)),
+    () => (state.reloading = false));
   navigator.serviceWorker?.getRegistration?.().then((r) => r?.update()).then(go, go) || go();
 }
 
@@ -879,6 +880,7 @@ async function loadUpdate() {
     return;
   }
   upd.data = r;
+  if (r.job?.state === "running" && r.job.kind !== "download" && !state.updating) return startUpdateOverlay(r.job.kind);
   renderUpdate();
   if (r.job?.state === "running" && !$("#set-update").hidden) upd.timer = setTimeout(loadUpdate, 1000);
 }
@@ -962,7 +964,7 @@ async function updateAction(action, btn) {
   try {
     const { r, j } = await securePost(`/api/update/${action}`);
     if (!r.ok) $("#up-msg").textContent = j.error || "Nu a mers.";
-    else setTimeout(loadUpdate, 800);
+    else startUpdateOverlay(action);
   } catch (e) { $("#up-msg").textContent = e.message === "Anulat." ? "" : e.message || "Pi-ul nu răspunde."; }
   btn.disabled = false;
 }
@@ -1771,3 +1773,69 @@ $("#su-back").onclick = () => {
 navigator.serviceWorker?.addEventListener("message", (e) => {
   if (String(e.data?.open || "").includes("v=alerts") && !$("#app").hidden) show("alerts");
 });
+
+/* ---------- ecranul „Actualizez Amper”: cercul se umple după pașii serviciului de actualizare; cât Amper
+   repornește, serverul nu răspunde (normal); aplicația se reîncarcă singură când versiunea nouă răspunde. */
+const UPOV_PCT = { verify: 4, space: 7, download: 10, check: 55, backup: 62, install: 75, restart: 86, health: 93 };
+const UPOV_MSG = { verify: "Verific semnătura…", space: "Verific spațiul liber…", download: "Descarc…",
+  check: "Verific arhiva…", backup: "Fac copia de siguranță a datelor…", install: "Instalez versiunea nouă…",
+  restart: "Repornesc Amper…", health: "Verific că pornește…" };
+function upovSet(pct, msg) {
+  pct = Math.max(state.upPct || 0, Math.min(100, Math.round(pct)));     // cercul doar înaintează
+  state.upPct = pct;
+  const c = 2 * Math.PI * 52;
+  $("#upov-arc").style.strokeDasharray = `${c}`;
+  $("#upov-arc").style.strokeDashoffset = `${c * (1 - pct / 100)}`;
+  $("#upov-pct").textContent = `${pct}%`;
+  if (msg) $("#upov-msg").textContent = msg;
+}
+function startUpdateOverlay(kind) {
+  state.updating = true; state.upPct = 0;
+  const from = state.info?.version || upd.data?.version;
+  $("#upov-title").textContent = kind === "rollback" ? "Revin la versiunea anterioară" : "Actualizez Amper";
+  $("#upov-close").hidden = true;
+  $("#upov").hidden = false;
+  upovSet(1, "Pornesc…");
+  let down = 0;
+  const tick = async () => {
+    // 1) Amper răspunde cu altă versiune → gata
+    try {
+      const h = await (await fetch("/api/health", { cache: "no-store" })).json();
+      if (h.version && from && h.version !== from) {
+        upovSet(100, "Gata! Reîncarc aplicația…");
+        return setTimeout(() => location.replace(location.pathname), 1200);
+      }
+    } catch {}
+    // 2) pașii, de la serviciul de actualizare (prin Amper; nu răspunde cât Amper e oprit)
+    try {
+      const r = await (await fetch("/api/update/status", { credentials: "same-origin", cache: "no-store" })).json();
+      const j = r.job?.state === "running" ? r.job : r.last_job || r.job || {};
+      down = 0;
+      if (j.state === "running") {
+        const base = UPOV_PCT[j.step] ?? 0;
+        const pct = j.step === "download" && j.progress != null ? 10 + j.progress * 0.45 : base;
+        upovSet(pct, UPOV_MSG[j.step] || j.message);
+      } else if (["failed", "rolled_back"].includes(j.state) && Date.now() / 1000 - (j.finished || 0) < 600) {
+        $("#upov-title").textContent = j.state === "rolled_back" ? "Am revenit la versiunea veche" : "Actualizarea nu a reușit";
+        $("#upov-msg").textContent = j.message;
+        $("#upov-close").hidden = false;
+        state.updating = false;
+        return;
+      } else if (j.state === "ok" && r.version && from && r.version !== from) {
+        upovSet(100, "Gata! Reîncarc aplicația…");
+        return setTimeout(() => location.replace(location.pathname), 1200);
+      }
+    } catch {
+      // Amper e oprit/repornește: cercul înaintează încet, ca să se vadă că lucrează
+      down++;
+      upovSet(Math.max(state.upPct, 62) + (down < 40 ? 0.6 : 0), down > 3 ? "Repornesc Amper… (durează până la un minut)" : null);
+      if (down > 150) {                                 // ~3 minute fără răspuns
+        $("#upov-msg").textContent = "Pi-ul nu răspunde încă. Închide aplicația și redeschide-o peste un minut.";
+        $("#upov-close").hidden = false;
+      }
+    }
+    setTimeout(tick, 1200);
+  };
+  tick();
+}
+$("#upov-close").onclick = () => { $("#upov").hidden = true; state.updating = false; loadUpdate(); };
