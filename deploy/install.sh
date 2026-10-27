@@ -8,6 +8,8 @@
 #     sudo bash /boot/firmware/amper/deploy/install.sh --demo        # date simulate (fără hardware)
 #     sudo bash ~/amper/deploy/install.sh --restore amper-date-AAAA-LL-ZZ.tar.gz
 #                       # pe un card nou: pune la loc config, istoric, Daly, Tailscale din copia din Drive
+#     --image           # doar pentru tools/build-image.sh (în chroot): fără dispozitive, fără nimic generat
+#                       # (topicul ntfy, cheile se fac la prima pornire: deploy/firstboot.sh), nu pornește nimic
 #
 #  Se poate rula de mai multe ori (actualizare): păstrează config-ul și baza de date.
 # =====================================================================
@@ -19,11 +21,13 @@ ETC=/etc/amper
 DATA=/var/lib/amper
 TAILSCALE=0
 DEMO=0
+IMAGE=0
 RESTORE=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --tailscale) TAILSCALE=1 ;;
     --demo) DEMO=1 ;;
+    --image) IMAGE=1 ;;
     --restore) RESTORE="$(readlink -f "${2:?lipsește fișierul copiei}")"; shift ;;
     *) echo "Opțiune necunoscută: $1"; exit 1 ;;
   esac
@@ -33,6 +37,8 @@ done
 
 [ "$(id -u)" -eq 0 ] || { echo "Rulați cu sudo:  sudo bash $0"; exit 1; }
 say() { printf "\n\033[1;34m==> %s\033[0m\n" "$*"; }
+# în imagine (chroot) serviciile doar se activează; pornesc la prima pornire a Pi-ului
+restart() { [ "$IMAGE" -eq 1 ] || systemctl restart "$@"; }
 
 say "Instalez pachetele necesare (Python, aiohttp, pyserial, yaml, Bluetooth)"
 apt-get update -qq
@@ -99,11 +105,23 @@ if [ ! -f "$ETC/config.yaml" ]; then
   else
     cp "$SRC/config.example.yaml" "$ETC/config.yaml"
   fi
+  if [ "$IMAGE" -eq 1 ]; then
+    # imaginea generică: dispozitivele le alege fiecare în ghidul de configurare; topicul la prima pornire
+    python3 - "$ETC/config.yaml" <<'PY'
+import re, sys
+p = sys.argv[1]
+s = open(p).read()
+s, n = re.subn(r"\ndevices:\n.*?(?=\n# -{10,}\n#  Alerte)", "\ndevices: []\n", s, flags=re.S)
+assert n == 1, "nu găsesc lista de dispozitive în config.example.yaml"
+open(p, "w").write(s)
+PY
+    touch "$ETC/.firstboot"
+  fi
   TOPIC="baterii-$(python3 -c 'import secrets; print(secrets.token_hex(6))')"
-  sed -i "s/REPLACE-TOPIC/$TOPIC/" "$ETC/config.yaml"
+  [ "$IMAGE" -eq 1 ] || sed -i "s/REPLACE-TOPIC/$TOPIC/" "$ETC/config.yaml"
 fi
 
-if [ "$DEMO" -eq 0 ] && grep -q "by-id/REPLACE-" "$ETC/config.yaml"; then
+if [ "$DEMO" -eq 0 ] && [ "$IMAGE" -eq 0 ] && grep -q "by-id/REPLACE-" "$ETC/config.yaml"; then
   say "Caut dispozitivele pe porturile USB (poate dura ~1 minut)"
   systemctl stop amper 2>/dev/null || true
   for svc in solar-assistant solarassistant; do systemctl stop "$svc" 2>/dev/null || true; done
@@ -126,15 +144,23 @@ EXEC="/usr/bin/python3 -m amper run -c $ETC/config.yaml"
 sed "s#@EXEC@#$EXEC#" "$SRC/deploy/amper.service" > /etc/systemd/system/amper.service
 systemctl daemon-reload
 systemctl enable amper >/dev/null 2>&1
-systemctl restart amper
+restart amper
 
 cp "$SRC/deploy/amper-backup.service" "$SRC/deploy/amper-backup.timer" "$SRC/deploy/amper-grow-root.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable amper-grow-root.service >/dev/null 2>&1
+# parola uitată: fișierul resetare-parola.txt pus pe card (partiția bootfs) o șterge la pornire
+cp "$SRC/deploy/amper-password-reset.service" /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable amper-password-reset.service >/dev/null 2>&1
+if [ -f "$ETC/.firstboot" ]; then
+  cp "$SRC/deploy/amper-firstboot.service" /etc/systemd/system/
+  systemctl enable amper-firstboot.service >/dev/null 2>&1
+fi
 # copia în Google Drive e opțională: pornește doar dacă există /etc/amper/rclone.conf
 if [ -f "$ETC/rclone.conf" ]; then
   say "Copia de siguranță în fiecare noapte la 00:00 (Google Drive)"
-  systemctl enable --now amper-backup.timer >/dev/null 2>&1
+  systemctl enable amper-backup.timer >/dev/null 2>&1 && restart amper-backup.timer
 else
   systemctl disable --now amper-backup.timer >/dev/null 2>&1 || true
 fi
@@ -143,15 +169,17 @@ say "Actualizările din aplicație (Setări → Actualizări; caută singur o da
 cp "$SRC/deploy/amper-update.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable amper-update >/dev/null 2>&1
-systemctl restart amper-update
+restart amper-update
 
 say "Hotspotul de configurare WiFi (pornește doar când Pi-ul nu are internet)"
-rfkill unblock wifi 2>/dev/null || true
-nmcli radio wifi on 2>/dev/null || true
+if [ "$IMAGE" -eq 0 ]; then
+  rfkill unblock wifi 2>/dev/null || true
+  nmcli radio wifi on 2>/dev/null || true
+fi
 cp "$SRC/deploy/amper-wifi.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable amper-wifi >/dev/null 2>&1
-systemctl restart amper-wifi
+restart amper-wifi
 
 # ---------------- Tailscale ----------------
 # Pachetul se instalează mereu (fără logare): accesul de oriunde se pornește din aplicație (Setări → Acces de
@@ -159,6 +187,11 @@ systemctl restart amper-wifi
 if ! command -v tailscale >/dev/null; then
   say "Instalez Tailscale (pentru accesul de oriunde; se pornește din aplicație)"
   curl -fsSL https://tailscale.com/install.sh | sh || echo "  (Tailscale nu s-a putut instala acum; accesul de oriunde nu va fi disponibil)"
+fi
+if [ "$IMAGE" -eq 1 ]; then
+  command -v tailscale >/dev/null || { echo "Imaginea are nevoie de Tailscale (îl pune tools/build-image.sh)"; exit 1; }
+  say "Gata (imagine): serviciile pornesc la prima pornire a Pi-ului"
+  exit 0
 fi
 if [ "$TAILSCALE" -eq 1 ] && command -v tailscale >/dev/null; then
   echo "Deschideți linkul afișat mai jos (de pe telefon sau PC) și autentificați-vă:"
@@ -185,5 +218,5 @@ cat <<EOF
 EOF
 [ "$NEW_CONFIG" -eq 1 ] && echo "  Verificați în config capacitățile (capacity_ah) ale modulelor — din ele se calculează SOC-ul total."
 grep -q "by-id/REPLACE-" "$ETC/config.yaml" && [ "$DEMO" -eq 0 ] && \
-  echo "  ATENȚIE: unele dispozitive nu au fost găsite. Vedeți README, secțiunea 'Dacă un dispozitiv nu e găsit'."
+  echo "  ATENȚIE: unele dispozitive nu au fost găsite. Vedeți docs/instalare-avansata.md, „Dacă un dispozitiv nu e găsit”."
 exit 0

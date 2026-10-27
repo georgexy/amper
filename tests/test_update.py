@@ -113,12 +113,15 @@ class Env:
         if cmd[:2] == ("systemctl", "restart") and cmd[2] == "amper" and self.on_restart:
             self.on_restart()
 
-    def updater(self, channel="stable", keys=None):
+    now = 1_900_000_000
+
+    def updater(self, channel="stable", keys=None, **kw):
         return up.Updater({"database": str(self.db), "update": {"repo": REPO, "channel": channel}},
                           opt_dir=str(self.opt), link=str(self.link), etc_dir=str(self.etc),
                           data_dir=str(self.data), state_dir=str(self.tmp / "state"),
                           keys=[self.pub] if keys is None else keys, fetch=self.fetch, run=self.run,
-                          health=lambda v: self.healthy.get(v, True), notify=self.notes.append, clock=lambda: 1_900_000_000)
+                          health=lambda v: self.healthy.get(v, True), notify=self.notes.append,
+                          clock=lambda: self.now, **kw)
 
     def snapshot(self):
         con = sqlite3.connect(self.db)
@@ -485,3 +488,87 @@ def test_command_line_install_fallback(tmp_path, monkeypatch, capsys):
     assert ex.value.code == 0 and os.path.realpath(e.link).endswith("amper-0.3.0")
     assert ("systemctl", "stop", "amper-update") in e.cmds and e.cmds[-1] == ("systemctl", "start", "amper-update")
     assert "0.3.0" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------- paznicul, revenirea de pe card, urgente
+class Svc:
+    """Serviciul amper simulat pentru paznic: starea systemd și dacă răspunde la /api/health."""
+    def __init__(self):
+        self.state, self.up = "active", True
+
+
+def test_watchdog_restarts_then_rolls_back_recent_update(tmp_path):
+    e = Env(tmp_path)
+    e.publish("0.3.0")
+    svc = Svc()
+    u = e.updater(ping=lambda: svc.up, svc_state=lambda: svc.state)
+    assert u.install()
+    assert u.watchdog_tick() is None                               # răspunde: nimic
+    svc.up = False                                                 # 0.3.0 se blochează după o vreme
+    assert u.watchdog_tick() is None                               # abia a observat
+    e.now += 200
+    assert u.watchdog_tick() is None                               # încă nu 5 minute
+    e.now += 120
+    assert u.watchdog_tick() == "restart"
+    assert e.cmds[-1] == ("systemctl", "restart", "amper") and any("l-am repornit" in n for n in e.notes)
+    e.now += 310
+    assert u.watchdog_tick() == "rollback"                         # tot nu merge: revine la 0.2.0
+    assert os.path.realpath(e.link) == str(e.opt / "amper-0.2.0")
+    assert u.state["bad_version"] == "0.3.0" and any("am revenit singur la 0.2.0" in n for n in e.notes)
+
+
+def test_watchdog_only_restarts_old_install_and_leaves_manual_stop(tmp_path):
+    e = Env(tmp_path)
+    svc = Svc()
+    u = e.updater(ping=lambda: svc.up, svc_state=lambda: svc.state)
+    svc.state = "inactive"                                         # oprit de mână (amper scan)
+    for _ in range(3):
+        assert u.watchdog_tick() is None
+        e.now += 400
+    svc.state, svc.up = "failed", False                           # cade, fără actualizare recentă
+    acts = []
+    for _ in range(4):
+        acts.append(u.watchdog_tick())
+        e.now += 310
+    assert acts == [None, "restart", "restart", "restart"] and os.path.realpath(e.link) == str(e.opt / "amper-0.2.0")
+    assert sum("l-am repornit" in n for n in e.notes) == 1         # o singură notificare pe incident
+    svc.state, svc.up = "active", True
+    assert u.watchdog_tick() is None and any("răspunde din nou" in n for n in e.notes)
+
+
+def test_card_rollback_file(tmp_path):
+    e = Env(tmp_path)
+    e.publish("0.3.0")
+    boot = tmp_path / "boot"
+    boot.mkdir()
+    u = e.updater(boot_dirs=[str(boot)])
+    assert u.install()
+    assert u.card_rollback() is None
+    (boot / "Revenire.txt").write_text("")
+    assert u.card_rollback() == "rollback"
+    assert os.path.realpath(e.link) == str(e.opt / "amper-0.2.0") and not list(boot.iterdir())
+    assert any("cerută de pe card" in n for n in e.notes)
+
+
+def test_urgent_release_installs_by_itself(tmp_path):
+    e = Env(tmp_path)
+    u = e.updater()
+    out = tmp_path / "dist-urg"
+    m = release.build(out, e.priv, root=fake_source(tmp_path, "0.3.1"), mtime=1_800_000_000, urgent=True)
+    assert m["urgent"] and up.verify_manifest((out / "manifest.json").read_bytes(),
+                                              (out / "manifest.json.sig").read_text(), [e.pub])["urgent"]
+    e.publish("0.3.0")
+    u.check(auto=True)
+    assert not u.urgent_pending() and any("Versiune nouă" in n for n in e.notes)
+    e.files.clear()
+    base = f"https://github.com/{REPO}/releases/download/v0.3.1/"
+    for n in (m["tarball"], "manifest.json", "manifest.json.sig"):
+        e.files[base + n] = (out / n).read_bytes()
+    e.files[API + "/latest"] = json.dumps({"tag_name": "v0.3.1", "draft": False, "assets": [
+        {"name": n, "browser_download_url": base + n} for n in (m["tarball"], "manifest.json", "manifest.json.sig")]}).encode()
+    e.now += up.URGENT_EVERY
+    assert u.due()                                                  # se caută la 6 ore, nu la 7 zile
+    u.check(auto=True)
+    assert u.urgent_pending() and any("urgentă" in n for n in e.notes)
+    u.state["bad_version"] = "0.3.1"                               # a căzut deja aici: nu insistă
+    assert not u.urgent_pending()

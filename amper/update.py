@@ -12,7 +12,10 @@ Pe Pi:
 
 Pașii unei actualizări: manifest + semnătură → arhivă (sha256) → spațiu → copia datelor → despachetare în
 /opt/amper-<ver> → schimbarea legăturii → repornire → /api/health în 60 s; altfel revine la versiunea veche
-(cod + date din copia făcută înainte). Căutarea automată (`update.check_days`, implicit 7 zile) doar anunță.
+(cod + date din copia făcută înainte). Căutarea automată (la 6 ore) doar anunță; o versiune marcată „urgentă” în
+manifestul semnat (`release.py build --urgent`) se instalează singură, cu aceleași verificări.
+Paznicul (la fiecare minut): Amper nu răspunde 5 minute → repornit; tot nu răspunde și actualizarea e din ultimele
+7 zile → revenire automată la versiunea anterioară. Fișierul `revenire.txt` pus pe card (bootfs) → revenire la pornire.
 API local pentru serverul web (utilizatorul amper): 127.0.0.1:8092, token în /run/amper-update/token.
 """
 from __future__ import annotations
@@ -43,6 +46,11 @@ TOKEN_PATH = "/run/amper-update/token"
 KEEP_BACKUPS = 3          # copii pre-update păstrate
 KEEP_VERSIONS = 3         # foldere /opt/amper-<ver> păstrate (curentă, anterioară și încă una)
 HEALTH_TIMEOUT = 60
+URGENT_EVERY = 6 * 3600   # cât de des se caută o versiune urgentă (și se anunță una nouă)
+WATCH_EVERY = 60          # paznicul: cât de des întreabă Amper dacă răspunde
+DOWN_RESTART = 300        # nu răspunde de atâtea secunde → repornire
+RECENT_UPDATE = 7 * 86400  # o actualizare mai nouă de atât e suspectă dacă Amper nu mai pornește
+CARD_ROLLBACK = ("revenire", "rollback")   # fișierul de pe card care cere revenirea
 STEPS = ("verify", "space", "download", "check", "backup", "install", "restart", "health")
 
 
@@ -226,7 +234,8 @@ def restore_data(src: str, db_path: str, etc_dir: str, data_dir: str) -> None:
 class Updater:
     def __init__(self, cfg: dict, *, opt_dir="/opt", link="/opt/amper", etc_dir="/etc/amper",
                  data_dir="/var/lib/amper", state_dir="/var/lib/amper-update", keys: list[str] | None = None,
-                 fetch=None, run=None, health=None, notify=None, clock=time.time):
+                 fetch=None, run=None, health=None, notify=None, clock=time.time, ping=None, svc_state=None,
+                 boot_dirs=("/boot/firmware", "/boot")):
         u = cfg.get("update") or {}
         self.repo = u.get("repo") or "georgexy/amper"
         self.channel = u.get("channel") or "stable"
@@ -245,6 +254,10 @@ class Updater:
         self.health = health or self._health
         self.notify = notify or self._notify
         self.clock = clock
+        self.ping = ping or self._ping
+        self.svc_state = svc_state or self._svc_state
+        self.boot_dirs = boot_dirs
+        self.wd = {"down_since": None, "restarts": 0, "notified": False}      # starea paznicului
         self.lock = threading.Lock()
         self.job: dict = {"state": "idle"}
         from .remote import Remote                    # acces de oriunde (Tailscale + Funnel), tot ca root
@@ -462,7 +475,7 @@ class Updater:
         try:
             rel = self._release()
             m = self._manifest(rel)
-            self.state["latest"] = {k: m.get(k) for k in ("version", "notes", "date", "size")}
+            self.state["latest"] = {k: m.get(k) for k in ("version", "notes", "date", "size", "urgent")}
             self.state["check_error"] = None
         except UpdateError as e:
             self.state["check_error"] = str(e)
@@ -473,8 +486,18 @@ class Updater:
         if cur and newer(m["version"], cur) and self.state.get("notified") != m["version"]:
             self.state["notified"] = m["version"]
             self.save()
-            self.notify(f"Versiune nouă Amper: {m['version']} (acum ai {cur}). Setări → Actualizări.")
+            if self.urgent_pending():
+                self.notify(f"⬆️ Actualizare urgentă Amper {m['version']} (acum ai {cur}): se instalează singură.")
+            else:
+                self.notify(f"Versiune nouă Amper: {m['version']} (acum ai {cur}). Setări → Actualizări.")
         return self.status()
+
+    def urgent_pending(self) -> bool:
+        """Ultima versiune găsită e marcată urgentă (în manifestul semnat) și nu a căzut deja aici."""
+        lt = self.state.get("latest") or {}
+        cur = self.installed_version()
+        return bool(lt.get("urgent") and cur and newer(lt["version"], cur)
+                    and lt["version"] != self.state.get("bad_version"))
 
     # ---------- comenzi de sistem ----------
     @staticmethod
@@ -493,6 +516,21 @@ class Updater:
                 pass
             time.sleep(2)
         return False
+
+    def _ping(self) -> bool:
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{self.port}/api/health", timeout=10) as r:
+                return bool(json.loads(r.read()).get("ok"))
+        except Exception:
+            return False
+
+    @staticmethod
+    def _svc_state() -> str:
+        try:
+            return subprocess.run(["systemctl", "is-active", "amper"], capture_output=True, text=True,
+                                  timeout=20).stdout.strip() or "unknown"
+        except Exception:
+            return "unknown"
 
     @staticmethod
     def _notify(msg: str) -> None:
@@ -678,20 +716,101 @@ class Updater:
         for d in extra[: max(0, len(dirs) - KEEP_VERSIONS)]:
             shutil.rmtree(d, ignore_errors=True)
 
+    # ---------- paznicul: Amper nu mai răspunde ----------
+    def watchdog_tick(self) -> str | None:
+        """Un pas al paznicului (la fiecare minut). Întoarce ce a făcut: None, "restart" sau "rollback"."""
+        if self.lock.locked():                        # actualizare în curs: Amper e oprit intenționat
+            self.wd["down_since"] = None
+            return None
+        now = self.clock()
+        st = self.svc_state()
+        if st == "inactive":                          # oprit de mână (ex. pentru `amper scan`): nu ne amestecăm
+            self.wd.update(down_since=None, restarts=0)
+            return None
+        if st == "active" and self.ping():
+            if self.wd["notified"]:
+                self.notify("✅ Amper răspunde din nou.")
+            self.wd.update(down_since=None, restarts=0, notified=False)
+            return None
+        if self.wd["down_since"] is None:
+            self.wd["down_since"] = now
+            return None
+        wait = DOWN_RESTART * (1 if self.wd["restarts"] < 3 else 6)    # după 3 reporniri, mai rar
+        if now - self.wd["down_since"] < wait:
+            return None
+        cur = self.installed_version()
+        inst, prev = self.state.get("installed") or {}, self.state.get("previous") or {}
+        recent = (now - (inst.get("at") or 0) < RECENT_UPDATE and prev.get("dir") and os.path.isdir(prev["dir"])
+                  and prev["dir"] != self.current_dir())
+        if self.wd["restarts"] >= 1 and recent:
+            log.error("paznic: Amper %s nu răspunde nici după repornire; revin la %s", cur, prev.get("version"))
+            self.state["bad_version"] = cur           # nu se reinstalează singură (actualizare urgentă)
+            self.save()
+            if self.rollback():
+                self.notify(f"⚠️ Amper {cur} nu mai răspundea; am revenit singur la {prev.get('version')}. "
+                            "Datele au rămas.")
+                self.wd.update(down_since=None, restarts=0, notified=False)
+                return "rollback"
+        log.warning("paznic: Amper nu răspunde de %d s (stare %s); îl repornesc", now - self.wd["down_since"], st)
+        self.run("systemctl", "restart", "amper")
+        self.wd["restarts"] += 1
+        self.wd["down_since"] = now
+        if not self.wd["notified"]:
+            self.wd["notified"] = True
+            self.notify("⚠️ Amper nu mai răspundea de 5 minute; l-am repornit.")
+        return "restart"
+
+    def watchdog(self) -> None:
+        time.sleep(120)
+        while True:
+            try:
+                if self.watchdog_tick() == "rollback":
+                    self._restart_self()
+            except Exception:
+                log.exception("paznicul")
+            time.sleep(WATCH_EVERY)
+
+    # ---------- revenirea cerută de pe card (fișierul revenire.txt pe bootfs) ----------
+    def card_rollback(self) -> str | None:
+        from .password_reset import find_files
+        files = find_files(self.boot_dirs, CARD_ROLLBACK)
+        if not files:
+            return None
+        for f in files:                               # întâi șters: o singură revenire, chiar dacă ceva cade
+            try:
+                os.remove(f)
+            except OSError as e:
+                log.warning("nu pot șterge %s: %s", f, e)
+        log.warning("revenire cerută de pe card (%s)", ", ".join(files))
+        cur = self.installed_version()
+        if self.rollback():
+            self.state["bad_version"] = cur
+            self.save()
+            self.notify(f"↩️ Revenire cerută de pe card: Amper a revenit de la {cur} la {self.installed_version()}.")
+            return "rollback"
+        self.notify(f"⚠️ Revenire cerută de pe card: {self.job.get('message') or 'nu a mers'}")
+        return "failed"
+
     # ---------- serviciul ----------
     def due(self) -> bool:
-        return self.clock() - (self.state.get("last_check") or 0) >= self.check_days * 86400
+        every = min(self.check_days * 86400, URGENT_EVERY)
+        return self.clock() - (self.state.get("last_check") or 0) >= every
 
     def loop(self) -> None:
+        if self.card_rollback() == "rollback":
+            self._restart_self()
+        threading.Thread(target=self.watchdog, daemon=True).start()
         time.sleep(120)                              # după pornire: lasă rețeaua să se stabilească
         while True:
             if self.due() and not self.lock.locked():
                 try:
                     self.check(auto=True)
+                    if self.urgent_pending() and self.install():
+                        self._restart_self()         # actualizare urgentă: instalată singură
                 except UpdateError as e:
                     log.info("căutarea automată: %s", e)
-                    self.state["last_check"] = int(self.clock()) - int(self.check_days * 86400) + 6 * 3600
-                    self.save()                      # fără internet: reîncearcă peste ~6 ore
+                    self.state["last_check"] = int(self.clock()) - URGENT_EVERY + 3600
+                    self.save()                      # fără internet: reîncearcă peste ~1 oră
                 except Exception:
                     log.exception("căutarea automată a eșuat")
             time.sleep(3600)

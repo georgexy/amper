@@ -217,6 +217,10 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   lansează ca stabilă (`x.y.z`) — abia atunci o primesc cunoscuții. Lansare: workflow-ul `release.yml`
   (`actions_run_trigger`, `run_workflow`, ref `main`); verificare: `Updater.check()` real pe GitHub.
 - Utilizatorul nu lucrează cu git/PR; explică-i pe scurt, în română, ce s-a schimbat.
+- Lansare urgentă (`release.yml` cu input `urgent: true` → `release.py build --urgent` → `"urgent": true` în
+  manifestul semnat): Pi-urile o instalează SINGURE. Doar pentru reparații care nu pot aștepta, doar stabile testate
+  pe beta, și tot doar după „publică”. Dacă după o urgentă vine repede altă versiune, marcheaz-o și pe ea urgentă
+  (un Pi offline la momentul urgentei vede doar ultima versiune).
 - **NU publica (merge + release) până nu spune explicit „publică”** (cerut 2026-10-27, după ce beta.5 a ieșit prea
   devreme). Lucrul se adună pe ramură; CHANGELOG are secțiunea „— în pregătire” până la publicare.
 
@@ -262,3 +266,54 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   folderul se schimbă cu `AMPER_BACKUP_REMOTE` în `/etc/amper/backup.env` (implicit `gdrive:back-up`).
 - Teste: `python -m pytest`; demo: `python -m amper simulate --hours 48`.
 - Preferință utilizator: nu face modificări nesolicitate. Propune-le și aplică doar ce cere.
+
+## Imaginea SD (3.3, 0.3.0-beta.8, 2026-10-27)
+- `tools/build-image.sh` (root): Raspberry Pi OS Lite 64-bit oficial → chroot (nativ pe arm64, altfel qemu-user-static)
+  → Tailscale din depozitul oficial → `deploy/install.sh --image` (nu pornește nimic, fără autoconfig, `devices: []`,
+  topicul rămâne REPLACE-TOPIC, marcaj `/etc/amper/.firstboot`) → hostname `amper`, SSH oprit, `userconfig` mascat,
+  `pi`/root blocați, țara WiFi (`COUNTRY`, implicit RO) în cmdline.txt → curățenie (machine-id gol, fără chei SSH,
+  /var/lib/amper și /var/lib/tailscale goale) → verificări → `resize2fs -M` + sfdisk (PARTUUID păstrat) → `.img.xz`.
+  Ales chroot, nu pi-gen: rulează exact install.sh, durează minute.
+- Baza (2026-10): Raspberry Pi OS 13 Trixie, cu cloud-init: `/boot/firmware/user-data` e înlocuit cu `users: []`
+  (fără cont de logare). Imaginea comprimată ≈ 640 MB. cmdline.txt are `resize` (extindere la prima pornire).
+- README.md = ghidul simplu pentru cunoscuți (imaginea); instalarea manuală și detaliile în `docs/instalare-avansata.md`.
+- `deploy/firstboot.sh` + `amper-firstboot.service` (înaintea amper/amper-wifi/amper-update): topicul ntfy, cheile SSH,
+  machine-id. Cheile VAPID, cookie.key și DB le face amper la pornire.
+- `.github/workflows/image.yml`: pe `ubuntu-24.04-arm`; la PR doar construiește + verifică (Artifacts 3 zile);
+  „Run workflow” o adaugă la versiunea publicată v<ver>. NEVERIFICAT: pornirea imaginii pe un Pi real.
+
+## Parola uitată (0.3.0-beta.8, 2026-10-27)
+- `amper/password_reset.py` + `amper-password-reset.service` (root, la fiecare pornire, înaintea amper): fișier
+  `resetare-parola*` (orice extensie/majuscule) în /boot/firmware → overlay `web.password=""`, `password_hash=""`,
+  `password_reset=<ts>` (settings.yaml dat înapoi lui amper), fișierul șters. `post-update.sh` instalează și activează
+  unitatea pe Pi-urile existente.
+- `web.py`: `reset_pending()` → `/api/info.password_reset`, notificare la pornire; cât e în așteptare, cererile prin
+  proxy (Tailscale serve/Funnel) la /api/* primesc 403 `reset_local`. Parola nouă (`/api/setup/password`) șterge
+  `password_reset`. `app.js`: `openSetup(false, "password", true)` = doar ecranul „Parolă nouă”; `showResetLocal`.
+- Utilizatorul NU vrea (deocamdată) butonul de feedback din 3.7.
+
+## Siguranță la actualizări: paznic, revenire de pe card, urgente (0.3.0-beta.8, 2026-10-27)
+- Motiv: utilizatorul a avut „ecran negru” (Pi online în Tailscale, Amper nu răspundea; cauza neaflată, fără SSH).
+- `Updater.watchdog_tick` (fir în amper-update, la 60 s, după 120 s de la pornire): `systemctl is-active amper` +
+  `/api/health`; „inactive” = oprit de mână → ignorat; 5 min fără răspuns → `systemctl restart amper` (o notificare
+  pe incident; după 3 reporniri, la 30 min); încă 5 min și instalarea e din ultimele 7 zile cu versiune anterioară
+  păstrată → `rollback()`, `state.bad_version`, notificare, amper-update se repornește.
+- `card_rollback()` la pornirea amper-update: `revenire*`/`rollback*` în /boot/firmware → șters, `rollback()`.
+  `password_reset.find_files(boot_dirs, names)` e comun.
+- Urgente: `state.latest.urgent`; `due()` = la 6 ore (`URGENT_EVERY`); `urgent_pending()` (mai nouă, nu
+  `bad_version`) → `install()` singur în `loop`. Notificare „⬆️ Actualizare urgentă…”.
+- `app.js` `showDown()`: după 5 s fără /api/info, mesaj „Amper nu răspunde…” în locul ecranului negru.
+- ATENȚIE: protecțiile ajută doar Pi-urile care le au instalate (de la beta.8). Pi-ul utilizatorului pe beta.7 nu le are.
+
+## UI 2026-10-27 (seara, beta.8)
+- Istoric: `histCache` (memorie + localStorage `hist:<ore>|<ids>`) → desenat instant, apoi `/api/history/all`;
+  serverul întoarce `ms` și scrie în jurnal peste 1,5 s (durata NU se afișează: utilizatorul n-o vrea).
+  Măsurat local (14 zile × 7 dispozitive, 185 MB): <0,1 s pe orice interval; fără medii 5 min, 7 zile ≈ 0,9 s.
+  Cauza lentorii la utilizator: conexiunea 4G (trafic limitat), aflată de el printr-un test local. Nu schimba
+  graficele până nu cere.
+- Dispozitive: `renderDaly` = doar cele care comunică (`connected && !stale`); restul în panoul `devoff`.
+- WiFi: panoul `wifi` se deschide din Info (`#info-wifi`, „înapoi” → info); scos din Conectare.
+- `sysinfo`: peer-ii `funnel-ingress-node*` / `ShareeNode` nu se mai listează.
+- Panouri: `InverterReading.pv_current` / `pv2_current` = registrele de intrare 7/8 (Buck1Curr/Buck2Curr, ×0,1 A),
+  CITITE din invertor (utilizatorul nu vrea valori calculate). DE CONFIRMAT pe Pi cu afișajul invertorului. Butonul `PV_I` (`data-pvinfo`) în toate temele → `#pvpop` (`pvInfoHtml`, actualizat
+  la fiecare citire, se deschide deasupra dacă nu are loc deasupra barei de jos).

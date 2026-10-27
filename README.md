@@ -1,315 +1,118 @@
-# Amper — monitorizarea bateriilor și a invertorului pe Raspberry Pi
+# Amper — bateriile și invertorul tău, pe telefon
 
-Înlocuiește SolarAssistant. Pe Raspberry Pi citește:
+Amper rulează pe un **Raspberry Pi** legat la bateriile și la invertorul tău. Pe telefon vezi în timp real
+SOC-ul, fiecare modul de baterie, celulele, panourile și consumul, plus istoricul. Primești **notificare pe
+telefon** când ceva nu e în regulă, de exemplu când un BMS oprește încărcarea fără să semnaleze.
 
-- **fiecare modul Daly**, pe câte un cablu USB-UART;
-- **bateria Seplos**, pe RS485;
-- **invertorul Growatt SPF 5000 ES**, pe USB/RS232.
-
-Pentru fiecare modul vezi pe telefon SOC-ul, curentul, celulele și starea MOSFET-urilor. Primești
-**notificare pe telefon când un modul nu se mai încarcă**, chiar dacă restul băncii arată normal.
+Fiecare instalație e a ta: Pi-ul tău, datele tale, parola ta. Nu există un server central și nu îți faci cont
+nicăieri, în afară de logarea cu Google pentru accesul de oriunde (opțional).
 
 ---
 
 ## 1. Ce îți trebuie
 
-- Raspberry Pi 4 (cel de acum, de la SolarAssistant).
-- Un card microSD nou, de 32 GB sau mai mult, de preferat „High Endurance”. **Cardul SolarAssistant nu se atinge.**
-- Câte un cablu USB-UART pentru fiecare modul Daly, un adaptor USB-RS485 pentru Seplos și cablul invertorului pe care îl folosești acum la SA.
-- Pe telefon: aplicația **ntfy** (Android/iPhone), pentru alerte. Opțional **Tailscale**, pentru acces de oriunde.
-
-## 2. Pregătirea cardului (acasă, pe PC sau Mac)
-
-1. Instalează **Raspberry Pi Imager** de pe raspberrypi.com/software.
-2. Alege: *Raspberry Pi 4* → *Raspberry Pi OS (other)* → **Raspberry Pi OS Lite (64-bit)** → cardul.
-3. La „Edit settings” / „Customisation” completezi:
-   - hostname: **amper**
-   - un utilizator și o parolă, la alegere
-   - Wi-Fi-ul **de la locație** (numele rețelei și parola)
-   - fusul orar Europe/Bucharest
-   - la „Services” bifezi **Enable SSH** (cu parolă)
-4. Scrii cardul. După ce termină, scoți cardul și îl bagi la loc în PC. Apare o partiție numită **bootfs**.
-5. **Copiezi tot folderul `amper`** (cel din arhivă) în rădăcina partiției `bootfs`.
-6. Opțional: în `amper/` faci o copie a fișierului `config.example.yaml`, o numești `config.yaml` și treci
-   capacitățile reale (`capacity_ah`) ale modulelor. Se poate face și mai târziu, de pe Pi.
-
-## 3. La locație
-
-1. Oprești Pi-ul, scoți cardul SolarAssistant (pune-i o etichetă), bagi cardul nou și pornești. Cablurile USB rămân toate în Pi.
-2. După 2–3 minute te conectezi prin SSH:
-   - de pe laptop, în aceeași rețea Wi-Fi: `ssh <utilizator>@amper.local`
-   - sau de pe telefon, cu aplicația **Termius** (host `amper.local`)
-3. Rulezi **o singură comandă**:
-
-   ```
-   sudo bash /boot/firmware/amper/deploy/install.sh --tailscale
-   ```
-
-   Fără `--tailscale` merge doar în rețeaua de la locație.
-   Scriptul instalează tot, **caută singur pe ce port e fiecare dispozitiv**, pornește serviciul și la final îți afișează:
-   - adresa aplicației
-   - **topicul ntfy** pentru notificări
-   - cu `--tailscale`, un link pe care îl deschizi ca să adaugi Pi-ul în contul tău Tailscale
-
-## 4. Aplicația pe telefon
-
-- Deschizi în browser **http://amper.local:8080**. Cu Tailscale, de oriunde: **http://amper:8080**
-  (sau adresa 100.x.y.z a Pi-ului din Tailscale).
-- **iPhone (Safari):** Partajare → *Adaugă pe ecranul principal*.
-  **Android (Chrome):** meniul ⋮ → *Instalează aplicația*.
-- De acum apare pe telefon ca o aplicație, „Amper”.
-- **Parola** aplicației se pune în `config.yaml`, la `web: password:` (apoi `sudo systemctl restart amper`).
-  Fiecare telefon sau laptop o cere o singură dată. Ecranul HDMI de pe Pi nu o cere.
-- Se afișează doar dispozitivele care au răspuns măcar o dată (în ultimele 14 zile). Unul trecut în config dar
-  încă nelegat nu apare și nu dă alerte. Apare singur după ce răspunde prima dată. Un modul care a mers și apoi
-  nu mai răspunde rămâne pe ecran, cu roșu, și primești alerta „Nu mai comunică”.
-
-| Ecran | Ce arată |
+| | |
 |---|---|
-| **Acum** | O singură baterie cu SOC-ul total și kWh rămași (verde = se încarcă, albastru = se descarcă, **roșu = un pachet are o problemă**), puterea panourilor, consumul și bateria. Arată diferit după tema aleasă. |
-| **Bateriile** | Se deschide când atingi bateria: câte un card pe pachet, cu SOC, curent, tensiune, temperatură, cicluri, MOSFET-uri și cele 16 celule. Atingi un pachet și vezi detaliile lui. |
-| **Setări BMS** (⚙ pe fiecare Daly, în ecranul Bateriile) | Capacitatea, timpul de somn, pragurile de tensiune pe celulă și pe pachet, curenții, temperaturile la încărcare și descărcare, echilibrarea — citite din BMS și modificabile (limite sigure LiFePO4, confirmare, parolă, verificare prin citire înapoi, jurnal, notificare). |
-| **Invertor** | Se deschide când atingi invertorul (sau rândul cu starea lui). Arată setările citite din invertor și permite modificarea lor (vezi mai jos). |
-| **Setări → Info** | Procesor, temperatură, memorie, card, alimentare (subtensiune), WiFi-ul și puterea semnalului, adrese, Tailscale și dispozitivele tale, porturile USB și cine le folosește, legăturile Bluetooth. **Schimbă rețeaua WiFi**: caută rețelele din zonă și trece Pi-ul pe alta (cere parola aplicației); dacă rețeaua nouă nu merge, Pi-ul revine singur la cea veche. |
-| **Setări** (rotița din colț) | Butoanele: **Teme** (Cadrane, Flux de energie sau Carduri, toate întunecate; alegerea se păstrează pe fiecare telefon), **Notificări** (pornirea notificărilor pe telefon și testul) și **Module Daly** (starea fiecărui modul și „Caută acum”). |
-| **Istoric** | Pe lângă graficele de mai sus, energia produsă și consumată pe 7 zile, 30 zile, 1 an (pe luni) sau un interval ales „de la – până la”, cu totalurile perioadei. |
-| **Istoric** | Grafice pe 6 ore, 24 ore, 7 sau 30 de zile: SOC și curent pe fiecare modul, puteri, energie pe zi. Ții degetul pe grafic ca să citești valorile. |
-| **Alerte** | Alertele active și istoricul lor, plus butonul pentru o notificare de test. |
+| **Raspberry Pi** | Pi 4 sau Pi 5 (merge și Pi 3B+). Cu alimentatorul lui oficial: unul slab dă erori ciudate. |
+| **Card microSD** | 32 GB sau mai mare, de preferat „High Endurance” (scrie zilnic pe el). |
+| **Bateriile** | **Daly**: prin Bluetooth (modulul BMS-ului, numele „DL-…”), fără cabluri; sau câte un cablu USB-UART Daly pe modul. <br> **Seplos V2**: un adaptor **USB-RS485** (cu cip CH340, ~30 lei), pe portul RS485 al bateriei. |
+| **Invertorul** | **Growatt SPF** (ex. SPF 5000 ES): un cablu USB obișnuit (A–B) în portul USB al invertorului, sau un adaptor USB-RS232 (FTDI) pe portul RS232. |
+| **Telefon** | Orice telefon cu browser (iPhone, Android). |
+| **Internet** | WiFi acasă/la locație. Pi-ul poate sta și pe cablu de rețea. |
 
-### Prima pornire: ghidul de configurare
+Alte BMS-uri sau invertoare: deocamdată nu. Spune-mi ce ai și vedem.
 
-La prima deschidere, aplicația arată un ghid în 6 pași: numele instalației, **parola aplicației** (minim 8
-caractere), accesul de oriunde, **căutarea dispozitivelor** (cabluri USB și module Daly prin Bluetooth),
-capacitățile modulelor și notificările pe telefon. Se poate relua oricând din **Setări → Ghid de configurare**.
+## 2. Scrii cardul (pe calculator)
 
-### Securitate
+1. Descarcă imaginea: **[Releases](https://github.com/georgexy/amper/releases/latest)** → fișierul
+   `amper-<versiune>.img.xz` (~0,6 GB). Nu trebuie dezarhivat.
+2. Instalează **Raspberry Pi Imager** de pe [raspberrypi.com/software](https://www.raspberrypi.com/software/).
+3. În Imager: *Choose Device* → Pi-ul tău; *Choose OS* → la final, **Use custom** → fișierul descărcat;
+   *Choose Storage* → cardul.
+4. Când te întreabă de personalizare („Would you like to apply OS customisation settings?”): **No**.
+   Amper își face singur setările.
+5. Scrie cardul, bagă-l în Pi, leagă adaptoarele (USB) și pornește Pi-ul.
 
-- Schimbarea setărilor bateriilor, ale invertorului, a rețelei WiFi și actualizarea cer parola din nou (ținută
-  minte 5 minute).
-- După 5 parole greșite de la aceeași adresă, încercările sunt încetinite și primești notificare.
-- La fiecare telefon sau calculator nou care intră în aplicație primești notificarea „🔐 Dispozitiv nou conectat”.
-- **Setări → Securitate** arată dispozitivele care au intrat și ultimele încercări de logare.
+## 3. Prima pornire: WiFi-ul (de pe telefon)
 
-### Pe monitorul legat la Pi (HDMI)
+1. Așteaptă **3–4 minute**. Pi-ul pornește o rețea WiFi numită **„Amper-Setup 10.42.0.1”**.
+2. Pe telefon: Setări → WiFi → **Amper-Setup…**, parola **`amper-setup`**.
+3. Se deschide singură pagina Amper (dacă nu: deschide în browser **http://10.42.0.1**).
+4. Alege WiFi-ul tău din listă, scrie parola lui și apasă **Conectează**.
+5. Pi-ul se conectează la WiFi-ul tău. Timp de 3 minute apare în lista de rețele ca
+   **„Amper gata 192.168.x.y”**: acela e numărul Pi-ului acasă. Nu te conecta la ea, doar notează numărul.
+6. Telefonul revine singur pe WiFi-ul tău. Deschide în browser **http://192.168.x.y:8080** (numărul de mai sus).
 
-Aplicația poate rula pe tot ecranul unui monitor legat la portul HDMI al Pi-ului (kiosk: Chromium în
-compozitorul `cage`, pornit singur la fiecare alimentare). Pe Pi, după `install.sh`:
+Dacă parola WiFi a fost greșită, după ~1 minut reapare „Amper-Setup” și pagina îți spune ce s-a întâmplat.
 
-```
-sudo bash ~/amper/deploy/kiosk.sh
-```
+## 4. Ghidul de configurare (în aplicație)
 
-Pe tty1 nu mai apare consola text; te conectezi în continuare prin SSH. Înapoi la consola text:
-`sudo bash ~/amper/deploy/kiosk.sh --remove`.
+La prima deschidere, aplicația te duce pas cu pas prin:
 
-### Setările invertorului
+1. **Numele instalației** (ex. „Casa de la munte”).
+2. **Parola aplicației**, aleasă de tine (minim 8 caractere). O cere fiecare telefon nou, o singură dată.
+3. **Accesul de oriunde** (opțional, se poate face și mai târziu): te loghezi cu **contul tău Google** pe pagina
+   care se deschide (serviciul Tailscale), apoi aprobi accesul. Primești o adresă `https://…ts.net` care merge de
+   pe orice telefon, de oriunde, fără altă aplicație.
+4. **Căutarea dispozitivelor**: Amper caută singur invertorul și bateriile (pe cablu și prin Bluetooth) și îți arată
+   ce a găsit.
+5. **Capacitatea** fiecărui modul de baterie (Ah), din ea se calculează SOC-ul total.
+6. **Notificările** pe acest telefon + o notificare de test. Telefonul le poate primi doar când aplicația e
+   deschisă prin adresa `https://…` de la pasul 3 (pe `http://192.168…` browserul nu le permite).
 
-Din ecranul **Invertor** se pot schimba: prioritatea ieșirii, sursa de încărcare, modul intrării AC, orele pentru
-rețea, tipul bateriei, curenții de încărcare, tensiunile (bulk, float, trecere pe rețea, revenire pe baterie,
-oprire), tensiunea și frecvența ieșirii, buzzer-ul și ceasul invertorului.
+**Pune aplicația pe ecranul telefonului:** iPhone (Safari) → Partajare → *Adaugă pe ecranul principal*;
+Android (Chrome) → ⋮ → *Instalează aplicația*. Pe iPhone, notificările merg doar așa.
 
-- Valorile permise sunt cele din protocolul Growatt V0.17; altele nu pot fi trimise.
-- Setările cu risc (marcate cu **!**) cer bifarea „Am înțeles riscul”. Fiecare scriere cere confirmare.
-- După scriere, Amper citește setarea înapoi și verifică dacă invertorul a aplicat-o.
-- Fiecare modificare apare în „Modificări făcute” și primești notificare pe telefon.
-- Modificarea cere **întotdeauna parola**, și de pe ecranul HDMI. Fără parolă setată în config, modificarea e dezactivată.
+## 5. Mai departe
 
-## 5. Notificări
+- **Actualizări:** Setări → Despre → Actualizări. Pi-ul caută singur o dată pe săptămână și te anunță; tu alegi
+  când instalezi. Datele și setările rămân; dacă versiunea nouă nu pornește, Pi-ul revine singur la cea veche.
+- **Dă adresa celor din casă:** Setări → Conectare → Partajează Amper.
+- **Alt WiFi** (ex. ai schimbat routerul): Setări → Despre → Info → atinge rândul „WiFi”. Dacă Pi-ul rămâne fără internet,
+  pornește din nou „Amper-Setup” și o iei de la pasul 3.
+- **Un dispozitiv nou** (ex. ai adăugat o baterie): Setări → Dispozitive conectate → + Adaugă dispozitiv.
+- **Setările BMS și ale invertorului** se pot schimba din aplicație (cu parola). Atenție: sunt pe răspunderea ta.
 
-**Direct în aplicația Amper (fără altă aplicație):**
-1. Pe iPhone, în Safari, deschide **https://amper.<tailnet>.ts.net** (adresa Pi-ului din Tailscale) (Tailscale trebuie să fie pornit pe telefon)
-   și intră cu parola aplicației.
-2. Partajare → **Adaugă pe ecranul principal**. Deschide Amper **de pe ecranul principal**, nu din Safari.
-3. Alerte → **Pornește notificările pe acest telefon** → **Permite**.
-4. **Trimite o notificare de test**.
+## 6. Dacă ceva nu merge
 
-Adresa https e făcută de Tailscale (`tailscale serve`), cu certificat reînnoit automat. Fiecare telefon se abonează
-separat. Pe lângă asta, alertele se trimit și prin ntfy (rezervă), ca mai jos.
+**Nu apare „Amper-Setup”:**
+- Mai așteaptă: hotspotul pornește după ~2 minute fără internet (prima pornire durează mai mult).
+- Dacă Pi-ul e legat cu cablu de rețea la router, are deja internet și nu pornește hotspotul. Deschide
+  **http://amper.local:8080** sau caută în pagina routerului dispozitivul „amper” și adresa lui.
+- Ledul verde al Pi-ului nu clipește deloc? Rescrie cardul (pasul 2) sau încearcă alt card.
+- Alimentatorul: cu unul slab, WiFi-ul și Bluetooth-ul se poartă ciudat.
 
-**Prin aplicația ntfy (rezervă):**
+**Aplicația scrie „Amper nu răspunde”:** Pi-ul are grijă singur. Dacă Amper nu răspunde 5 minute, îl repornește;
+dacă problema a venit cu o actualizare din ultima săptămână, revine singur la versiunea anterioară (datele rămân) și
+te anunță pe telefon. Dacă tot nu merge:
+1. Scoate alimentarea Pi-ului câteva secunde și pornește-l din nou.
+2. Revenire de pe card: oprește Pi-ul, pune cardul în calculator și fă pe partiția **bootfs** un fișier text gol
+   **`revenire.txt`**. Pune cardul la loc și pornește: Pi-ul revine la versiunea anterioară a aplicației.
 
-1. Instalezi aplicația **ntfy** pe telefon, apeși **+** și adaugi topicul afișat la instalare (`baterii-xxxxxxxxxxxx`).
-2. În aplicația Amper → Alerte → **Trimite o notificare de test**.
+**Am pierdut adresa de acasă:** conectează-te din nou la routerul tău și caută dispozitivul „amper”, sau încearcă
+**http://amper.local:8080** (merge pe iPhone și pe calculator; pe unele telefoane Android nu).
 
-Ce alerte primești:
+**Un dispozitiv nu e găsit:**
+- Daly prin Bluetooth: BMS-ul poate „adormi” fără curent; pornește un consumator și apasă „Caută” din nou. Cât timp
+  aplicația Daly de pe telefon e conectată la modul, Pi-ul nu se poate conecta la el (și invers).
+- Seplos: adaptorul pe portul **RS485** (nu CAN) al bateriei; adresele din DIP switch diferite pe fiecare pachet.
+- Growatt: încearcă alt cablu USB sau alt port USB al Pi-ului.
 
-| Alertă | Când |
-|---|---|
-| **Modulul X NU se încarcă** | banca se încarcă, dar modulul are curent ≈ 0 timp de 10 minute (și nu e plin) |
-| **BMS-ul a OPRIT încărcarea / descărcarea** | MOSFET-ul de încărcare sau de descărcare e oprit |
-| **Nu mai comunică** | nicio citire de la un dispozitiv timp de 2 minute |
-| SOC scăzut / critic | sub 25% / sub 12% |
-| Celulă prea sus / prea jos, dezechilibru | peste 3,60 V / sub 2,90 V / diferență peste 150 mV |
-| Temperatură | peste 50 °C sau încărcare sub 1 °C |
-| SOC divergent | un modul diferă cu peste 15% față de celelalte timp de 30 de minute |
-| **PROTECȚIE BMS** (critic) | BMS-ul raportează o protecție sau un defect: supracurent, scurtcircuit, supra/subtensiune, temperatură (Seplos: „protection”; Daly: nivel 2 și defectele de hardware) |
-| Avertisment BMS | BMS-ul raportează o alarmă de nivel 1 (tensiune, temperatură, curent aproape de limită) |
-| **DEFECT invertor** (critic) | codul de defect al invertorului, cu textul lui (ex. „07 — Suprasarcină”) |
-| Avertisment invertor | avertismentele invertorului (baterie scăzută, suprasarcină, ventilator, BMS com error etc.); „Putere PV insuficientă” doar se afișează, nu se trimite |
+**Ai uitat parola aplicației:**
+1. Oprește Pi-ul (scoate alimentarea), scoate cardul și bagă-l în calculator. Apare o partiție numită **bootfs**.
+2. Fă pe ea un fișier text gol numit **`resetare-parola.txt`** (clic dreapta → Nou → Document text).
+3. Pune cardul înapoi în Pi și pornește-l. Pi-ul șterge parola și fișierul și te anunță pe telefon.
+4. Deschide Amper **din rețeaua de acasă** (`http://192.168.x.y:8080` sau `http://amper.local:8080`) și alege o
+   parolă nouă. Prin adresa `https://…` de oriunde nu se poate, ca nimeni din internet să nu apuce s-o aleagă el.
 
-Când problema dispare, primești și mesajul „✅ Rezolvat”.
+## 7. Ajutor și feedback
 
-Despre Pi însuși:
-- **🔌 Amper a pornit**: după o repornire sau o pană de curent, cu intervalul în care n-au fost date.
-- **🌐 Amper a revenit online**: când revine internetul după o întrerupere de peste 2 minute, cu intervalul.
-- **Pi-ul a căzut de tot** (fără curent sau fără internet): Pi-ul nu se poate anunța singur. Pentru asta, în
-  `config.yaml`, la `notify:`, se pune `heartbeat_url:` cu adresa unei verificări de la healthchecks.io. Pi-ul trimite
-  un semnal la fiecare minut, iar healthchecks.io te anunță (ntfy, email) când semnalele se opresc. Pragurile se schimbă în `config.yaml`, la `alerts:`.
-
-## 6. Comenzi utile (pe Pi)
-
-```
-journalctl -u amper -f                    # ce face programul, în timp real
-sudo systemctl restart amper              # după ce modifici config-ul
-sudo nano /etc/amper/config.yaml          # configurarea
-sudo systemctl restart amper-kiosk        # reîncarcă ecranul HDMI (jurnal: journalctl -u amper-kiosk)
-
-sudo systemctl stop amper                 # (portul trebuie eliberat pentru comenzile de mai jos)
-amper scan                                # ce dispozitiv e pe fiecare port USB
-amper read daly1                          # citește o dată un modul și afișează tot
-sudo amper autoconfig -c /etc/amper/config.yaml
-sudo systemctl start amper
-```
-
-Mod demonstrativ, cu date simulate: `sudo bash /boot/firmware/amper/deploy/install.sh --demo`.
-Revii la normal rulând din nou comanda fără `--demo`.
-
-## 7. Modulele Daly: cablu sau Bluetooth
-
-Modulele Daly se leagă **singure**. Le aduci la locație, le alimentezi și fie bagi cablul USB-UART în Pi, fie lași
-modulul Bluetooth al BMS-ului pornit. Amper le găsește și le afișează la prima citire. Primești notificarea
-„🔌 Daly 1: conectat (Bluetooth ...)” sau „(cablu ...)”.
-
-- Căutarea se face la 30 s în primele 10 minute după pornire, apoi la 3 minute. Un cablu USB nou se încearcă imediat.
-  În aplicație: rotița → **Module Daly** → **Caută acum**.
-- Bluetooth: se caută modulele cu nume Daly („DL-…”), în ordinea semnalului. Cât timp Pi-ul e conectat la un modul,
-  aplicația Daly de pe telefon nu se poate conecta la el.
-- Prima legătură găsită se ține minte (`/var/lib/amper/daly-auto.json`), deci Daly 1/2/3 rămân aceleași după repornire.
-  Dacă vrei altă ordine, șterge fișierul și repornește serviciul.
-- Poți fixa și manual legătura, în config: `port: /dev/serial/by-id/...` (cablu) sau `ble: AA:BB:CC:DD:EE:FF`
-  (Bluetooth). `amper scan` arată și modulele Bluetooth din jur.
-
-## 7b. Dacă un dispozitiv nu e găsit
-
-- **Daly:** BMS-ul poate „adormi” când nu trece curent prin el. Pornește un consumator sau încărcarea și rulează din nou `amper scan`.
-  Dacă la Daly ai modul Bluetooth pe același port UART, cablul către Pi nu primește răspuns. Ori scoți Bluetooth-ul, ori folosești un splitter.
-- **Seplos:** verifică pe care port e legat (pe RS485, nu pe CAN), baudrate-ul (19200 sau 9600) și adresa din DIP switch.
-- **Growatt:** folosește același cablu cu care mergea SolarAssistant.
-- Vezi și `ls -l /dev/serial/by-id/`. Fiecare cablu trebuie să apară acolo.
-
-## 8. Ce trebuie verificat la prima pornire
-
-Codul e testat pe date simulate și pe cadre de protocol. Câteva detalii diferă însă de la un firmware la altul, așa că verifică pe hardware:
-
-1. **Semnul curentului la Daly:** când banca se încarcă, curentul modulelor trebuie să fie **pozitiv**. Dacă e invers, adaugi `invert_current: true` la modulul respectiv.
-2. **Puterea bateriei la Growatt:** „Baterie, intră” trebuie să apară când se încarcă. Dacă e invers, adaugi `battery_power_sign: 1` la invertor.
-3. **Seplos, starea MOSFET-urilor:** compară în fișa modulului „MOSFET încărcare” cu afișajul bateriei.
-4. Puterea PV și consumul trebuie să se potrivească cu afișajul invertorului.
-
-Dacă ceva nu se potrivește, deschizi proiectul în Claude Code pe un calculator din aceeași rețea cu Pi-ul și îi ceri să verifice. Fișierul `CLAUDE.md` îi dă tot contextul.
-
-## 9. Actualizarea programului
-
-În aplicație: **Setări → Actualizări**.
-
-- Pi-ul caută singur o versiune nouă o dată pe săptămână și te anunță pe telefon; nu instalează nimic singur.
-- **Caută actualizări acum** caută imediat pe GitHub și arată notele versiunii noi.
-- **Actualizează** (cere parola aplicației): descărcare → verificarea semnăturii → copia datelor → instalare →
-  repornire → verificare. Dacă versiunea nouă nu pornește în 60 s, Pi-ul revine singur la cea veche, cu datele de
-  dinainte. Aplicația de pe telefon se reîncarcă singură la final.
-- **Revino la versiunea anterioară**: dacă ultima versiune nu-ți place. Istoricul și setările rămân.
-- Se instalează **numai** versiunile semnate de autor; o arhivă modificată e refuzată.
-- Datele (config, istoric, alerte, abonamente, legăturile Daly, Tailscale) nu se ating la actualizare. Înainte de
-  fiecare actualizare se face o copie în `/var/lib/amper/pre-update/` (ultimele 3).
-- Canalul de test (versiunile „beta”): în config, `update: channel: beta`.
-
-**Cale de rezervă, dacă aplicația nu merge** (prin SSH, pe Pi), cu aceleași verificări (semnătură, copia datelor,
-revenire automată):
-```
-sudo amper update --check       # ce versiune nouă există
-sudo amper update --install     # o instalează acum
-sudo amper update --rollback    # revine la versiunea anterioară
-```
-
-Manual (sau de pe un Pi cu o versiune fără butonul de actualizare): copiezi folderul `amper` pe Pi, apoi
-```
-sudo bash ~/amper/deploy/install.sh
-```
-Configurarea și istoricul se păstrează.
-
-## 9a. WiFi: conectarea de pe telefon (fără cablu, fără monitor)
-
-Când Pi-ul **nu are internet** 2 minute (nici prin cablu, nici prin WiFi), pornește singur o rețea WiFi
-**„Amper-Setup”**. Parola ei e în config, la `wifi_setup: password:`, și e afișată la finalul instalării.
-
-1. Pe telefon: Setări → WiFi → **Amper-Setup** → parola.
-2. Se deschide singură pagina Amper. Dacă nu se deschide, intri în browser la **http://10.42.0.1**.
-3. Alegi rețeaua WiFi din listă (sau scrii numele unei rețele ascunse), scrii parola ei și apeși **Conectează**.
-4. „Amper-Setup” dispare, iar Pi-ul se conectează la rețeaua aleasă. De acolo îl găsești prin Tailscale ca de obicei.
-   Dacă parola a fost greșită, „Amper-Setup” reapare în ~1 minut, iar pagina spune ce s-a întâmplat.
-
-Cât timp Pi-ul are internet, rețeaua „Amper-Setup” nu există. Bluetooth-ul nu e folosit, deci rămâne pentru
-modulele Daly. Dacă nimeni nu se conectează la hotspot, la 5 minute Pi-ul încearcă din nou rețelele știute
-(de exemplu după o pană a routerului). Ecranul HDMI pornește singur când e legat un monitor.
-
-## 9b. Copia de siguranță (Google Drive, opțională) și restaurarea
-
-Dacă există `/etc/amper/rclone.conf` (remote-ul rclone `gdrive`), Pi-ul face copii în Google Drive, în folderul
-**back-up**, la 00:00 (altfel copia e dezactivată). Alt folder: `AMPER_BACKUP_REMOTE=gdrive:<folder>` în
-`/etc/amper/backup.env`.
-
-| Folder | Ce conține | Când | Câte se păstrează |
-|---|---|---|---|
-| `back-up/back-up` | `amper-date-AAAA-LL-ZZ.tar.gz`: config, istoric, legăturile Daly, Tailscale | în fiecare noapte | ultimele 14 |
-| `back-up/clona` | `amper-clona-AAAA-LL-ZZ.img.gz`: imaginea întregului card | o dată pe săptămână, în noaptea de duminică spre luni | doar cea mai nouă: după ce clona nouă e urcată, cea veche se șterge **definitiv** (fără Coș) |
-
-Dacă o copie nu reușește, primești notificare pe telefon. Jurnalul: `journalctl -u amper-backup`.
-Manual: `sudo bash /opt/amper/deploy/backup.sh` (sau `... date` / `... clona`).
-
-**Dacă se strică cardul:** descarci ultima clonă din Drive, o scrii pe un card nou (de cel puțin 16 GB) cu
-Raspberry Pi Imager („Choose OS” → „Use custom” → fișierul `.img.gz`), bagi cardul și pornești. Totul e ca înainte:
-aplicația, ecranul HDMI, Tailscale, istoricul până în noaptea copiei. Partiția se extinde singură pe tot cardul la
-prima pornire. Nu porni în același timp cardul vechi și clona.
-
-**Doar datele, pe un sistem nou:** instalezi Raspberry Pi OS, copiezi folderul `amper` și rulezi
-`sudo bash ~/amper/deploy/install.sh --restore amper-date-AAAA-LL-ZZ.tar.gz`.
-
-Legătura cu Drive-ul e în `/etc/amper/rclone.conf`. Pi-ul vede în Drive doar fișierele create de el.
-
-## 10. Înapoi la SolarAssistant
-
-Oprești Pi-ul, pui cardul SolarAssistant și pornești. Totul revine cum era.
+Scrie-mi direct cu ce ai observat (o captură de ecran ajută). Corecturile ajung la tine ca actualizare în
+aplicație.
 
 ---
 
-### Pentru dezvoltare (pe orice calculator)
+**Pentru avansați:** instalarea manuală peste Raspberry Pi OS, comenzile de pe Pi, toate alertele, copiile de
+siguranță în Google Drive și dezvoltarea: [docs/instalare-avansata.md](docs/instalare-avansata.md).
 
-```
-pip install aiohttp pyserial pyyaml cryptography pytest
-python -m amper simulate --hours 48      # aplicația cu date simulate la http://localhost:8080
-python -m pytest
-```
-
-**Lansarea unei versiuni:** se mărește `__version__` în `amper/__init__.py` și se scrie secțiunea ei în
-`CHANGELOG.md` (în română, apare în aplicație), apoi GitHub → Actions → **Lansează versiunea** → *Run workflow*.
-Workflow-ul rulează testele, construiește `amper-<ver>.tar.gz` + `manifest.json`, le semnează cu cheia din secretul
-`AMPER_SIGNING_KEY` și le publică ca GitHub Release. O versiune `x.y.z-beta.N` iese ca pre-release (canalul beta).
-
-**Cheia de semnare (o singură dată):** `python tools/release.py keygen` pe laptop. Cheia privată → GitHub, repo →
-Settings → Secrets and variables → Actions → secretul `AMPER_SIGNING_KEY` (și o copie într-un loc sigur); cheia
-publică → `amper/update_key.py`.
-
----
-
-### Licență
-
-Amper este distribuit sub **PolyForm Noncommercial 1.0.0** (textul complet în `LICENSE`, în engleză). Pe scurt:
-
-- îl poți folosi, modifica și da mai departe **gratuit**, pentru uz personal (casa ta, instalația ta, hobby),
-  precum și în școli, organizații caritabile și instituții publice;
-- **nu** ai voie să-l folosești pentru a câștiga bani (de exemplu să-l vinzi sau să-l incluzi într-o instalație
-  vândută clienților) fără acordul autorului;
-- cine îl dă mai departe trebuie să păstreze licența și rândul „Required Notice”;
-- se oferă **fără nicio garanție**: setările scrise în BMS sau în invertor sunt pe răspunderea ta.
-
-Fonturile Barlow din `web/fonts/` au licența lor, SIL Open Font License 1.1 (`web/fonts/OFL.txt`).
+**Licență:** gratuit pentru uz personal, necomercial ([PolyForm Noncommercial 1.0.0](LICENSE)), fără nicio garanție.

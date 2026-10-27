@@ -82,7 +82,9 @@ class InverterReading:
     status_code: Optional[int] = None
     pv_power: Optional[float] = None         # W (total)
     pv_voltage: Optional[float] = None       # V (PV1)
+    pv_current: Optional[float] = None       # A (PV1), citit din invertor (Growatt: Buck1Curr)
     pv2_voltage: Optional[float] = None
+    pv2_current: Optional[float] = None      # A (PV2)
     load_power: Optional[float] = None       # W (ieșire AC)
     load_percent: Optional[float] = None     # %
     battery_voltage: Optional[float] = None  # V

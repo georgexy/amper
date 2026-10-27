@@ -1,0 +1,13 @@
+[Unit]
+Description=amper - prima pornire a imaginii (topic ntfy, chei unice)
+After=local-fs.target
+Before=amper.service amper-wifi.service amper-update.service ssh.service
+ConditionPathExists=/etc/amper/.firstboot
+
+[Service]
+Type=oneshot
+ExecStart=/opt/amper/deploy/firstboot.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

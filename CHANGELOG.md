@@ -2,6 +2,31 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 0.3.0-beta.8 — 2026-10-27
+- Imaginea SD Amper: se scrie pe card cu Raspberry Pi Imager („Use custom”) și Pi-ul pornește direct cu hotspotul
+  „Amper-Setup”, apoi ghidul de configurare. Imaginea e aceeași pentru toți; ce trebuie să fie unic (topicul de
+  notificări, cheile, baza de date) se face la prima pornire. SSH e oprit, numele în rețea e „amper”.
+- Hotspotul deblochează singur WiFi-ul la pornire (pe un card nou Raspberry Pi OS îl ține blocat).
+- Parola uitată: pui pe card (partiția „bootfs”, din calculator) un fișier `resetare-parola.txt` și pornești Pi-ul;
+  parola se șterge, primești notificare, iar aplicația cere una nouă — doar din rețeaua de acasă, nu prin adresa
+  de oriunde.
+- Paznic pe Pi: dacă Amper nu răspunde 5 minute, e repornit; dacă nici așa nu merge și a fost actualizat în ultima
+  săptămână, Pi-ul revine singur la versiunea anterioară (cu datele) și te anunță.
+- În loc de ecran negru, aplicația scrie „Amper nu răspunde” și ce se întâmplă.
+- Revenire de pe card: fișierul `revenire.txt` pus pe partiția „bootfs” → la pornire, versiunea anterioară.
+- Actualizări urgente: o versiune marcată „urgentă” se instalează singură pe toate Pi-urile (în câteva ore), cu
+  aceleași verificări și revenire automată. Pi-ul caută versiuni noi la 6 ore (anunță tot o singură dată).
+- Istoric: graficele apar imediat din ultima încărcare (ținută și pe telefon) și se actualizează în fundal.
+- „Dispozitive conectate” arată doar dispozitivele care comunică acum; cele configurate dar tăcute sunt în meniul
+  „Dispozitive inactive”.
+- Rețeaua WiFi s-a mutat în Setări → Despre → Info: atingi rândul „WiFi” (sau „neconectat”) și se deschide
+  schimbarea rețelei. Info nu mai arată nodurile tehnice „funnel-ingress-node”; aparatele tale legate la server au
+  secțiunea lor.
+- La „Panouri”, pe toate temele: un buton mic „i” arată tensiunea și curentul PV de acum (pe fiecare intrare, dacă
+  invertorul are două), citite din invertor.
+- Documentație nouă, simplă, pentru cei care primesc Amper (README): ce trebuie cumpărat, scrierea cardului,
+  prima pornire, ce faci dacă nu apare „Amper-Setup”. Instalarea manuală a trecut în docs/instalare-avansata.md.
+
 ## 0.3.0-beta.7 — 2026-10-27
 - Hotspotul de configurare arată adresa în nume: „Amper-Setup 10.42.0.1”; după ce Pi-ul s-a conectat la WiFi-ul
   ales, timp de 3 minute „Amper gata 192.168.x.y” — adresa de acasă se citește direct din lista de rețele.

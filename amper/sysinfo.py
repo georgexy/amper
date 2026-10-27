@@ -95,8 +95,10 @@ def network() -> dict:
         d = json.loads(_run("tailscale", "status", "--json"))
         ts = dict(state=d.get("BackendState"), ip=(d.get("Self") or {}).get("TailscaleIPs", [None])[0],
                   name=(d.get("Self") or {}).get("DNSName", "").rstrip("."),
+                  # fără nodurile Tailscale pentru accesul public (funnel-ingress-node): nu sunt aparatele tale
                   peers=[dict(name=p.get("HostName"), online=p.get("Online"), os=p.get("OS"))
-                         for p in (d.get("Peer") or {}).values()])
+                         for p in (d.get("Peer") or {}).values()
+                         if not str(p.get("HostName") or "").startswith("funnel-ingress") and not p.get("ShareeNode")])
     except (ValueError, TypeError):
         pass
     return dict(devices=[dict(device=d[0], type=d[1], state=d[2], connection=d[3]) for d in devs

@@ -7,10 +7,14 @@
 set -uo pipefail
 NEW="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CHANGED=0
-for unit in amper-update.service amper-wifi.service amper-grow-root.service amper-backup.service amper-backup.timer; do
+for unit in amper-update.service amper-wifi.service amper-password-reset.service amper-grow-root.service amper-backup.service amper-backup.timer; do
   if [ -f "$NEW/deploy/$unit" ] && ! cmp -s "$NEW/deploy/$unit" "/etc/systemd/system/$unit"; then
     cp "$NEW/deploy/$unit" /etc/systemd/system/ && CHANGED=1
   fi
 done
 [ "$CHANGED" -eq 1 ] && systemctl daemon-reload
+# unități noi, care trebuie și activate (o versiune veche nu le avea)
+for unit in amper-password-reset.service; do
+  [ -f "/etc/systemd/system/$unit" ] && ! systemctl is-enabled -q "$unit" 2>/dev/null && systemctl enable "$unit" >/dev/null 2>&1
+done
 exit 0

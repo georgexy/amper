@@ -67,17 +67,29 @@ def make_app(engine) -> web.Application:
         await asyncio.sleep(1)
         return _json({"error": "Parola nu e corectă.", "bad_password": True}, 403)
 
+    def proxied(request) -> bool:
+        """Cerere venită prin `tailscale serve` / `funnel` (https, din tailnet sau din internet)."""
+        return any(h in request.headers for h in ("X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Forwarded",
+                                                   "Tailscale-User-Login", "Tailscale-Funnel-Request"))
+
+    def reset_pending() -> bool:
+        """Parola a fost ștearsă cu fișierul de pe card (password_reset.py) și încă nu s-a ales alta."""
+        return bool(cfg.get("password_reset")) and not auth_.enabled
+
     def local(request) -> bool:
         # ecranul HDMI (kiosk) rulează pe Pi și nu are tastatură: nu i se cere parola.
         # Cererile venite prin `tailscale serve` / `tailscale funnel` (https, din tailnet sau din internet) ajung
         # tot de la 127.0.0.1, dar cu antetele proxy-ului: acelea vin de pe telefon și trebuie să ceară parola.
-        if any(h in request.headers for h in ("X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Forwarded",
-                                              "Tailscale-User-Login", "Tailscale-Funnel-Request")):
+        if proxied(request):
             return False
         return request.remote in ("127.0.0.1", "::1")
 
     @web.middleware
     async def auth(request, handler):
+        if reset_pending() and proxied(request) and request.path.startswith("/api/") and request.path != "/api/health":
+            # fără parolă, nimeni din internet nu trebuie să poată alege una: doar din rețeaua de acasă
+            return _json({"error": "Parola a fost ștearsă de pe card. Deschide Amper din rețeaua de acasă "
+                                   "(adresa http://…:8080) și alege o parolă nouă.", "reset_local": True}, 403)
         if auth_.enabled and request.path.startswith("/api/") and request.path not in ("/api/login", "/api/health") \
                 and not local(request):
             if not auth_.valid_cookie(request.cookies.get("amper")):
@@ -115,6 +127,9 @@ def make_app(engine) -> web.Application:
         return resp
 
     app = web.Application(middlewares=[headers, auth, no_cache_api])
+    if reset_pending():
+        engine.notifier.send("🔐 Parola aplicației a fost ștearsă cu fișierul de pe card. Deschide Amper din rețeaua "
+                             "de acasă și alege una nouă.", title="Amper: securitate", priority="high")
     app["engine"] = engine
 
     # Versiunea aplicației = amprenta fișierelor din web/ (nume, mărime, data modificării), recalculată cel mult
@@ -170,6 +185,7 @@ def make_app(engine) -> web.Application:
         return _json(dict(devices=devs, auth=auth_.enabled, poll_interval=cfg["poll_interval"], version=__version__,
                           port=int((cfg.get("web") or {}).get("port") or 8080),
                           site_name=cfg.get("site_name") or "", setup_needed=setup_needed(cfg),
+                          password_reset=reset_pending(),
                           public_url=wp.subject if wp else None,
                           notifications=engine.notifier.enabled,
                           simulated=any(d["type"].startswith("sim_") for d in cfg["devices"])))
@@ -194,6 +210,8 @@ def make_app(engine) -> web.Application:
         end = int(time.time())
         start = end - int(hours * 3600)
 
+        t0 = time.monotonic()
+
         def read():
             out = {}
             for d in ids:
@@ -204,7 +222,11 @@ def make_app(engine) -> web.Application:
                     log.warning("istoric %s: %s", d, e)
                     out[d] = dict(kind=kind, rows=[], error=str(e))
             return out
-        return _json(dict(start=start, end=end, series=await asyncio.to_thread(read)))
+        series = await asyncio.to_thread(read)
+        ms = int((time.monotonic() - t0) * 1000)
+        if ms > 1500:
+            log.warning("istoricul (%s h, %d dispozitive) a durat %.1f s", hours, len(ids), ms / 1000)
+        return _json(dict(start=start, end=end, series=series, ms=ms))
 
     async def energy(request):
         inv = [k for k, v in engine.devices.items() if v.driver.kind == "inverter"]
@@ -476,6 +498,9 @@ def make_app(engine) -> web.Application:
             await asyncio.to_thread(auth_.set_password, str(body.get("password", "")))
         except ValueError as e:
             return _json({"error": str(e)}, 400)
+        if cfg.get("password_reset"):
+            await asyncio.to_thread(save_overlay, cfg, {"password_reset": None})
+            cfg.pop("password_reset", None)
         engine.notifier.send(f"🔐 Parola aplicației a fost schimbată (de la {client_ip(request)}).",
                              title="Amper: securitate", priority="high")
         resp = _json({"ok": True})

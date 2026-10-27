@@ -220,9 +220,6 @@
           <button class="card set-btn" data-panel="share"><span class="ic" style="--ic:var(--charge)">
             <svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.9l7.6-3.8M8.2 13.1l7.6 3.8"/></svg></span>
             <span><b>Partajează Amper</b><span>Adresa pentru cei din casă</span></span><i>›</i></button>
-          <button class="card set-btn" data-panel="wifi"><span class="ic" style="--ic:var(--acc)">
-            <svg viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.7 15.8a5 5 0 0 1 6.6 0"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg></span>
-            <span><b>Rețeaua WiFi</b><span id="set-wifi-sub">Rețeaua la care e legat Pi-ul</span></span><i>›</i></button>
         </div>
       </section>
 
@@ -235,7 +232,7 @@
       </section>
 
       <section class="set-panel" id="set-wifi" hidden>
-        <div class="pk-top"><button class="back set-back" data-back="conn" aria-label="Înapoi la Conectare">‹</button><h2>Rețeaua WiFi</h2></div>
+        <div class="pk-top"><button class="back set-back" data-back="info" aria-label="Înapoi la Info">‹</button><h2>Rețeaua WiFi</h2></div>
         <p class="note" id="wifi-now"></p>
         <p class="note">Pi-ul trece pe altă rețea din zonă. Dacă rețeaua nouă nu merge (parolă greșită, fără internet),
           revine singur la cea de acum, în cel mult ~2 minute. Cât timp schimbă, aplicația pierde legătura câteva secunde.</p>
@@ -268,12 +265,24 @@
       <section class="set-panel" id="set-daly" hidden>
         <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Dispozitive conectate</h2></div>
         <div id="daly-list"></div>
+        <button class="btn ed-go" id="dev-add">+ Adaugă dispozitiv</button>
+        <div class="set-menu">
+          <button class="card set-btn" data-panel="devoff" id="dev-off-btn" hidden><span class="ic" style="--ic:var(--faint)">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg></span>
+            <span><b>Dispozitive inactive</b><span id="dev-off-n"></span></span><i>›</i></button>
+        </div>
+      </section>
+
+      <section class="set-panel" id="set-devoff" hidden>
+        <div class="pk-top"><button class="back set-back" data-back="daly" aria-label="Înapoi la dispozitive">‹</button><h2>Dispozitive inactive</h2></div>
+        <p class="note">Dispozitive din configurare care nu comunică acum (nelegate, BMS adormit sau cablu scos). Apar
+          singure la „Dispozitive conectate” când răspund din nou.</p>
+        <div id="dev-off-list"></div>
         <div id="daly-auto-box">
           <p class="note">Modulele Daly se găsesc singure, pe cablu USB sau prin Bluetooth (nume „DL-…”). Căutarea se
             face la 30 s în primele 10 minute după pornire, apoi la 3 minute.</p>
           <button class="btn" id="daly-search">Caută acum modulele Daly</button>
         </div>
-        <button class="btn ed-go" id="dev-add">+ Adaugă dispozitiv</button>
       </section>
     </main>
 
@@ -397,5 +406,6 @@
   </dialog>
 
   <script src="app.js"></script>
+  <div id="pvpop" class="pvpop" role="dialog" aria-label="Panouri" hidden></div>
 </body>
 </html>

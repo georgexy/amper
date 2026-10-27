@@ -72,6 +72,10 @@ const state = { histReq: 0, info: null, snap: null, view: "now", hours: 24, last
 async function api(path, opts) {
   const r = await fetch(path, { credentials: "same-origin", ...opts });
   if (r.status === 401) { showLogin(); throw new Error("auth"); }
+  if (r.status === 403) {
+    const j = await r.clone().json().catch(() => ({}));
+    if (j.reset_local) { showResetLocal(j.error); throw new Error("reset"); }
+  }
   return r.json();
 }
 
@@ -83,11 +87,13 @@ async function boot() {
   try {
     state.info = await api("/api/info");
   } catch (e) {
-    if (e.message !== "auth") setTimeout(boot, 3000);
+    if (e.message !== "auth" && e.message !== "reset") { showDown(); setTimeout(boot, 3000); }
     return;
   }
+  bootDown = 0;
   $("#login").hidden = true;
   if (state.info.setup_needed) return openSetup(false);
+  if (state.info.password_reset) return openSetup(false, "password", true);
   $("#app").hidden = false;
   $("#simnote").hidden = !state.info.simulated;
   if (state.info.site_name) { $("#site-name").textContent = state.info.site_name; document.title = `Amper · ${state.info.site_name}`; }
@@ -107,6 +113,8 @@ async function boot() {
 function showLogin() {
   $("#app").hidden = true;
   $("#login").hidden = false;
+  $("#pw").hidden = $("#pwgo").hidden = $('label[for="pw"]').hidden = false;    // după mesajul „nu răspunde”
+  $("#pwerr").textContent = "";
   $("#pw").focus();
 }
 $("#pwgo").onclick = async () => {
@@ -274,6 +282,34 @@ const kv = (v, u, d = 0) => (v == null ? "–" : `${num(v, d)}<span class="u">${
 function put(root, k, html) { root.querySelectorAll(`[data-k="${k}"]`).forEach((e) => { if (e._h !== html) e.innerHTML = e._h = html; }); }
 function modeClass(el, h, extra = "") { el.className = `${extra} mode-${h.mode} ${h.health.cls === "fault" ? "fault" : ""}`.trim(); }
 
+/* ---------- butonul „i” de la panouri (toate temele): tensiunea și curentul PV de acum ---------- */
+const PV_I = `<button class="pv-i" data-pvinfo aria-label="Tensiunea și curentul panourilor">i</button>`;
+function pvInfoHtml() {
+  const ir = homeData().ir;
+  if (!ir) return "Invertorul nu trimite date acum.";
+  const row = (name, v, a) => `<div><span>${name}</span><b>${v == null ? "–" : num(v, 1) + " V"}</b><b>${a == null ? "–" : num(a, 1) + " A"}</b></div>`;
+  const two = ir.pv2_voltage >= 10;
+  return `<div class="pvp-h"><span></span><span>Tensiune</span><span>Curent</span></div>
+    ${row(two ? "PV1" : "Panouri", ir.pv_voltage, ir.pv_current)}${two ? row("PV2", ir.pv2_voltage, ir.pv2_current) : ""}`;
+}
+function pvInfoShow(btn) {
+  const pop = $("#pvpop");
+  if (!pop.hidden && pop._btn === btn) { pop.hidden = true; return; }
+  pop._btn = btn;
+  pop.innerHTML = pvInfoHtml();
+  pop.hidden = false;
+  const r = btn.getBoundingClientRect(), w = pop.offsetWidth;
+  pop.style.left = `${Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2))}px`;
+  // dedesubt, dacă are loc deasupra barei de jos; altfel deasupra butonului
+  const below = r.bottom + 8 + pop.offsetHeight < innerHeight - 110;
+  pop.style.top = `${(below ? r.bottom + 8 : r.top - 8 - pop.offsetHeight) + scrollY}px`;
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-pvinfo]");
+  if (b) { e.preventDefault(); e.stopPropagation(); return pvInfoShow(b); }
+  if (!e.target.closest("#pvpop")) $("#pvpop").hidden = true;
+}, true);
+
 /* ---------- tema Cadrane ---------- */
 const ARC = Math.PI * 56, RING = 2 * Math.PI * 62;
 const GAUGES = [["pv", "Panouri", "--sun"], ["load", "Consum", "--load"], ["bat", "Baterie", "--charge"], ["temp", "Invertor", "--cell"]];
@@ -288,7 +324,7 @@ const cadrane = {
     <div class="k-gauges">${GAUGES.map(([k, l, c]) => `
       <div class="card k-g" style="--gc:var(${c})"${k === "temp" ? ' data-open="inverter" role="button" tabindex="0"' : ""}><svg viewBox="0 0 140 78"><path class="trk" d="M14 72 A56 56 0 0 1 126 72"/>
         <path class="arc" data-g="${k}" d="M14 72 A56 56 0 0 1 126 72" stroke-dasharray="0 ${ARC}"/></svg>
-        <div class="val num" data-k="g-${k}">–</div><div class="lbl" data-k="l-${k}">${l}</div></div>`).join("")}</div>
+        <div class="val num" data-k="g-${k}">–</div><div class="lbl"><span data-k="l-${k}">${l}</span>${k === "pv" ? PV_I : ""}</div></div>`).join("")}</div>
     <section class="card k-day"><h3><span>Azi</span><span data-k="day"></span></h3><svg data-k="chart" viewBox="0 0 330 92" preserveAspectRatio="none"></svg></section>
     <div class="inv-line" data-k="inv" data-open="inverter" role="button" tabindex="0"></div>`,
   update(root, h) {
@@ -366,7 +402,7 @@ const flux = {
     <div class="f-diag">
       <svg class="lines" viewBox="0 0 360 330">${Object.entries(FLUX).map(([k, d]) =>
         `<path class="ln" data-ln="${k}" d="${d}"/><path class="dots" data-dots="${k}" d="${d}"/>`).join("")}</svg>
-      <div class="f-node" style="left:20%;top:19%;--c:var(--sun)"><div class="disc">${icon("sun")}</div><div class="w" data-k="pv">–</div><div class="l">Panouri</div></div>
+      <div class="f-node" style="left:20%;top:19%;--c:var(--sun)"><div class="disc">${icon("sun")}</div><div class="w" data-k="pv">–</div><div class="l">Panouri ${PV_I}</div></div>
       <div class="f-node" style="left:80%;top:19%;--c:var(--load)"><div class="disc">${icon("home")}</div><div class="w" data-k="load">–</div><div class="l">Consum casă</div></div>
       <div class="f-node sm" data-open="inverter" role="button" tabindex="0" aria-label="Invertor" style="left:50%;top:69%;--c:var(--cell)"><div class="disc" style="width:64px;height:64px">${icon("inv")}</div></div>
       <div class="f-node sm" data-k-cls="grid" style="left:11%;top:88%;--c:var(--muted)"><div class="disc">${icon("grid")}</div><div class="l" data-k="grid">Rețea</div></div>
@@ -433,7 +469,7 @@ const carduri = {
     <section class="card c-list">${[["pv", "Panouri solare", "--sun", "sun"], ["load", "Consum casă", "--load", "home"],
       ["bat", "Baterie", "--charge", "batt"], ["grid", "Rețea", "--muted", "grid"]].map(([k, l, c, i]) => `
       <div class="c-it" style="--ic:var(${c})" data-it="${k}"><div class="c-ico">${icon(i)}</div>
-        <div class="m"><div class="k" data-k="l-${k}">${l}</div><div class="tr"><i data-bar="${k}"></i></div></div><div class="v" data-k="v-${k}">–</div></div>`).join("")}</section>`,
+        <div class="m"><div class="k"><span data-k="l-${k}">${l}</span>${k === "pv" ? PV_I : ""}</div><div class="tr"><i data-bar="${k}"></i></div></div><div class="v" data-k="v-${k}">–</div></div>`).join("")}</section>`,
   update(root, h) {
     const { b, ir, bp } = h;
     put(root, "st", `${h.ir ? esc(ir.status || "") : "Invertor: fără date"}${ir ? ` · ${num(ir.inverter_temp, 0)} °C` : ""} ›`);
@@ -487,6 +523,7 @@ function renderNow() {
     $$("[data-open=inverter]", home).forEach((el) => (el.onclick = () => show("inverter")));
   }
   L.update(home, homeData());
+  if (!$("#pvpop").hidden) $("#pvpop").innerHTML = pvInfoHtml();            // valorile se schimbă la fiecare citire
   if (state.view === "packs") renderPacks();
   if (state.view === "inverter") renderInverterLive();
   if (state.view === "settings") renderDaly();
@@ -759,11 +796,19 @@ function renderDaly() {
   const all = state.info?.devices || [], devs = state.snap?.devices || {};
   const inv = all.filter((x) => x.kind === "inverter"), bms = all.filter((x) => x.kind === "pack");
   const n = inv.length + bms.length;
-  const ok = [...inv, ...bms].filter((x) => devs[x.id]?.connected && !devs[x.id]?.stale).length;
-  $("#set-daly-sub").textContent = n ? `${ok} din ${n} comunică` : "Niciun dispozitiv configurat";
-  $("#daly-list").innerHTML = n ? devSection(inv.length > 1 ? "Invertoare" : "Invertor", inv, devs) + devSection("BMS-uri", bms, devs)
-    : `<div class="empty">Niciun dispozitiv în configurare. Adaugă-le din Ghid de configurare.</div>`;
-  $("#daly-auto-box").hidden = !bms.some((x) => x.type === "daly");
+  // pe ecran doar cele care comunică acum; celelalte (configurate, dar tăcute) într-un meniu separat
+  const on = (x) => devs[x.id]?.connected && !devs[x.id]?.stale;
+  const ok = [...inv, ...bms].filter(on), off = [...inv, ...bms].filter((x) => !on(x));
+  $("#set-daly-sub").textContent = n ? `${ok.length} comunică${off.length ? ` · ${off.length} inactive` : ""}`
+    : "Niciun dispozitiv configurat";
+  const oInv = inv.filter(on), oBms = bms.filter(on);
+  $("#daly-list").innerHTML = ok.length ? devSection(oInv.length > 1 ? "Invertoare" : "Invertor", oInv, devs) + devSection("BMS-uri", oBms, devs)
+    : `<div class="empty">${n ? "Niciun dispozitiv nu comunică acum." : "Niciun dispozitiv configurat. Adaugă-le cu butonul de mai jos."}</div>`;
+  $("#dev-off-btn").hidden = !off.length;
+  $("#dev-off-n").textContent = off.length === 1 ? "1 dispozitiv configurat care nu comunică" : `${off.length} dispozitive configurate care nu comunică`;
+  const fInv = inv.filter((x) => !on(x)), fBms = bms.filter((x) => !on(x));
+  $("#dev-off-list").innerHTML = devSection(fInv.length > 1 ? "Invertoare" : "Invertor", fInv, devs) + devSection("BMS-uri", fBms, devs);
+  $("#daly-auto-box").hidden = !bms.some((x) => x.type === "daly" && !on(x));
 }
 $("#daly-search").onclick = async () => {
   const b = $("#daly-search");
@@ -776,7 +821,7 @@ $("#daly-search").onclick = async () => {
 /* meniul setărilor: butoane → secțiuni (Teme, Notificări, Module Daly) */
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "notif", "daly", "info", "update", "security", "remote", "auto", "about", "conn", "share", "wifi"])
+  for (const k of ["teme", "notif", "daly", "devoff", "info", "update", "security", "remote", "auto", "about", "conn", "share", "wifi"])
     $("#set-" + k).hidden = k !== name;
   if (name === "about") $("#about-version").textContent = $("#version").textContent;
   if (name === "share") loadShare();
@@ -789,7 +834,7 @@ function showPanel(name) {
   if (name === "update") loadUpdate();
   if (name === "info") { loadInfo(); state.infoTimer = setInterval(() => !$("#set-info").hidden && loadInfo(), 5000); }
   if (name === "notif") renderNotif();
-  if (name === "daly") renderDaly();
+  if (name === "daly" || name === "devoff") renderDaly();
   window.scrollTo(0, 0);
 }
 $$(".set-btn[data-panel]").forEach((b) => (b.onclick = () => showPanel(b.dataset.panel)));
@@ -843,16 +888,17 @@ async function loadInfo() {
     <p class="note">${esc(x.model)} · ${esc(x.hostname)} · încărcare ${esc((x.load || []).join(" / "))}</p>
     <h2>Rețea</h2>
     <div class="list">
-      <div class="row"><span>WiFi: <b>${w ? esc(w.ssid) : "neconectat"}</b>${x.wifi_job?.hotspot ? " · hotspot Amper-Setup pornit" : ""}</span>
-        <span class="t">${w ? `semnal ${bars4(w.signal)} ${w.signal}% · ${esc(w.freq)} · canal ${esc(w.channel)}` : ""}</span></div>
+      <button class="row row-link" id="info-wifi"><span>WiFi: <b class="lnk">${w ? esc(w.ssid) : "neconectat"}</b>${x.wifi_job?.hotspot ? " · hotspot Amper-Setup pornit" : ""}</span>
+        <span class="t">${w ? `semnal ${bars4(w.signal)} ${w.signal}% · ${esc(w.freq)} · canal ${esc(w.channel)} · ` : ""}schimbă rețeaua ›</span></button>
       <div class="row"><span>Adrese locale</span><span class="t">${Object.entries(n.ip || {}).filter(([k]) => k !== "lo")
-        .map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(" · ") || "–"}</span></div>
+        .map(([k, v]) => `${esc(k.startsWith("tailscale") ? "server" : k)}: ${esc(v)}`).join(" · ") || "–"}</span></div>
       <div class="row"><span>Cablu de rețea</span><span class="t">${eth ? (eth.state === "connected" ? "legat" : "nelegat") : "–"}</span></div>
       <div class="row"><span>Server: <b>${ts.state === "Running" ? "conectat" : ts.state ? "neconectat" : "–"}</b></span>
         <span class="t">${esc(ts.ip || "")} · ${esc(ts.name || "")}</span></div>
-      ${(ts.peers || []).map((p) => `<div class="row"><span>${esc(p.name)}</span>
-        <span class="t">${p.online ? "online" : "offline"} · ${esc(p.os || "")}</span></div>`).join("")}
     </div>
+    ${(ts.peers || []).length ? `<h2>Aparatele tale legate la server</h2>
+    <div class="list">${ts.peers.map((p) => `<div class="row"><span>${esc(p.name)}</span>
+        <span class="t">${p.online ? "online" : "offline"}${p.os ? " · " + esc(p.os) : ""}</span></div>`).join("")}</div>` : ""}
     <h2>Porturi USB</h2>
     <div class="list">${(x.ports || []).map((p) => `<div class="row"><span>${esc(p.port)}</span>
       <span class="t">${esc(p.dev)} · ${p.used_by.length ? "folosit de " + esc(p.used_by.join(", ")) : "liber"}</span></div>`).join("")
@@ -862,6 +908,7 @@ async function loadInfo() {
       <span class="t">${esc(b.target)} · ${b.ok ? "conectat, citește" : b.connected ? "conectat, nu răspunde" : "neconectat"}</span></div>`).join("")
       || `<div class="empty">Niciun modul Bluetooth.</div>`}</div>
     <p class="note">Actualizat ${esc(x.time)}</p>`;
+  $("#info-wifi").onclick = () => showPanel("wifi");
   $("#set-info-sub").textContent = `${num(x.cpu_temp, 0)} °C · ${w ? "WiFi " + w.ssid + " " + w.signal + "%" : "fără WiFi"}`;
 }
 
@@ -1162,6 +1209,7 @@ function show(v) {
   const tab = ["packs", "inverter", "bms"].includes(v) ? "now" : v;      // se deschid din „Acum”
   $$("nav.tabs button").forEach((b) => b.dataset.view === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
   for (const k of ["now", "hist", "alerts", "packs", "inverter", "bms", "settings"]) $("#view-" + k).hidden = v !== k;
+  $("#pvpop").hidden = true;
   if (v === "bms") loadBms();
   if (v === "packs") renderPacks();
   if (v === "inverter") { renderInverterLive(); loadInverter(); }
@@ -1185,17 +1233,43 @@ async function loadHistory() {
   const pts = Math.min(400, Math.round(innerWidth * 1.2));
   // toate graficele într-o singură cerere; până vin datele, „Se încarcă…”; o eroare nu lasă ecranul gol
   const req = ++state.histReq;
-  $$("#charts .when").forEach((el) => (el.textContent = "Se încarcă…"));
+  const ids = [...pk, ...(inv ? [inv] : [])].map((d) => encodeURIComponent(d.id)).join(",");
+  const key = `${state.hours}|${ids}`;
+  // ultima încărcare a aceluiași interval se desenează imediat (din memorie sau de pe telefon); cea nouă vine după
+  const cached = histCache.get(key);
+  if (cached) drawHistory(cached.data, pk, inv);
+  else $$("#charts .when").forEach((el) => (el.textContent = "Se încarcă…"));
   let data;
   try {
-    const ids = [...pk, ...(inv ? [inv] : [])].map((d) => encodeURIComponent(d.id)).join(",");
     data = await api(`/api/history/all?devices=${ids}&hours=${state.hours}&points=${pts}`);
   } catch (e) {
-    if (e.message !== "auth" && req === state.histReq)
+    if (e.message !== "auth" && req === state.histReq && !cached)
       $$("#charts .when").forEach((el) => (el.textContent = "Pi-ul nu a răspuns. Încearcă din nou."));
     return;
   }
   if (req !== state.histReq) return;                     // între timp s-a ales alt interval
+  histCache.put(key, data);
+  drawHistory(data, pk, inv);
+}
+
+/* graficele încărcate ultima dată, pe interval: în memorie și pe telefon (se deschid instant data viitoare) */
+const histCache = {
+  mem: new Map(),
+  get(k) {
+    if (this.mem.has(k)) return this.mem.get(k);
+    try { const v = JSON.parse(localStorage.getItem("hist:" + k) || "null"); if (v) this.mem.set(k, v); return v; } catch { return null; }
+  },
+  put(k, data) {
+    const v = { at: Date.now(), data };
+    this.mem.set(k, v);
+    try {
+      for (const x of Object.keys(localStorage)) if (x.startsWith("hist:") && x !== "hist:" + k && x.split("|")[1] !== k.split("|")[1]) localStorage.removeItem(x);
+      localStorage.setItem("hist:" + k, JSON.stringify(v));
+    } catch {}
+  },
+};
+
+function drawHistory(data, pk, inv) {
   const S = data.series || {}, rowsOf = (d) => S[d.id]?.rows || [];
   const ph = pk.map((d) => ({ rows: rowsOf(d) })), ih = inv ? { rows: rowsOf(inv) } : null;
   const ser = (rows, key) => rows.map((r) => [r.t, r[key]]).filter((p) => p[1] != null);
@@ -1651,8 +1725,30 @@ const SU_STEPS = [
 const DEV_NAME = { daly: "Daly", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
 const su = { i: 0, d: null, chosen: null, keep: false, again: false, pollT: 0 };
 
-async function openSetup(again, step) {
-  su.again = again; su.chosen = null; su.keep = false;
+// Pi-ul nu răspunde (Amper oprit sau blocat, Pi fără curent/internet): un mesaj în loc de ecran negru.
+// Paznicul de pe Pi repornește Amper după 5 minute și, dacă o actualizare recentă e de vină, revine singur.
+let bootDown = 0;
+function showDown() {
+  if (!bootDown) bootDown = Date.now();
+  if (Date.now() - bootDown < 5000) return;              // o clipă (repornire): nu speria pe nimeni
+  const min = Math.floor((Date.now() - bootDown) / 60000);
+  $("#app").hidden = true; $("#setup").hidden = true; $("#login").hidden = false;
+  $("#pw").hidden = true; $("#pwgo").hidden = true; $('label[for="pw"]').hidden = true;
+  $("#pwerr").innerHTML = `<b>Amper nu răspunde${min ? ` de ${min} min` : ""}.</b> Reîncerc singur…<br><br>
+    Dacă Pi-ul are curent și internet, Amper se repornește singur în câteva minute; după o actualizare care nu
+    merge, Pi-ul revine singur la versiunea anterioară. Dacă durează mult, scoate alimentarea Pi-ului câteva
+    secunde și pornește-l din nou.`;
+}
+
+// parola ștearsă cu fișierul de pe card, iar telefonul e pe adresa publică: parola nouă se alege doar de acasă
+function showResetLocal(msg) {
+  $("#app").hidden = true; $("#setup").hidden = true; $("#login").hidden = false;
+  $("#pw").hidden = true; $("#pwgo").hidden = true; $('label[for="pw"]').hidden = true;
+  $("#pwerr").textContent = msg;
+}
+
+async function openSetup(again, step, reset = false) {
+  su.again = again; su.chosen = null; su.keep = false; su.reset = reset;
   su.i = su.start = Math.max(0, SU_STEPS.findIndex((x) => x.k === step));     // „+ Adaugă dispozitiv” → direct la Dispozitive
   try { su.d = await api("/api/setup"); } catch { return; }
   $("#app").hidden = true; $("#login").hidden = true; $("#setup").hidden = false;
@@ -1667,7 +1763,8 @@ function suRender() {
   $("#su-step").textContent = `Pasul ${su.i + 1} din ${SU_STEPS.length}`;
   $("#su-dots").innerHTML = SU_STEPS.map((x, i) => `<i class="${i < su.i ? "done" : i === su.i ? "on" : ""}"></i>`).join("");
   $("#su-err").textContent = "";
-  $("#su-back").hidden = su.i === 0 && !su.again;
+  $("#su-back").hidden = (su.i === 0 && !su.again) || su.reset;
+  $("#su-step").hidden = $("#su-dots").hidden = su.reset;
   $("#su-back").textContent = su.i === su.start ? "‹ Renunță" : "‹ Înapoi";
   $("#su-next").textContent = su.i === SU_STEPS.length - 1 ? "Gata" : "Mai departe";
   $("#su-next").disabled = false;
@@ -1678,6 +1775,13 @@ function suRender() {
         "Câțiva pași și Amper începe să-ți urmărească bateriile și invertorul."}</p>
       ${suField("su-name", "Cum se numește instalația?", `maxlength="60" placeholder="de ex. Casa de la munte" value="${esc(d.site_name)}"`)}
       <p class="note">Apare sus în aplicație și te ajută să deosebești instalațiile, dacă ai mai multe.</p>`;
+  } else if (st.k === "password" && su.reset) {
+    b.innerHTML = `<h2>Parolă nouă</h2>
+      <p class="note">Parola a fost ștearsă cu fișierul de pe card. Alege una nouă (minim 8 caractere); telefoanele
+        logate până acum o vor cere din nou.</p>
+      ${suField("su-pw", "Parola nouă", 'type="password" autocomplete="new-password"')}
+      ${suField("su-pw2", "Scrie-o încă o dată", 'type="password" autocomplete="new-password"')}`;
+    $("#su-next").textContent = "Salvează";
   } else if (st.k === "password") {
     b.innerHTML = `<h2>Parola aplicației</h2>
       <p class="note">O vei scrie o singură dată pe fiecare telefon. E cerută din nou la schimbarea setărilor
@@ -1788,6 +1892,7 @@ async function suNext() {
       await post("/api/setup/password", { password: pw, repeat: pw2, old: $("#su-old")?.value || "" });
       su.d.has_password = true;
       pwCache.v = pw; pwCache.until = Date.now() + 5 * 60000;
+      if (su.reset) { location.reload(); return; }
     }
   } else if (st.k === "devices") {
     if (su.keep) { su.chosen = null; su.i += 2; return suRender(); }       // sari peste capacități

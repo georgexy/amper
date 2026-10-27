@@ -93,7 +93,7 @@ def public_b64(priv) -> str:
                                                            serialization.PublicFormat.Raw)).decode()
 
 
-def build(out: Path, key_b64: str, root: Path = ROOT, mtime: int | None = None) -> dict:
+def build(out: Path, key_b64: str, root: Path = ROOT, mtime: int | None = None, urgent: bool = False) -> dict:
     ver = version(root)
     note = notes(ver, root)
     tar = build_tarball(ver, root, mtime)
@@ -103,6 +103,8 @@ def build(out: Path, key_b64: str, root: Path = ROOT, mtime: int | None = None) 
     manifest = {"version": ver, "tarball": name, "sha256": hashlib.sha256(tar).hexdigest(), "size": len(tar),
                 "date": time.strftime("%Y-%m-%d", time.gmtime(_mtime(root) if mtime is None else mtime)),
                 "notes": note}
+    if urgent:                     # Pi-urile o instalează singure (semnat, deci nimeni altcineva nu poate cere asta)
+        manifest["urgent"] = True
     mb = json.dumps(manifest, ensure_ascii=False, indent=1).encode()
     (out / "manifest.json").write_bytes(mb)
     sig = _private_key(key_b64).sign(mb)
@@ -152,6 +154,7 @@ def main() -> None:
     n.add_argument("ver", nargs="?")
     b = sub.add_parser("build")
     b.add_argument("--out", default="dist")
+    b.add_argument("--urgent", action="store_true", help="actualizare urgentă: Pi-urile o instalează singure")
     v = sub.add_parser("verify")
     v.add_argument("out", nargs="?", default="dist")
     a = p.parse_args()
@@ -165,8 +168,9 @@ def main() -> None:
         key = os.environ.get("AMPER_SIGNING_KEY", "")
         if not key:
             sys.exit("Lipsește AMPER_SIGNING_KEY (secretul repo-ului; vezi `python tools/release.py keygen`).")
-        m = build(Path(a.out), key)
-        print(f"Amper {m['version']}: {m['tarball']} ({m['size'] / 1e6:.2f} MB), sha256 {m['sha256']}")
+        m = build(Path(a.out), key, urgent=a.urgent)
+        print(f"Amper {m['version']}: {m['tarball']} ({m['size'] / 1e6:.2f} MB), sha256 {m['sha256']}"
+              + (" — URGENTĂ" if m.get("urgent") else ""))
     elif a.cmd == "verify":
         m = verify(Path(a.out))
         print(f"semnătura e validă: Amper {m['version']}")

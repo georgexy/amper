@@ -1,0 +1,54 @@
+# Imaginea SD Amper (tools/build-image.sh), construită pe un calculator ARM ca Pi-ul (fără emulare).
+#
+#   GitHub → Actions → „Imaginea SD” → Run workflow: construiește imaginea versiunii din amper/__init__.py și o
+#   adaugă la versiunea publicată v<versiune> (fișierele amper-<versiune>.img.xz și .sha256).
+#   La un PR care schimbă instalarea: doar o construiește și o verifică (rămâne 3 zile la „Artifacts”).
+name: Imaginea SD
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - tools/build-image.sh
+      - deploy/install.sh
+      - deploy/firstboot.sh
+      - deploy/*.service
+      - .github/workflows/image.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unelte
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xz-utils e2fsprogs fdisk parted
+
+      - name: Construiește imaginea
+        run: sudo OUT="$PWD/dist" WORK="$RUNNER_TEMP/build" bash tools/build-image.sh
+
+      - name: Imaginea la Artifacts (PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: amper-image
+          path: dist/
+          retention-days: 3
+          compression-level: 0
+
+      - name: Adaugă imaginea la versiunea publicată
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          VER="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' amper/__init__.py)"
+          gh release view "v$VER" >/dev/null || { echo "::error::Versiunea v$VER nu e publicată încă (întâi „Lansează versiunea”)"; exit 1; }
+          gh release upload "v$VER" dist/amper-*.img.xz dist/amper-*.img.xz.sha256 --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

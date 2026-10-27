@@ -4,11 +4,18 @@
 #   GitHub → Actions → „Lansează versiunea” → Run workflow   (merge și de pe telefon)
 #   sau: un tag v<versiune> (ex. v1.3.0) împins pe GitHub.
 # O versiune cu sufix (1.3.0-beta.1) iese ca „pre-release”: o primesc doar Pi-urile pe canalul beta.
+# „Urgentă” (bifă la Run workflow): Pi-urile o instalează singure în câteva ore, fără să apese nimeni nimic
+# (pentru o problemă care trebuie reparată peste tot; aceleași verificări și revenire automată).
 # Cheia privată: secretul repo-ului AMPER_SIGNING_KEY (vezi `python tools/release.py keygen`).
 name: Lansează versiunea
 
 on:
   workflow_dispatch:
+    inputs:
+      urgent:
+        description: "Urgentă: Pi-urile o instalează singure (doar pentru reparații care nu pot aștepta)"
+        type: boolean
+        default: false
   push:
     tags: ["v*"]
 
@@ -56,10 +63,11 @@ jobs:
 
       - name: Arhiva și semnătura
         run: |
-          python tools/release.py build --out dist
+          python tools/release.py build --out dist $URGENT
           python tools/release.py verify dist
         env:
           AMPER_SIGNING_KEY: ${{ secrets.AMPER_SIGNING_KEY }}
+          URGENT: ${{ inputs.urgent && '--urgent' || '' }}
 
       - name: Publicare pe GitHub
         run: |

@@ -1,6 +1,8 @@
 [Unit]
 Description=amper - actualizari din GitHub (semnate), cu copie a datelor si revenire automata
 After=network-online.target
+# revenire.txt pus pe card (partiția bootfs) se citește la pornire
+RequiresMountsFor=/boot/firmware
 Wants=network-online.target
 
 [Service]
