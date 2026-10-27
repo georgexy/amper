@@ -221,6 +221,8 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   manifestul semnat): Pi-urile o instalează SINGURE. Doar pentru reparații care nu pot aștepta, doar stabile testate
   pe beta, și tot doar după „publică”. Dacă după o urgentă vine repede altă versiune, marcheaz-o și pe ea urgentă
   (un Pi offline la momentul urgentei vede doar ultima versiune).
+- Numerotare (stabilit 2026-10-27): după 0.3.0-beta.10 urmează 1.0.0-beta.N; **1.0.0** stabilă (prima pentru
+  cunoscuți, cu imaginea SD) abia după testul complet al imaginii pe un card + Pi de rezervă. 0.3.0 stabilă nu se mai lansează.
 - **NU publica (merge + release) până nu spune explicit „publică”** (cerut 2026-10-27, după ce beta.5 a ieșit prea
   devreme). Lucrul se adună pe ramură; CHANGELOG are secțiunea „— în pregătire” până la publicare.
 
@@ -337,7 +339,7 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   actualiza.” `app.js`: `?v=update` și mesajul SW deschid Setări → Actualizări.
 - Ecran: beta sus, `#up-check` „Caută actualizări”, `.up-new-head` (titlu + „Descarcă”), bara/instalarea înaintea notelor.
 
-## Deconectare BMS, module excluse, egalizatoare (0.3.0-beta.11, în pregătire)
+## Deconectare BMS, module excluse, egalizatoare (1.0.0-beta.1, în pregătire)
 - Pe Pi-ul utilizatorului, căutarea a legat un EGALIZATOR ACTIV (BLE „DL-B77B020306D3”) ca daly2: răspunde la 0x90 cu
   tensiuni reale, SOC 0, 0 cicluri, MOSFET 0. Utilizatorul a scos modulele BLE de pe egalizatoare și va deconecta daly2.
 - `daly_auto.check_bms(drv)`: 0x90 (+0x50 capacitate, 0x93 Ah rămași, 0x94 celule/cicluri); BMS = 5–100 V, SOC 0–100

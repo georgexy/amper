@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 0.3.0-beta.11 — în pregătire
+## 1.0.0-beta.1 — în pregătire
 - „Deconectează” pentru orice BMS: în fișa bateriei (atingi bateria în ecranul Bateriile) și la „Dispozitive
   inactive”. Cere parola și o confirmare. Amper nu-l mai citește și nu mai dă alerte pentru el (alertele lui
   deschise se închid fără notificare), fără repornire; modificarea apare în jurnal și primești o notificare.
