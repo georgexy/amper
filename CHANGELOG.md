@@ -17,6 +17,8 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Istoric mai rapid: peste 6 ore, graficele folosesc mediile la 5 minute (de ~12 ori mai puțin de citit de pe
   card), iar toate graficele vin într-o singură cerere; „Se încarcă…” până sosesc datele.
 - Reparat: pe 7 și 30 de zile, cu puține zile de date, liniile nu se desenau deloc (erau rupte după fiecare punct).
+- Setări → Despre → „Partajează Amper”: adresa de oriunde și cea de acasă, cu „Trimite” (WhatsApp, Mesaje…) și
+  „Copiază”, ca s-o dai celor din casă.
 
 ## 0.3.0-beta.6 — 2026-10-27
 - Setări: meniul nou „Despre” cuprinde Actualizări și Info.

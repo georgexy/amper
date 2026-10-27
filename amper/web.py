@@ -167,6 +167,7 @@ def make_app(engine) -> web.Application:
                 for d in cfg["devices"]]
         wp = engine.notifier.webpush
         return _json(dict(devices=devs, auth=auth_.enabled, poll_interval=cfg["poll_interval"], version=__version__,
+                          port=int((cfg.get("web") or {}).get("port") or 8080),
                           site_name=cfg.get("site_name") or "", setup_needed=setup_needed(cfg),
                           public_url=wp.subject if wp else None,
                           notifications=engine.notifier.enabled,

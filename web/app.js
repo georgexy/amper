@@ -747,7 +747,7 @@ $("#daly-search").onclick = async () => {
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
   for (const k of ["teme", "notif", "daly", "info", "update", "security", "remote", "auto", "about"]) $("#set-" + k).hidden = k !== name;
-  if (name === "about") $("#about-version").textContent = $("#version").textContent;
+  if (name === "about") { $("#about-version").textContent = $("#version").textContent; loadShare(); }
   if (name === "auto") loadUserAlerts();
   if (name === "remote") renderRemote($("#remote-body"));
   if (name === "security") loadSecurity();
@@ -1933,4 +1933,41 @@ async function renderRemote(el) {
   if ($("#rm-off", el)) $("#rm-off", el).onclick = () =>
     confirm("Opresc accesul de oriunde? Telefoanele fără Tailscale nu vor mai putea deschide Amper.") && act("/api/remote/funnel", { on: false });
   if (waiting) remote.timer = setTimeout(() => renderRemote(el), 2500);
+}
+
+/* ------------------------------------------------------------------ PARTAJEAZĂ AMPER (Setări → Despre) */
+async function loadShare() {
+  const out = [];
+  const [rm, sys] = await Promise.all([api("/api/remote").catch(() => ({})), api("/api/system").catch(() => ({}))]);
+  if (rm.url && rm.funnel)
+    out.push({ t: "De oriunde", d: "Merge pe orice telefon, acasă sau oriunde, fără altă aplicație.", url: rm.url });
+  else if (rm.url && rm.state === "Running")
+    out.push({ t: "De oriunde (doar cu Tailscale)", d: "Merge doar pe telefoanele cu aplicația Tailscale în contul tău. " +
+      "Pornește „Acces de oriunde” din Setări ca să meargă pentru oricine.", url: rm.url });
+  const port = state.info?.port || 8080;
+  const ips = Object.entries(sys.network?.ip || {}).filter(([k, ip]) => k !== "lo" && !k.startsWith("tailscale") &&
+    !ip.startsWith("100.") && !ip.startsWith("10.42.") && !ip.startsWith("127."));
+  for (const [, ip] of ips.slice(0, 2))
+    out.push({ t: "Acasă", d: "Merge doar pe telefoanele conectate la rețeaua de acasă.", url: `http://${ip}:${port}` });
+  if (!out.length) out.push({ t: "Adresa de acum", d: "Adresa la care ai deschis acum aplicația.", url: location.origin });
+  $("#share-list").innerHTML = out.map((x, i) => `<div class="row share-row"><span><b>${esc(x.t)}</b>
+      <small class="share-url">${esc(x.url)}</small><small>${esc(x.d)}</small></span>
+      <span class="share-act"><button class="btn sm" data-share="${i}">Trimite</button>
+      <button class="btn sm" data-copy="${i}">Copiază</button></span></div>`).join("");
+  $$("[data-share]").forEach((b) => (b.onclick = async () => {
+    const x = out[+b.dataset.share];
+    const text = `Amper — bateriile și invertorul: ${x.url}`;
+    if (navigator.share) { try { await navigator.share({ title: "Amper", text, url: x.url }); } catch {} }
+    else copyText(x.url);
+  }));
+  $$("[data-copy]").forEach((b) => (b.onclick = () => copyText(out[+b.dataset.copy].url)));
+}
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); }
+  catch {                                        // fără https: varianta veche
+    const ta = Object.assign(document.createElement("textarea"), { value: t });
+    document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
+  }
+  $("#share-msg").textContent = `Copiat: ${t}`;
+  setTimeout(() => ($("#share-msg").textContent = ""), 4000);
 }
