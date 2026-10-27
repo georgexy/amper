@@ -9,6 +9,8 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
   aplicația se reîncarcă singură.
 - Reparat: după actualizare, aplicația putea rămâne cu ecranul negru (pagina de eroare a Tailscale din timpul
   repornirii era afișată și ținută minte). Acum se folosește ultima versiune bună până răspunde Pi-ul.
+- Pregătit pentru accesul fără Tailscale pe telefon (Tailscale Funnel): cererile venite prin Funnel cer
+  întotdeauna parola, ca și cele de pe telefon.
 
 ## 0.3.0-beta.3 — 2026-10-27
 - Sigla Amper (bateria cu fulger) sus, înaintea numelui.

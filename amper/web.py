@@ -69,9 +69,10 @@ def make_app(engine) -> web.Application:
 
     def local(request) -> bool:
         # ecranul HDMI (kiosk) rulează pe Pi și nu are tastatură: nu i se cere parola.
-        # Cererile venite prin `tailscale serve` (https) ajung tot de la 127.0.0.1, dar cu antetele proxy-ului:
-        # acelea vin de pe telefon și trebuie să ceară parola.
-        if any(h in request.headers for h in ("X-Forwarded-For", "Tailscale-User-Login", "Forwarded")):
+        # Cererile venite prin `tailscale serve` / `tailscale funnel` (https, din tailnet sau din internet) ajung
+        # tot de la 127.0.0.1, dar cu antetele proxy-ului: acelea vin de pe telefon și trebuie să ceară parola.
+        if any(h in request.headers for h in ("X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Forwarded",
+                                              "Tailscale-User-Login", "Tailscale-Funnel-Request")):
             return False
         return request.remote in ("127.0.0.1", "::1")
 

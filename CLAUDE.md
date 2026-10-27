@@ -231,6 +231,8 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - Scrierile (BMS, invertor, WiFi, actualizare) cer `app_password` în corp (`web.confirm`); în pagină `securePost`
   + dialogul `#pwask`, parola ținută 5 min în memorie. Antete: CSP, X-Frame-Options, nosniff, Referrer-Policy.
 - Roluri admin/vizualizare: NEFĂCUTE (opționale în brief).
+- `web.local()` (scutirea kiosk-ului de parolă) e falsă la orice antet de proxy, inclusiv `Tailscale-Funnel-Request`
+  și `X-Forwarded-*` — condiție pentru Funnel (adresa publică, telefoane fără Tailscale).
 
 ## Lucru pe Pi
 - Datele de acces la Pi-ul autorului (utilizator, IP-uri, Tailscale): în `LOCAL.md`.
