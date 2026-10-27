@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 0.3.0-beta.7 — în pregătire
+## 0.3.0-beta.7 — 2026-10-27
 - Hotspotul de configurare arată adresa în nume: „Amper-Setup 10.42.0.1”; după ce Pi-ul s-a conectat la WiFi-ul
   ales, timp de 3 minute „Amper gata 192.168.x.y” — adresa de acasă se citește direct din lista de rețele.
 - Instalările noi folosesc parola comună „amper-setup” pentru hotspot (cele existente își păstrează parola).
