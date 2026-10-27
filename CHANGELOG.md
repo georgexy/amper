@@ -2,6 +2,24 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.1 — 2026-10-27
+- Setări arată ca pe iPhone: o listă grupată, cu iconițe colorate care se mișcă puțin (clopoțelul se leagănă,
+  bateria se umple, globul se rotește…), fără explicații sub butoane.
+- „Deconectează” pentru orice BMS: în fișa bateriei (atingi bateria în ecranul Bateriile) și la „Dispozitive
+  inactive”. Cere parola și o confirmare. Amper nu-l mai citește și nu mai dă alerte pentru el (alertele lui
+  deschise se închid fără notificare), fără repornire; modificarea apare în jurnal și primești o notificare.
+  Istoricul lui rămâne.
+- La Daly, poziția (ex. „Daly 2”) rămâne liberă, iar căutarea automată poate găsi alt modul; cel deconectat intră
+  pe lista „Module excluse” (Setări → Dispozitive conectate), de unde îl poți „Permite din nou”. La o poziție
+  liberă: „Caută din nou”. Seplos și celelalte se scot din configurare.
+- BMS JK (Jikong), încă netestat pe un JK real: prin Bluetooth (JK cu hardware 10.x, 24 de celule, și 11 sau mai nou,
+  32 de celule; protocolul se alege singur după versiunea BMS-ului) și pe cablu, prin modulul RS485/UART al JK.
+  La „Adaugă dispozitiv” → „Caută prin Bluetooth” un JK apare ca „pare JK”; pe cablu e găsit singur. JK-urile foarte
+  vechi (hardware 3.x, protocolul JK04) nu sunt încă suportate.
+- Egalizatoarele active (module Bluetooth tot „DL-…”) nu mai sunt luate drept BMS Daly: un modul se leagă doar dacă
+  răspunde ca un BMS (capacitate validă sau SOC și Ah rămași). La „Caută acum” și în ghidul de configurare vezi ce
+  s-a găsit, cu valorile citite, și poți „Respinge” un modul greșit (intră pe lista de excluse).
+
 ## 0.3.0-beta.10 — 2026-10-27
 - Actualizări: comutatorul „versiunile de test (beta)” e primul, sus; butonul se numește „Caută actualizări”;
   „Descarcă” stă în dreapta titlului „Versiune nouă”, iar bara și „Instalează acum” apar imediat sub el.

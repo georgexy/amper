@@ -590,6 +590,59 @@ def make_app(engine) -> web.Application:
             restart_soon()                                  # se citește după repornire (câteva secunde)
         return _json({"ok": True, "device": dev, "restart": not sim})
 
+    # ---------------- Deconectează / module excluse / ce a găsit căutarea ----------------
+    async def device_disconnect(request):
+        dev = request.match_info["device"]
+        st = engine.devices.get(dev)
+        if not st or st.driver.kind != "pack":
+            return _json({"error": "BMS necunoscut"}, 404)
+        body = await request.json()
+        if (err := await confirm(request, body, f"deconectare {dev}")) is not None:
+            return err
+        res = engine.disconnect_device(dev)
+        if res["devices"] is not None:                  # config schimbat (Seplos scos, Daly fix → poziție liberă)
+            await asyncio.to_thread(save_overlay, cfg, {"devices": [d for d in res["devices"]
+                                                                     if not d["type"].startswith("sim_")] or res["devices"]})
+        return _json({"ok": True, **{k: v for k, v in res.items() if k != "devices"}})
+
+    async def excluded_get(request):
+        from .drivers import daly_auto
+        return _json({"items": daly_auto.load_excluded()})
+
+    async def excluded_allow(request):
+        from .drivers import daly_auto
+        body = await request.json()
+        idx = body.get("index")
+        items = await asyncio.to_thread(daly_auto.allow_again, None if idx is None else int(idx))
+        log.warning("module excluse: permise din nou (%s)", "toate" if idx is None else f"#{idx}")
+        return _json({"items": items})
+
+    async def daly_found(request):
+        """Ce a încercat căutarea automată (legate sau respinse), cu valorile citite, plus pozițiile Daly."""
+        from .drivers import daly_auto
+        pos = [{"id": k, "name": st.cfg.get("name", k), "free": st.driver.inner is None, "link": st.driver.link_desc,
+                "state": st.driver.state}
+               for k, st in engine.devices.items() if isinstance(st.driver, daly_auto.DalyAutoDriver)]
+        return _json({"found": daly_auto.recent_found(), "positions": pos})
+
+    async def daly_reject(request):
+        """Respinge un modul găsit (ex. un egalizator activ): pe lista de excluse; dacă era legat, poziția se eliberează."""
+        from .drivers import daly_auto
+        body = await request.json()
+        if (err := await confirm(request, body, "respingere modul")) is not None:
+            return err
+        item = next((x for x in daly_auto.recent_found() if x["keys"] == body.get("keys")), None)
+        if not item and isinstance(body.get("binding"), dict) and (body["binding"].get("ble") or body["binding"].get("port")):
+            item = {"binding": body["binding"], "label": str(body.get("label") or "")[:60], "device": None}   # din ghid
+        if not item:
+            return _json({"error": "Modulul nu mai e în listă; caută din nou."}, 404)
+        if item["device"] and item["device"] in engine.devices and \
+                getattr(engine.devices[item["device"]].driver, "binding", None) is not None:
+            engine.disconnect_device(item["device"], "respins din aplicație (nu e BMS)")
+        else:
+            daly_auto.exclude(item["binding"], item["label"], "respins din aplicație (nu e BMS)")
+        return _json({"ok": True})
+
     async def setup_finish(request):
         if not auth_.enabled:
             return _json({"error": "Alege întâi o parolă pentru aplicație."}, 400)
@@ -767,6 +820,11 @@ def make_app(engine) -> web.Application:
     app.router.add_post("/api/devices/scan", devices_scan_start)
     app.router.add_get("/api/devices/scan", devices_scan_get)
     app.router.add_post("/api/devices/add", devices_add)
+    app.router.add_post("/api/devices/{device}/disconnect", device_disconnect)
+    app.router.add_get("/api/devices/excluded", excluded_get)
+    app.router.add_post("/api/devices/excluded/allow", excluded_allow)
+    app.router.add_get("/api/daly/found", daly_found)
+    app.router.add_post("/api/daly/reject", daly_reject)
     app.router.add_get("/api/security", security_get)
     app.router.add_post("/api/update/channel", update_channel)
     app.router.add_get("/api/update/status", update_status)

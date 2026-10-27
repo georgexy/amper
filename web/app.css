@@ -366,16 +366,63 @@ nav.tabs .badge[data-n]::after { content: attr(data-n); position: absolute; top:
 .en-total { font-size: 13.5px; color: var(--muted); margin: 4px 0 2px; }
 .en-total b { color: var(--text); font-weight: 600; }
 
-/* ---------- setări: meniul cu butoane ---------- */
-.set-menu { display: grid; gap: 10px; }
-.set-btn { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px; color: inherit; text-align: left; cursor: pointer; }
-.set-btn .ic { width: 44px; height: 44px; border-radius: 13px; flex: none; display: flex; align-items: center; justify-content: center;
-  color: var(--ic); background: color-mix(in srgb, var(--ic) 16%, transparent); }
-.set-btn .ic svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+/* ---------- setări: meniul — listă grupată, ca Setările de pe iPhone, fără explicații ---------- */
+.set-menu { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; margin-bottom: 14px; }
+.set-menu:not(:has(> .set-btn:not([hidden]))) { display: none; }          /* grup cu toate butoanele ascunse */
+.set-menu > .set-btn.card { background: none; border: 0; border-radius: 0; }
+.set-btn { display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px 14px; color: inherit; text-align: left;
+  cursor: pointer; transition: background .15s ease; }
+.set-menu > .set-btn:not([hidden]) ~ .set-btn:not([hidden]) { border-top: 1px solid var(--line); }
+.set-btn:active { background: var(--panel-2); }
+.set-btn .ic { width: 36px; height: 36px; border-radius: 10px; flex: none; display: flex; align-items: center; justify-content: center;
+  color: #0E1A22; background: var(--ic); }
+.set-btn .ic svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
 .set-btn > span:nth-child(2) { flex: 1; min-width: 0; }
 .set-btn b { display: block; font: 600 19px "Barlow Condensed", sans-serif; }
-.set-btn > span:nth-child(2) > span { font-size: 13.5px; color: var(--muted); }
-.set-btn i { font-style: normal; font-size: 24px; color: var(--muted); }
+.set-btn > span:nth-child(2) > span { display: none; }                   /* fără explicații sub butoane */
+.set-btn i { font-style: normal; font-size: 22px; color: var(--faint); }
+
+/* ---------- setări: iconițe animate (mișcare scurtă, din câteva în câteva secunde; la apăsare se joacă imediat) ---------- */
+.ai * { transform-box: fill-box; }
+.ai-teme .a-spin { transform-origin: right center; animation: a-spin 9s linear infinite; }
+.ai-notif .a-swing { transform-origin: 50% 0; animation: a-swing 5s ease-in-out infinite; }
+.ai-notif .a-clap { animation: a-clap 5s ease-in-out infinite; }
+.ai-daly .a-bar { animation: a-bar 2.6s ease-in-out infinite; }
+.ai-daly .a-bar:nth-of-type(2) { animation-delay: .25s; } .ai-daly .a-bar:nth-of-type(3) { animation-delay: .5s; }
+.ai-daly .a-bar:nth-of-type(4) { animation-delay: .75s; }
+.ai-auto .a-flash { transform-origin: center; animation: a-flash 3.6s ease-in-out infinite; }
+.ai .a-globe { transform-origin: center; animation: a-globe 4s ease-in-out infinite; }
+.ai-security .a-shackle { animation: a-shackle 5.5s ease-in-out infinite; }
+.ai-about .a-dot { animation: a-dot 4.5s ease-in-out infinite; }
+.ai-update .a-drop { animation: a-drop 2.8s ease-in-out infinite; }
+.ai-info .a-type { stroke-dasharray: 9; animation: a-type 4s ease-in-out infinite; } .ai-info .a-type2 { animation-delay: .35s; }
+.ai-wizard .a-slide { animation: a-slide 4.5s ease-in-out infinite; }
+.ai-share .a-node { transform-origin: center; animation: a-node 3.2s ease-in-out infinite; }
+.ai-share .a-node2 { animation-delay: .3s; } .ai-share .a-node3 { animation-delay: .6s; }
+.ai-devoff .a-fade { animation: a-fade 3s ease-in-out infinite; }
+.ai-excl .a-strike { stroke-dasharray: 19; animation: a-strike 4s ease-in-out infinite; }
+/* la apăsare: iconița sare puțin */
+.set-btn:active .ic { animation: a-press .35s ease; }
+
+@keyframes a-spin { to { transform: rotate(360deg); } }
+@keyframes a-swing { 0%, 22%, 100% { transform: rotate(0); } 4% { transform: rotate(16deg); } 9% { transform: rotate(-13deg); }
+  14% { transform: rotate(8deg); } 18% { transform: rotate(-4deg); } }
+@keyframes a-clap { 0%, 22%, 100% { transform: translateX(0); } 6% { transform: translateX(-1.6px); } 12% { transform: translateX(1.4px); } }
+@keyframes a-bar { 0%, 100% { opacity: .25; } 35%, 65% { opacity: 1; } }
+@keyframes a-flash { 0%, 70%, 100% { transform: scale(1); fill: transparent; } 78% { transform: scale(1.18); fill: currentColor; }
+  86% { transform: scale(.96); fill: transparent; } 92% { fill: currentColor; } }
+@keyframes a-globe { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(.12); } }
+@keyframes a-shackle { 0%, 60%, 100% { transform: translateY(0); } 68%, 80% { transform: translateY(-2.6px); } 86% { transform: translateY(.4px); } }
+@keyframes a-dot { 0%, 70%, 100% { transform: translateY(0); } 78% { transform: translateY(-3px); } 86% { transform: translateY(0); }
+  91% { transform: translateY(-1px); } }
+@keyframes a-drop { 0%, 100% { transform: translateY(-2px); opacity: .8; } 50% { transform: translateY(1.6px); opacity: 1; } }
+@keyframes a-type { 0% { stroke-dashoffset: 9; } 30%, 80% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -9; } }
+@keyframes a-slide { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-4px); } }
+@keyframes a-node { 0%, 60%, 100% { transform: scale(1); } 72% { transform: scale(1.3); fill: currentColor; } }
+@keyframes a-fade { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+@keyframes a-strike { 0% { stroke-dashoffset: 19; } 35%, 85% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 0; } }
+@keyframes a-press { 40% { transform: scale(.82) rotate(-6deg); } 75% { transform: scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { .set-btn .ic, .ai * { animation: none !important; } }
 .set-panel .pk-top { margin-bottom: 8px; }
 
 /* ---------- istoric: ordinea graficelor ---------- */
@@ -547,3 +594,12 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .up-new-head { margin: 20px 0 10px; }
 .up-new-head h2 { margin: 0 auto 0 0; }
 .up-new-head .btn { margin: 0; flex: none; width: auto; padding: 9px 20px; }
+/* Deconectează, module excluse, găsite la căutare */
+.bms-row .row-act { grid-column: 1 / -1; display: flex; gap: 8px; margin-top: 6px; }
+.bms-row .row-act .btn { margin: 0; }
+.sh-disc { width: 100%; margin-top: 18px; }
+.toast { position: fixed; left: 16px; right: 16px; bottom: 104px; z-index: 80; padding: 12px 14px; border-radius: 14px;
+  background: var(--panel-2); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,.45); font-size: 14.5px; }
+.su-rej { margin: -2px 0 8px 14px; }
+small.warnc { color: var(--warn); }
+#daly-list + .set-menu { margin-top: 14px; }

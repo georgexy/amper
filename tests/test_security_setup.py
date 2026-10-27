@@ -254,8 +254,12 @@ def test_add_device_ids_and_unsupported():
     assert d["id"] == "daly4" and d["name"] == "Daly 4" and d["ble"] == "BB:00" and d["ble_name"] == "DL-BB00"
     s = add_device(existing, {"type": "seplos", "port": "/dev/ttyUSB1", "address": 2, "capacity_ah": 100, "name": "Raft"})
     assert s["id"] == "seplos1" and s["name"] == "Raft" and s["baudrate"] == 19200
-    with pytest.raises(ValueError, match="JK BMS.*nu e suportat"):
-        add_device(existing, {"type": "jk", "ble": "CC", "capacity_ah": 100})
+    with pytest.raises(ValueError, match="JBD.*nu e suportat"):
+        add_device(existing, {"type": "jbd", "ble": "CC", "capacity_ah": 100})
+    j = add_device(existing, {"type": "jk", "ble": "CC:00", "ble_name": "JK_B2A8S20P", "capacity_ah": 280})
+    assert j["id"] == "jk1" and j["name"] == "JK 1" and j["ble"] == "CC:00" and j["ble_name"] == "JK_B2A8S20P"
+    u = add_device(existing, {"type": "jk", "port": "/dev/ttyUSB2", "capacity_ah": 100})
+    assert u["port"] == "/dev/ttyUSB2" and u["baudrate"] == 115200
     with pytest.raises(ValueError, match="capacitatea"):
         add_device(existing, {"type": "daly", "ble": "CC"})
 
@@ -270,13 +274,13 @@ def test_scan_ble_hides_used_modules(monkeypatch, tmp_path):
         {"address": "DD:00", "name": "", "rssi": -40}])            # fără nume: nu apare
     monkeypatch.setattr(daly_auto, "load_bindings", lambda: {"daly2": {"type": "ble", "ble": "BB:00", "name": "DL-BB00"}})
     r = setup_scan.scan_ble({"devices": [{"id": "daly1", "type": "daly", "ble": "aa:00"}]})
-    assert [f["ble"] for f in r["found"]] == ["CC:00"] and r["found"][0]["guess"] is None
+    assert [f["ble"] for f in r["found"]] == ["CC:00"] and r["found"][0]["guess"] == "jk"
     assert any(t["type"] == "daly" and t["supported"] for t in r["types"])
 
 
 def test_api_add_device(tmp_path):
     async def steps(c, eng, n):
-        bad = await c.post("/api/devices/add", json={"device": {"type": "jk", "ble": "CC", "capacity_ah": 50}})
+        bad = await c.post("/api/devices/add", json={"device": {"type": "jbd", "ble": "CC", "capacity_ah": 50}})
         ok = await c.post("/api/devices/add", json={"device": {"type": "daly", "ble": "CC:00", "ble_name": "DL-CC00",
                                                                  "capacity_ah": 105}})
         return bad.status, await ok.json(), n.sent
@@ -287,3 +291,27 @@ def test_api_add_device(tmp_path):
     over = yaml.safe_load((tmp_path / "settings.yaml").read_text())
     assert [d["id"] for d in over["devices"]] == ["daly1", "daly2"] and over["devices"][1]["ble_name"] == "DL-CC00"
     assert any("Dispozitiv adăugat" in m for m in sent)
+
+
+def test_api_disconnect_needs_password_and_excluded_list(tmp_path):
+    from amper.drivers import daly_auto
+    daly_auto.set_state_dir(str(tmp_path))
+    daly_auto.exclude({"type": "ble", "ble": "EE:01", "name": "DL-B77B"}, "daly2: DL-B77B", "respins din aplicație")
+
+    async def steps(c, eng, n):
+        await c.post("/api/login", json={"password": "pw-corecta"})
+        no = await c.post("/api/devices/seplos1/disconnect", json={})
+        bad = await c.post("/api/devices/seplos1/disconnect", json={"app_password": "gresit"})
+        ok = await c.post("/api/devices/seplos1/disconnect", json={"app_password": "pw-corecta"})
+        inv = await c.post("/api/devices/inv/disconnect", json={"app_password": "pw-corecta"})   # invertorul: nu e BMS
+        ex = await (await c.get("/api/devices/excluded")).json()
+        allow = await (await c.post("/api/devices/excluded/allow", json={"index": 0})).json()
+        return no.status, bad.status, ok.status, await ok.json(), inv.status, ex, allow, list(eng.devices)
+    no, bad, ok, okj, inv, ex, allow, devs = run({"web": {"password": "pw-corecta"}, "devices": [
+        {"id": "inv", "name": "Growatt", "type": "sim_growatt"},
+        {"id": "seplos1", "name": "Seplos 1", "type": "seplos", "port": "/dev/ttyX", "address": 1, "capacity_ah": 100}]},
+        steps, tmp_path)
+    assert no == 403 and bad == 403 and ok == 200 and okj["action"] == "removed" and inv == 404
+    assert devs == ["inv"] and ex["items"][0]["label"] == "daly2: DL-B77B" and allow["items"] == []
+    over = yaml.safe_load((tmp_path / "settings.yaml").read_text())
+    assert [d["id"] for d in over["devices"]] == ["inv"]

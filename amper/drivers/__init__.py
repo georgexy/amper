@@ -5,6 +5,7 @@ from .base import Driver, DriverError
 from .daly import DalyBleDriver, DalyDriver
 from .daly_auto import DalyAutoDriver, is_auto
 from .growatt_spf import GrowattSPFDriver
+from .jk import JkBleDriver, JkUartDriver
 from .seplos import SeplosDriver
 from .simulator import SimInverterDriver, SimPackDriver, SimWorld
 
@@ -17,6 +18,8 @@ def make_driver(cfg: dict, all_cfgs: list[dict] | None = None) -> Driver:
         if is_auto(cfg):
             return DalyAutoDriver(cfg, all_cfgs)
         return DalyBleDriver(cfg) if cfg.get("ble") else DalyDriver(cfg)
+    if t == "jk":
+        return JkBleDriver(cfg) if cfg.get("ble") else JkUartDriver(cfg)
     if t in REAL:
         return REAL[t](cfg)
     world = SimWorld.get(all_cfgs or [cfg])

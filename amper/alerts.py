@@ -274,6 +274,17 @@ class AlertManager:
                                                 fired_at=r["ts_start"], extra={"last_seen": now})
         return old
 
+    def drop_device(self, device: str, now: float | None = None) -> int:
+        """Dispozitiv deconectat din aplicație: alertele lui se închid în tăcere (fără „✅ Rezolvat”)."""
+        now = now or time.time()
+        n = 0
+        for key in [k for k, a in self.active.items() if a.cond.device == device]:
+            act = self.active.pop(key)
+            if act.fired and act.db_id:
+                self.db.close_alert(act.db_id, int(now))
+            n += 1
+        return n
+
     def shift_clock(self, delta: float) -> None:
         """Ceasul sistemului a sărit cu `delta` s: duratele alertelor în curs rămân cele reale."""
         for act in self.active.values():

@@ -768,7 +768,7 @@ function renderLooks() {
   }));
 }
 /* Setări → Dispozitive conectate: Invertoare și BMS-uri (grupate după tip, în ordinea adresei), cu legătura și starea */
-const DEV_TYPE = { daly: "Daly", sim_daly: "Daly (simulat)", seplos: "Seplos V2 (RS485)", sim_seplos: "Seplos (simulat)",
+const DEV_TYPE = { daly: "Daly", jk: "JK", sim_daly: "Daly (simulat)", seplos: "Seplos V2 (RS485)", sim_seplos: "Seplos (simulat)",
   growatt_spf: "Growatt SPF", sim_growatt: "Growatt (simulat)" };
 function devLink(info, d) {
   const live = d.reading?.raw?.link;                          // Daly: legătura găsită („Bluetooth AA:…”, „cablu …”)
@@ -779,17 +779,23 @@ function devLink(info, d) {
   if (port.startsWith("/dev/")) return `${info.type.includes("seplos") ? "RS485" : "cablu"} ${port.replace(/^.*\//, "")}`;
   return info.type.startsWith("sim_") ? "simulare" : "";
 }
-function devRow(x, devs) {
+function devRow(x, devs, actions = false) {
   const d = devs[x.id] || {};
   const st = d.connected && !d.stale ? "comunică" : d.connected ? "nu răspunde acum" : "nu a comunicat încă";
   const cls = d.connected && !d.stale ? "ok" : d.connected ? "warning" : "";
   const addr = x.address == null ? "" : x.type === "daly" ? `adresa 0x${Number(x.address).toString(16).toUpperCase()}`
     : `adresa ${x.address}`;
   const parts = [addr, devLink(x, d), x.baudrate ? `${x.baudrate} baud` : "", x.capacity_ah ? `${num(x.capacity_ah, 0)} Ah` : ""];
+  // în „Dispozitive inactive”: Daly cu poziție liberă → „Caută din nou”; legat (sau fix) → „Deconectează”
+  const free = x.type === "daly" && dalyPos[x.id]?.free;
+  const act = actions && x.kind === "pack" ? (free
+    ? `<button class="btn sm" data-research="${esc(x.id)}">Caută din nou</button>`
+    : `<button class="btn sm danger" data-disc="${esc(x.id)}">Deconectează</button>`) : "";
   return `<div class="row bms-row ${cls === "warning" ? "warning" : ""}"><span><b>${esc(x.name)}</b>
-    <small>${esc(parts.filter(Boolean).join(" · "))}</small></span><span class="bms-st ${cls}">${st}</span></div>`;
+    <small>${esc((free ? ["poziție liberă — se caută singur", x.capacity_ah ? `${num(x.capacity_ah, 0)} Ah` : ""] : parts).filter(Boolean).join(" · "))}</small></span>
+    <span class="bms-st ${cls}">${free ? "" : st}</span>${act ? `<span class="row-act">${act}</span>` : ""}</div>`;
 }
-function devSection(title, infos, devs) {
+function devSection(title, infos, devs, actions = false) {
   if (!infos.length) return "";
   const groups = {};
   for (const x of infos) (groups[x.type] ||= []).push(x);
@@ -797,7 +803,7 @@ function devSection(title, infos, devs) {
   return `<h2>${title}</h2>` + Object.entries(groups).map(([type, list]) => {
     list.sort((a, b) => (a.address ?? 0) - (b.address ?? 0) || a.name.localeCompare(b.name));
     return `${many || title === "BMS-uri" ? `<h3 class="bms-h">${esc(DEV_TYPE[type] || type)}</h3>` : ""}
-      <div class="list">${list.map((x) => devRow(x, devs)).join("")}</div>`;
+      <div class="list">${list.map((x) => devRow(x, devs, actions)).join("")}</div>`;
   }).join("");
 }
 function renderDaly() {
@@ -815,7 +821,9 @@ function renderDaly() {
   $("#dev-off-btn").hidden = !off.length;
   $("#dev-off-n").textContent = off.length === 1 ? "1 dispozitiv configurat care nu comunică" : `${off.length} dispozitive configurate care nu comunică`;
   const fInv = inv.filter((x) => !on(x)), fBms = bms.filter((x) => !on(x));
-  $("#dev-off-list").innerHTML = devSection(fInv.length > 1 ? "Invertoare" : "Invertor", fInv, devs) + devSection("BMS-uri", fBms, devs);
+  $("#dev-off-list").innerHTML = devSection(fInv.length > 1 ? "Invertoare" : "Invertor", fInv, devs) + devSection("BMS-uri", fBms, devs, true);
+  $$("#dev-off-list [data-disc]").forEach((b) => (b.onclick = () => devDisconnect(b.dataset.disc)));
+  $$("#dev-off-list [data-research]").forEach((b) => (b.onclick = () => dalySearchNow(b)));
   $("#daly-auto-box").hidden = !bms.some((x) => x.type === "daly" && !on(x));
 }
 $("#daly-search").onclick = async () => {
@@ -823,12 +831,13 @@ $("#daly-search").onclick = async () => {
   b.disabled = true;
   b.textContent = "Caut… (până la un minut)";
   try { await api("/api/daly/search", { method: "POST" }); } catch {}
+  [10, 25, 45, 70].forEach((s) => setTimeout(() => { if (!$("#set-devoff").hidden) loadDalyFound().then(renderDaly); }, s * 1000));
   setTimeout(() => { b.disabled = false; b.textContent = "Caută acum modulele Daly"; }, 30000);
 };
 
 /* ---------- Adaugă dispozitiv: ce e nou pe cablu (căutat singur) + căutare prin Bluetooth, apoi tipul BMS ---------- */
 const da = { cable: null, ble: null, types: [], timer: 0 };
-const DA_NAME = { daly: "Daly", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
+const DA_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
 function devAddOpen() {
   da.ble = null;
   $("#da-ble-list").innerHTML = ""; $("#da-form").hidden = true;
@@ -916,10 +925,85 @@ async function devAdd(c) {
   } catch (e) { $("#da-msg").textContent = e.message; $("#da-go").disabled = false; }
 }
 
+/* ---------- Deconectează (orice BMS), module excluse, ce a găsit căutarea Daly ---------- */
+function toast(msg) {
+  let t = $("#toast");
+  if (!t) { t = document.createElement("div"); t.id = "toast"; t.className = "toast"; document.body.appendChild(t); }
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(t._h); t._h = setTimeout(() => (t.hidden = true), 5000);
+}
+let dalyPos = {};                 // pozițiile Daly cu căutare automată: {id: {free, link, state}}
+async function devDisconnect(id) {
+  const d = (state.info?.devices || []).find((x) => x.id === id), name = d?.name || id;
+  if (!confirm(`Sigur deconectezi ${name}? Amper nu-l mai citește și nu mai dă alerte pentru el.`)) return false;
+  try {
+    const { r, j } = await securePost(`/api/devices/${encodeURIComponent(id)}/disconnect`);
+    if (!r.ok) throw new Error(j.error || "Nu a mers.");
+    toast(`${name} a fost deconectat.${j.action === "freed" ? " Poziția rămâne liberă; căutarea poate găsi alt modul." : ""}`);
+  } catch (e) { if (e.message !== "Anulat.") toast(e.message || "Pi-ul nu răspunde."); return false; }
+  try { state.info = await api("/api/info"); } catch {}
+  if ($("#sheet").open) $("#sheet").close();
+  await loadDalyFound();
+  renderDaly(); loadExcluded();
+  if (state.view === "packs") renderPacks();
+  return true;
+}
+$("#sh-disc").onclick = () => state.sheetDev && devDisconnect(state.sheetDev);
+
+async function loadExcluded() {
+  let r;
+  try { r = await api("/api/devices/excluded"); } catch { return; }
+  const items = r.items || [];
+  $("#excl-btn").hidden = !items.length;
+  $("#excl-n").textContent = items.length === 1 ? "1 modul nu se mai leagă singur" : `${items.length} module nu se mai leagă singure`;
+  $("#excl-list").innerHTML = items.length ? items.map((x, i) => `<div class="row bms-row"><span><b>${esc(x.label || x.keys?.join(", "))}</b>
+      <small>${esc(x.reason || "")}${x.at ? " · " + dateTime(x.at) : ""}</small></span>
+      <span class="row-act"><button class="btn sm" data-allow="${i}">Permite din nou</button></span></div>`).join("")
+    : `<div class="empty">Niciun modul exclus.</div>`;
+  $("#excl-all").hidden = items.length < 2;
+  $$("[data-allow]").forEach((b) => (b.onclick = () => allowAgain(+b.dataset.allow)));
+}
+async function allowAgain(index) {
+  try { await api("/api/devices/excluded/allow", jsonPost(index == null ? {} : { index })); } catch {}
+  loadExcluded();
+}
+$("#excl-all").onclick = () => allowAgain(null);
+
+async function loadDalyFound() {
+  let r;
+  try { r = await api("/api/daly/found"); } catch { return; }
+  dalyPos = Object.fromEntries((r.positions || []).map((p) => [p.id, p]));
+  const f = (r.found || []).slice().reverse();
+  $("#daly-found-h").hidden = $("#daly-found-note").hidden = !f.length;
+  const val = (c) => [c.voltage != null ? `${num(c.voltage, 1)} V` : "", c.soc != null ? `SOC ${num(c.soc, 0)}%` : "",
+    c.capacity_ah ? `${num(c.capacity_ah, 0)} Ah` : "fără capacitate", c.cells ? `${c.cells} celule` : "", c.cycles != null ? `${c.cycles} cicluri` : ""]
+    .filter(Boolean).join(" · ");
+  $("#daly-found").innerHTML = f.map((x, i) => `<div class="row bms-row ${x.ok ? "" : "warning"}"><span><b>${esc(x.label)}</b>
+      <small>${esc(x.link)} · ${esc(val(x.check || {}))}</small>
+      <small>${x.ok ? `legat la ${esc(dalyPos[x.device]?.name || x.device || "")}` : "nu pare BMS (egalizator?) — nelegat"}</small></span>
+      <span class="row-act"><button class="btn sm danger" data-reject="${i}">Respinge</button></span></div>`).join("");
+  $$("[data-reject]").forEach((b) => (b.onclick = async () => {
+    const x = f[+b.dataset.reject];
+    if (!confirm(`Respingi ${x.label}? Nu va mai fi legat automat${x.ok ? "; poziția lui devine liberă" : ""}.`)) return;
+    try {
+      const { r, j } = await securePost("/api/daly/reject", { keys: x.keys, binding: x.binding, label: x.label });
+      if (!r.ok) throw new Error(j.error || "Nu a mers.");
+    } catch (e) { if (e.message !== "Anulat.") toast(e.message); return; }
+    try { state.info = await api("/api/info"); } catch {}
+    loadDalyFound(); loadExcluded(); renderDaly();
+  }));
+}
+function dalySearchNow(btn) {
+  btn.disabled = true; btn.textContent = "Caut…";
+  api("/api/daly/search", { method: "POST" }).catch(() => {});
+  [10, 25, 45, 70].forEach((s) => setTimeout(() => { if (!$("#set-devoff").hidden) { loadDalyFound().then(renderDaly); } }, s * 1000));
+  setTimeout(() => { btn.disabled = false; btn.textContent = "Caută din nou"; }, 30000);
+}
+
 /* meniul setărilor: butoane → secțiuni (Teme, Notificări, Module Daly) */
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "notif", "daly", "devoff", "devadd", "info", "update", "security", "remote", "auto", "about", "conn", "share", "wifi"])
+  for (const k of ["teme", "notif", "daly", "devoff", "devadd", "excl", "info", "update", "security", "remote", "auto", "about", "conn", "share", "wifi"])
     $("#set-" + k).hidden = k !== name;
   if (name === "about") $("#about-version").textContent = $("#version").textContent;
   if (name === "share") loadShare();
@@ -934,6 +1018,8 @@ function showPanel(name) {
   if (name === "notif") renderNotif();
   if (name === "daly" || name === "devoff") renderDaly();
   if (name === "devadd") devAddOpen();
+  if (name === "daly" || name === "excl") loadExcluded();
+  if (name === "devoff") loadDalyFound().then(renderDaly);
   window.scrollTo(0, 0);
 }
 $$(".set-btn[data-panel]").forEach((b) => (b.onclick = () => showPanel(b.dataset.panel)));
@@ -1821,7 +1907,7 @@ const SU_STEPS = [
   { k: "name", t: "Numele instalației" }, { k: "password", t: "Parola aplicației" }, { k: "remote", t: "Acces de oriunde" },
   { k: "devices", t: "Dispozitivele" }, { k: "capacity", t: "Capacitățile" }, { k: "notif", t: "Notificări" },
 ];
-const DEV_NAME = { daly: "Daly", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
+const DEV_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
 const su = { i: 0, d: null, chosen: null, keep: false, again: false, pollT: 0 };
 
 // Pi-ul nu răspunde (Amper oprit sau blocat, Pi fără curent/internet): un mesaj în loc de ecran negru.
@@ -1926,6 +2012,11 @@ function suRender() {
   const first = b.querySelector("input");
   if (first && st.k !== "capacity") first.focus();
 }
+function suCheck(c) {
+  return [c.voltage != null ? `${num(c.voltage, 1)} V` : "", c.soc != null ? `SOC ${num(c.soc, 0)}%` : "",
+    c.capacity_ah ? `${num(c.capacity_ah, 0)} Ah` : "fără capacitate", c.cells ? `${c.cells} celule` : "",
+    c.cycles != null ? `${c.cycles} cicluri` : ""].filter(Boolean).join(" · ");
+}
 function suDefaultName(c, i) {
   const same = (su.chosen || []).filter((x) => x.type === c.type);
   return same.length > 1 || c.type !== "growatt_spf" ? `${DEV_NAME[c.type]} ${same.indexOf(c) + 1}` : DEV_NAME[c.type];
@@ -1945,8 +2036,11 @@ function suRenderDevices() {
     <button class="btn" id="su-scan" ${sc.state === "running" ? "disabled" : ""}>${sc.state === "running" ? "Caut…" : found.length ? "Caută din nou" : "Caută dispozitivele"}</button>
     <p class="note" id="su-scan-msg">${esc(sc.state === "running" ? sc.message : sc.state === "failed" ? sc.message : sc.ble_note || "")}</p>
     ${sc.state === "done" ? `<div class="list">${found.length ? found.map((f, i) => `<label class="row-check">
-        <input type="checkbox" class="su-f" data-i="${i}" checked>
-        <span><b>${esc(f.label)}</b><small>${esc(f.link)}${f.short ? " · " + esc(f.short) : ""}${f.rssi ? ` · semnal ${f.rssi} dBm` : ""}</small></span></label>`).join("")
+        <input type="checkbox" class="su-f" data-i="${i}" ${f.ok === false ? "" : "checked"}>
+        <span><b>${esc(f.label)}</b><small>${esc(f.link)}${f.short ? " · " + esc(f.short) : ""}${f.rssi ? ` · semnal ${f.rssi} dBm` : ""}</small>
+        ${f.check ? `<small>${esc(suCheck(f.check))}</small>` : ""}
+        ${f.ok === false ? `<small class="warnc">Nu pare BMS (egalizator activ?) — nebifat.</small>` : ""}</span></label>
+        ${f.binding ? `<button class="btn sm danger su-rej" data-rej="${i}">Respinge ${esc(f.name || "")}</button>` : ""}`).join("")
       : `<div class="empty">N-am găsit nimic. Verifică cablurile și că BMS-urile sunt treze (pornește un consumator), apoi caută din nou.</div>`}</div>` : ""}
     <p class="note">Ai module Daly care nu sunt încă legate? Adaugă-le acum: se vor găsi singure când apar
       (pe cablu sau Bluetooth).</p>
@@ -1957,6 +2051,15 @@ function suRenderDevices() {
     su.d.scan = await api("/api/setup/scan", { method: "POST" });
     suRenderDevices(); suPollScan();
   };
+  $$(".su-rej").forEach((b) => (b.onclick = async () => {
+    const f = found[+b.dataset.rej];
+    if (!confirm(`Respingi ${f.name}? Nu va mai fi legat automat (se poate permite din nou din Setări).`)) return;
+    try {
+      const { r, j } = await securePost("/api/daly/reject", { keys: f.keys, binding: f.binding, label: f.label });
+      if (!r.ok) throw new Error(j.error || "Nu a mers.");
+      found.splice(+b.dataset.rej, 1); suRenderDevices();
+    } catch (e) { if (e.message !== "Anulat.") $("#su-err").textContent = e.message; }
+  }));
   $("#su-add-daly").onclick = () => { su.extraDaly = (su.extraDaly || 0) + 1; $("#su-add-n").textContent = `${su.extraDaly} adăugate`; };
   if ($("#su-keep")) $("#su-keep").onchange = (e) => (su.keep = e.target.checked);
   if (sc.state === "running") suPollScan();
@@ -2005,7 +2108,7 @@ async function suNext() {
       su.chosen = []; su.i += 2; return suRender();
     }
     // ordinea: Daly, Seplos, invertor
-    const order = { daly: 0, seplos: 1, growatt_spf: 2 };
+    const order = { daly: 0, jk: 1, seplos: 2, growatt_spf: 3 };
     su.chosen = sel.sort((a, b) => order[a.type] - order[b.type]);
   } else if (st.k === "capacity") {
     su.chosen.forEach((c, i) => {

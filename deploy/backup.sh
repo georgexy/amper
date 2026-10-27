@@ -47,7 +47,7 @@ backup_date() {
   rm -rf "$t"; mkdir -p "$t/etc" "$t/var-lib-amper" "$t/var-lib-tailscale"
   cp -a /etc/amper/. "$t/etc/"
   sqlite3 /var/lib/amper/amper.db ".backup '$t/var-lib-amper/amper.db'" || return 1   # copie corectă și în timpul scrierii
-  for f in daly-auto.json vapid.json settings.yaml cookie.key; do   # legăturile Daly, cheile notificărilor, setările din aplicație
+  for f in daly-auto.json daly-excluded.json vapid.json settings.yaml cookie.key; do   # legăturile Daly și modulele excluse, cheile notificărilor, setările din aplicație
     [ -f "/var/lib/amper/$f" ] && cp -a "/var/lib/amper/$f" "$t/var-lib-amper/"
   done
   [ -d /var/lib/tailscale ] && cp -a /var/lib/tailscale/. "$t/var-lib-tailscale/"

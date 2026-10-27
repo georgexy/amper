@@ -15,12 +15,12 @@ nicăieri, în afară de logarea cu Google pentru accesul de oriunde (opțional)
 |---|---|
 | **Raspberry Pi** | Pi 4 sau Pi 5 (merge și Pi 3B+). Cu alimentatorul lui oficial: unul slab dă erori ciudate. |
 | **Card microSD** | 32 GB sau mai mare, de preferat „High Endurance” (scrie zilnic pe el). |
-| **Bateriile** | **Daly**: prin Bluetooth (modulul BMS-ului, numele „DL-…”), fără cabluri; sau câte un cablu USB-UART Daly pe modul. <br> **Seplos V2**: un adaptor **USB-RS485** (cu cip CH340, ~30 lei), pe portul RS485 al bateriei. |
+| **Bateriile** | **Daly**: prin Bluetooth (modulul BMS-ului, numele „DL-…”), fără cabluri; sau câte un cablu USB-UART Daly pe modul. <br> **JK** (Jikong): prin Bluetooth (modelele cu hardware 10 și mai noi), sau pe cablu prin modulul RS485/UART al JK și un adaptor USB-RS485. <br> **Seplos V2**: un adaptor **USB-RS485** (cu cip CH340, ~30 lei), pe portul RS485 al bateriei. |
 | **Invertorul** | **Growatt SPF** (ex. SPF 5000 ES): un cablu USB obișnuit (A–B) în portul USB al invertorului, sau un adaptor USB-RS232 (FTDI) pe portul RS232. |
 | **Telefon** | Orice telefon cu browser (iPhone, Android). |
 | **Internet** | WiFi acasă/la locație. Pi-ul poate sta și pe cablu de rețea. |
 
-Alte BMS-uri sau invertoare: deocamdată nu. Spune-mi ce ai și vedem.
+Alte BMS-uri sau invertoare (de ex. Daly cu aplicația nouă, JBD, PowerCube): deocamdată nu. Spune-mi ce ai și vedem.
 
 ## 2. Scrii cardul (pe calculator)
 
