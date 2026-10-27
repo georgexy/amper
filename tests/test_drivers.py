@@ -182,7 +182,7 @@ def growatt_responder(regs):
 
 
 def test_growatt_decode():
-    regs = {0: 5, 1: 2853, 3: 0, 4: 25000, 9: 0, 10: 8500, 17: 5320, 18: 71,
+    regs = {0: 5, 1: 2853, 3: 0, 4: 25000, 7: 87, 9: 0, 10: 8500, 17: 5320, 18: 71,
             22: 2300, 23: 5000, 25: 345, 27: 170, 42: 0, 43: 0}
     bw = (-16000) & 0xFFFFFFFF          # -1600 W în registru = încărcare (semn protocol)
     regs[77], regs[78] = bw >> 16, bw & 0xFFFF
@@ -192,8 +192,8 @@ def test_growatt_decode():
     assert r.status_code == 5 and r.status == "Încărcare din PV"
     assert r.pv_voltage == 285.3
     assert r.pv_power == 2500.0
-    assert r.pv_current == 8.76          # 2500 W ÷ 285,3 V
-    assert r.pv2_current == 0.0          # PV2 fără tensiune
+    assert r.pv_current == 8.7           # registrul 7, citit din invertor
+    assert r.pv2_current == 0.0
     assert r.load_power == 850.0
     assert r.battery_voltage == 53.2
     assert r.battery_soc == 71

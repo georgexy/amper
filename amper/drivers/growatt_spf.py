@@ -103,20 +103,15 @@ def decode(regs: dict[int, int], r: InverterReading, battery_sign: int = -1) -> 
     def sc(v, k):
         return None if v is None else round(v * k, 3)
 
-    def pv_amps(p_raw, volts):
-        if p_raw is None or volts is None:
-            return None
-        return round(p_raw * 0.1 / volts, 2) if volts >= 10 else 0.0
-
     r.status_code = g(0)
     r.status = STATUS.get(g(0), f"cod {g(0)}")
     r.pv_voltage = sc(g(1), 0.1)
     r.pv2_voltage = sc(g(2), 0.1)
     p1, p2 = u32(3), u32(5)
     r.pv_power = sc((p1 or 0) + (p2 or 0), 0.1) if p1 is not None else None
-    # curentul PV nu e în registre: putere ÷ tensiune, pe fiecare intrare (sub 10 V = panouri fără soare)
-    r.pv_current = pv_amps(p1, r.pv_voltage)
-    r.pv2_current = pv_amps(p2, r.pv2_voltage)
+    # curentul PV, citit din invertor: registrele 7/8 (Buck1Curr/Buck2Curr, 0,1 A) — curentul fiecărui MPPT
+    r.pv_current = sc(g(7), 0.1)
+    r.pv2_current = sc(g(8), 0.1)
     r.load_power = sc(u32(9), 0.1)
     r.battery_voltage = sc(g(17), 0.01)
     r.battery_soc = g(18)

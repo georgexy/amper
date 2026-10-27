@@ -290,8 +290,7 @@ function pvInfoHtml() {
   const row = (name, v, a) => `<div><span>${name}</span><b>${v == null ? "–" : num(v, 1) + " V"}</b><b>${a == null ? "–" : num(a, 1) + " A"}</b></div>`;
   const two = ir.pv2_voltage >= 10;
   return `<div class="pvp-h"><span></span><span>Tensiune</span><span>Curent</span></div>
-    ${row(two ? "PV1" : "Panouri", ir.pv_voltage, ir.pv_current)}${two ? row("PV2", ir.pv2_voltage, ir.pv2_current) : ""}
-    <small>Curentul e calculat: putere ÷ tensiune.</small>`;
+    ${row(two ? "PV1" : "Panouri", ir.pv_voltage, ir.pv_current)}${two ? row("PV2", ir.pv2_voltage, ir.pv2_current) : ""}`;
 }
 function pvInfoShow(btn) {
   const pop = $("#pvpop");

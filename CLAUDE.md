@@ -314,6 +314,6 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - Dispozitive: `renderDaly` = doar cele care comunică (`connected && !stale`); restul în panoul `devoff`.
 - WiFi: panoul `wifi` se deschide din Info (`#info-wifi`, „înapoi” → info); scos din Conectare.
 - `sysinfo`: peer-ii `funnel-ingress-node*` / `ShareeNode` nu se mai listează.
-- Panouri: `InverterReading.pv_current` / `pv2_current` = putere ÷ tensiune (Growatt nu are registru de curent PV
-  în ce citim; sub 10 V → 0). Butonul `PV_I` (`data-pvinfo`) în toate temele → `#pvpop` (`pvInfoHtml`, actualizat
+- Panouri: `InverterReading.pv_current` / `pv2_current` = registrele de intrare 7/8 (Buck1Curr/Buck2Curr, ×0,1 A),
+  CITITE din invertor (utilizatorul nu vrea valori calculate). DE CONFIRMAT pe Pi cu afișajul invertorului. Butonul `PV_I` (`data-pvinfo`) în toate temele → `#pvpop` (`pvInfoHtml`, actualizat
   la fiecare citire, se deschide deasupra dacă nu are loc deasupra barei de jos).

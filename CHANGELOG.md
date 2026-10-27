@@ -23,7 +23,7 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
   schimbarea rețelei. Info nu mai arată nodurile tehnice „funnel-ingress-node”; aparatele tale legate la server au
   secțiunea lor.
 - La „Panouri”, pe toate temele: un buton mic „i” arată tensiunea și curentul PV de acum (pe fiecare intrare, dacă
-  invertorul are două). Curentul e calculat din putere și tensiune (invertorul nu-l raportează separat).
+  invertorul are două), citite din invertor.
 - Documentație nouă, simplă, pentru cei care primesc Amper (README): ce trebuie cumpărat, scrierea cardului,
   prima pornire, ce faci dacă nu apare „Amper-Setup”. Instalarea manuală a trecut în docs/instalare-avansata.md.
 
