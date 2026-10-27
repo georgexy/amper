@@ -10,7 +10,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
-NAMES = {"daly": "Daly", "seplos": "Seplos", "growatt_spf": "Invertor Growatt SPF"}
+NAMES = {"daly": "Daly", "jk": "JK", "seplos": "Seplos", "growatt_spf": "Invertor Growatt SPF"}
 
 
 def used_ports(cfg: dict) -> dict[str, str]:
@@ -22,7 +22,7 @@ def used_ports(cfg: dict) -> dict[str, str]:
 # supported=False: apar în listă, dar nu se pot adăuga încă (nu există driver).
 BLE_TYPES = [
     {"type": "daly", "label": "Daly", "supported": True},
-    {"type": "jk", "label": "JK BMS (Jikong)", "supported": False},
+    {"type": "jk", "label": "JK BMS (Jikong)", "supported": True},
     {"type": "jbd", "label": "JBD / Xiaoxiang", "supported": False},
     {"type": "ant", "label": "ANT BMS", "supported": False},
 ]
@@ -57,8 +57,9 @@ def scan_ble(cfg: dict, seconds: float = 10) -> dict:
     for d in ble.scan(seconds):
         if not d["name"] or d["address"].upper() in used or d["name"].upper() in used:
             continue
+        from .drivers.jk import JK_NAME
         found.append({"ble": d["address"], "name": d["name"], "rssi": d["rssi"],
-                      "guess": "daly" if ble.is_daly_name(d["name"]) else None})
+                      "guess": "daly" if ble.is_daly_name(d["name"]) else "jk" if JK_NAME.match(d["name"]) else None})
     return {"found": found, "types": BLE_TYPES}
 
 
@@ -119,7 +120,7 @@ def add_device(existing: list[dict], c: dict) -> dict:
         raise ValueError(f"{t['label'] if t else typ}: nu e suportat încă.")
     dev = build_devices([c])[0]
     ids, names = {d["id"] for d in existing}, {d.get("name") for d in existing}
-    base = {"daly": "daly", "seplos": "seplos", "growatt_spf": "inverter"}[typ]
+    base = {"daly": "daly", "jk": "jk", "seplos": "seplos", "growatt_spf": "inverter"}[typ]
     n = sum(1 for d in existing if d.get("type") == typ) + 1
     while f"{base}{n}" in ids:
         n += 1
@@ -129,7 +130,7 @@ def add_device(existing: list[dict], c: dict) -> dict:
         while dev["name"] in names:
             n += 1
             dev["name"] = f"{NAMES[typ]} {n}"
-    if typ == "daly" and c.get("ble") and c.get("ble_name"):
+    if typ in ("daly", "jk") and c.get("ble") and c.get("ble_name"):
         dev["ble_name"] = str(c["ble_name"])[:40]
     return dev
 
@@ -137,14 +138,14 @@ def add_device(existing: list[dict], c: dict) -> dict:
 def build_devices(chosen: list[dict]) -> list[dict]:
     """Din alegerile din ghid: intrările `devices` pentru config (id-uri și nume stabile, în ordine)."""
     out, count = [], {}
-    total = {t: sum(1 for c in chosen if c.get("type") == t) for t in ("daly", "seplos", "growatt_spf")}
+    total = {t: sum(1 for c in chosen if c.get("type") == t) for t in ("daly", "jk", "seplos", "growatt_spf")}
     for c in chosen:
         typ = c.get("type")
         if typ not in total:
             raise ValueError(f"tip necunoscut: {typ}")
         count[typ] = count.get(typ, 0) + 1
         n = count[typ]
-        base = {"daly": "daly", "seplos": "seplos", "growatt_spf": "inverter"}[typ]
+        base = {"daly": "daly", "jk": "jk", "seplos": "seplos", "growatt_spf": "inverter"}[typ]
         dev = {"id": f"{base}{n}" if typ != "growatt_spf" or total[typ] > 1 else base,
                "name": str(c.get("name") or "").strip()[:40] or
                (f"{NAMES[typ]} {n}" if typ != "growatt_spf" or total[typ] > 1 else NAMES[typ]),
@@ -158,13 +159,21 @@ def build_devices(chosen: list[dict]) -> list[dict]:
                     dev["address"] = int(c["address"])
             else:
                 dev["port"] = "auto"
+        elif typ == "jk":                                   # JK: Bluetooth sau modulul RS485/UART (115200)
+            if c.get("ble"):
+                dev["ble"] = str(c["ble"])
+            elif str(c.get("port", "")).startswith("/dev/"):
+                dev["port"] = c["port"]
+                dev["baudrate"] = int(c.get("baudrate") or 115200)
+            else:
+                raise ValueError(f"{dev['name']}: alege modulul Bluetooth sau portul")
         else:
             if not str(c.get("port", "")).startswith("/dev/"):
                 raise ValueError(f"{dev['name']}: lipsește portul")
             dev["port"] = c["port"]
             dev["baudrate"] = int(c.get("baudrate") or (19200 if typ == "seplos" else 9600))
             dev["address"] = int(c.get("address") if c.get("address") is not None else (0 if typ == "seplos" else 1))
-        if typ in ("daly", "seplos"):
+        if typ in ("daly", "jk", "seplos"):
             cap = float(c.get("capacity_ah") or 0)
             if not 1 <= cap <= 2000:
                 raise ValueError(f"{dev['name']}: capacitatea trebuie să fie între 1 și 2000 Ah")

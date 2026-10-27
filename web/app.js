@@ -768,7 +768,7 @@ function renderLooks() {
   }));
 }
 /* Setări → Dispozitive conectate: Invertoare și BMS-uri (grupate după tip, în ordinea adresei), cu legătura și starea */
-const DEV_TYPE = { daly: "Daly", sim_daly: "Daly (simulat)", seplos: "Seplos V2 (RS485)", sim_seplos: "Seplos (simulat)",
+const DEV_TYPE = { daly: "Daly", jk: "JK", sim_daly: "Daly (simulat)", seplos: "Seplos V2 (RS485)", sim_seplos: "Seplos (simulat)",
   growatt_spf: "Growatt SPF", sim_growatt: "Growatt (simulat)" };
 function devLink(info, d) {
   const live = d.reading?.raw?.link;                          // Daly: legătura găsită („Bluetooth AA:…”, „cablu …”)
@@ -837,7 +837,7 @@ $("#daly-search").onclick = async () => {
 
 /* ---------- Adaugă dispozitiv: ce e nou pe cablu (căutat singur) + căutare prin Bluetooth, apoi tipul BMS ---------- */
 const da = { cable: null, ble: null, types: [], timer: 0 };
-const DA_NAME = { daly: "Daly", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
+const DA_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
 function devAddOpen() {
   da.ble = null;
   $("#da-ble-list").innerHTML = ""; $("#da-form").hidden = true;
@@ -1907,7 +1907,7 @@ const SU_STEPS = [
   { k: "name", t: "Numele instalației" }, { k: "password", t: "Parola aplicației" }, { k: "remote", t: "Acces de oriunde" },
   { k: "devices", t: "Dispozitivele" }, { k: "capacity", t: "Capacitățile" }, { k: "notif", t: "Notificări" },
 ];
-const DEV_NAME = { daly: "Daly", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
+const DEV_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
 const su = { i: 0, d: null, chosen: null, keep: false, again: false, pollT: 0 };
 
 // Pi-ul nu răspunde (Amper oprit sau blocat, Pi fără curent/internet): un mesaj în loc de ecran negru.
@@ -2108,7 +2108,7 @@ async function suNext() {
       su.chosen = []; su.i += 2; return suRender();
     }
     // ordinea: Daly, Seplos, invertor
-    const order = { daly: 0, seplos: 1, growatt_spf: 2 };
+    const order = { daly: 0, jk: 1, seplos: 2, growatt_spf: 3 };
     su.chosen = sel.sort((a, b) => order[a.type] - order[b.type]);
   } else if (st.k === "capacity") {
     su.chosen.forEach((c, i) => {

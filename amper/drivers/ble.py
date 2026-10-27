@@ -1,9 +1,11 @@
-"""Bluetooth Low Energy (prin BlueZ, biblioteca `bleak`) pentru modulele Bluetooth ale BMS-urilor Daly.
+"""Bluetooth Low Energy (prin BlueZ, biblioteca `bleak`) pentru modulele Bluetooth ale BMS-urilor (Daly, JK).
 
 Modulul Daly expune un „UART prin BLE”: serviciul 0xFFF0, caracteristica 0xFFF1 (notificări = răspunsurile BMS-ului)
 și 0xFFF2 (scriere = cererile). Prin el trec aceleași cadre de 13 octeți ca pe cablu.
 UUID-urile sunt cele folosite de modulele Daly cunoscute — DE VERIFICAT pe modulele reale; dacă lipsesc,
 se caută în serviciul 0xFFF0 orice caracteristică de notificare + una de scriere.
+JK: serviciul 0xFFE0, caracteristica 0xFFE1 (scriere și notificări; modulele noi au două caracteristici 0xFFE1, una
+pentru fiecare) — `BleLink(target, service=JK_SERVICE, notify=JK_CHAR, write=JK_CHAR)`.
 
 bleak e asincron, iar driverele rulează în thread-uri: toate operațiile BLE rulează într-o singură buclă asyncio
 proprie (un thread), iar driverele așteaptă rezultatul.
@@ -22,6 +24,8 @@ log = logging.getLogger(__name__)
 SERVICE = "0000fff0-0000-1000-8000-00805f9b34fb"
 NOTIFY = "0000fff1-0000-1000-8000-00805f9b34fb"
 WRITE = "0000fff2-0000-1000-8000-00805f9b34fb"
+JK_SERVICE = "0000ffe0-0000-1000-8000-00805f9b34fb"
+JK_CHAR = "0000ffe1-0000-1000-8000-00805f9b34fb"
 MAC_RE = re.compile(r"^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")
 DALY_NAME = re.compile(r"^(DL-|DALY)", re.I)
 
@@ -94,8 +98,9 @@ def is_daly_name(name: str) -> bool:
 class BleLink:
     """O legătură BLE persistentă către un modul; se reconectează singură la nevoie."""
 
-    def __init__(self, target: str):
+    def __init__(self, target: str, service: str = SERVICE, notify: str = NOTIFY, write: str = WRITE):
         self.target = target                    # adresa MAC sau numele modulului
+        self.uuids = (service, notify, write)
         self.address = target.upper() if MAC_RE.match(target) else None    # aflate la conectare
         self.name = None if MAC_RE.match(target) else target
         self.client = None
@@ -134,14 +139,19 @@ class BleLink:
             client = bleak.BleakClient(dev, disconnected_callback=lambda _c: setattr(self, "client", None))
             await client.connect(timeout=15)
         try:
-            notify, write = NOTIFY, WRITE
-            svc = client.services.get_service(SERVICE)
-            if svc is None or not svc.get_characteristic(NOTIFY) or not svc.get_characteristic(WRITE):
-                chars = svc.characteristics if svc else [c for s in client.services for c in s.characteristics]
-                notify = next((c.uuid for c in chars if "notify" in c.properties), None)
-                write = next((c.uuid for c in chars if {"write", "write-without-response"} & set(c.properties)), None)
-                if not notify or not write:
-                    raise DriverError("Bluetooth: modulul nu are canalul serial Daly (0xFFF0)")
+            # caracteristicile alese după proprietăți (la JK, scrierea și notificările au același UUID), întâi cele
+            # cu UUID-ul așteptat, apoi orice notify/write din serviciu
+            service, n_uuid, w_uuid = self.uuids
+            svc = client.services.get_service(service)
+            chars = svc.characteristics if svc else [c for s in client.services for c in s.characteristics]
+
+            def pick(uuid, props):
+                ok = [c for c in chars if set(props) & set(c.properties)]
+                return next((c for c in ok if c.uuid.lower() == uuid), None) or next(iter(ok), None)
+            notify = pick(n_uuid, ("notify", "indicate"))
+            write = pick(w_uuid, ("write", "write-without-response"))
+            if notify is None or write is None:
+                raise DriverError(f"Bluetooth: modulul nu are canalul serial al BMS-ului ({service[4:8].upper()})")
             self.got = asyncio.Event()
 
             def on_data(_char, data: bytearray):

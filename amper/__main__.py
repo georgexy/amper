@@ -149,6 +149,9 @@ def probe(port: str) -> list[str]:
     for addr in (0x40, 0x80):
         if ok(DalyDriver({"id": "probe", "type": "daly", "port": port, "address": addr}), lambda d: d._query(0x90)):
             return [f"daly {json.dumps({'address': addr})}"]
+    from .drivers.jk import JkUartDriver           # JK cu modulul RS485/UART (115200)
+    if ok(JkUartDriver({"id": "probe", "type": "jk", "port": port}), lambda d: d.read()):
+        return ['jk {"baudrate": 115200}']
     if ok(GrowattSPFDriver({"id": "probe", "type": "growatt_spf", "port": port}), lambda d: d._read_block(0, 3)):
         return ['growatt_spf {"baudrate": 9600}']
     for baud in (19200, 9600):

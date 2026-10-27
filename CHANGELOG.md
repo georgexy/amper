@@ -10,6 +10,10 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - La Daly, poziția (ex. „Daly 2”) rămâne liberă, iar căutarea automată poate găsi alt modul; cel deconectat intră
   pe lista „Module excluse” (Setări → Dispozitive conectate), de unde îl poți „Permite din nou”. La o poziție
   liberă: „Caută din nou”. Seplos și celelalte se scot din configurare.
+- BMS JK (Jikong), încă netestat pe un JK real: prin Bluetooth (JK cu hardware 10.x, 24 de celule, și 11 sau mai nou,
+  32 de celule; protocolul se alege singur după versiunea BMS-ului) și pe cablu, prin modulul RS485/UART al JK.
+  La „Adaugă dispozitiv” → „Caută prin Bluetooth” un JK apare ca „pare JK”; pe cablu e găsit singur. JK-urile foarte
+  vechi (hardware 3.x, protocolul JK04) nu sunt încă suportate.
 - Egalizatoarele active (module Bluetooth tot „DL-…”) nu mai sunt luate drept BMS Daly: un modul se leagă doar dacă
   răspunde ca un BMS (capacitate validă sau SOC și Ah rămași). La „Caută acum” și în ghidul de configurare vezi ce
   s-a găsit, cu valorile citite, și poți „Respinge” un modul greșit (intră pe lista de excluse).

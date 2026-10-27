@@ -254,8 +254,12 @@ def test_add_device_ids_and_unsupported():
     assert d["id"] == "daly4" and d["name"] == "Daly 4" and d["ble"] == "BB:00" and d["ble_name"] == "DL-BB00"
     s = add_device(existing, {"type": "seplos", "port": "/dev/ttyUSB1", "address": 2, "capacity_ah": 100, "name": "Raft"})
     assert s["id"] == "seplos1" and s["name"] == "Raft" and s["baudrate"] == 19200
-    with pytest.raises(ValueError, match="JK BMS.*nu e suportat"):
-        add_device(existing, {"type": "jk", "ble": "CC", "capacity_ah": 100})
+    with pytest.raises(ValueError, match="JBD.*nu e suportat"):
+        add_device(existing, {"type": "jbd", "ble": "CC", "capacity_ah": 100})
+    j = add_device(existing, {"type": "jk", "ble": "CC:00", "ble_name": "JK_B2A8S20P", "capacity_ah": 280})
+    assert j["id"] == "jk1" and j["name"] == "JK 1" and j["ble"] == "CC:00" and j["ble_name"] == "JK_B2A8S20P"
+    u = add_device(existing, {"type": "jk", "port": "/dev/ttyUSB2", "capacity_ah": 100})
+    assert u["port"] == "/dev/ttyUSB2" and u["baudrate"] == 115200
     with pytest.raises(ValueError, match="capacitatea"):
         add_device(existing, {"type": "daly", "ble": "CC"})
 
@@ -270,13 +274,13 @@ def test_scan_ble_hides_used_modules(monkeypatch, tmp_path):
         {"address": "DD:00", "name": "", "rssi": -40}])            # fără nume: nu apare
     monkeypatch.setattr(daly_auto, "load_bindings", lambda: {"daly2": {"type": "ble", "ble": "BB:00", "name": "DL-BB00"}})
     r = setup_scan.scan_ble({"devices": [{"id": "daly1", "type": "daly", "ble": "aa:00"}]})
-    assert [f["ble"] for f in r["found"]] == ["CC:00"] and r["found"][0]["guess"] is None
+    assert [f["ble"] for f in r["found"]] == ["CC:00"] and r["found"][0]["guess"] == "jk"
     assert any(t["type"] == "daly" and t["supported"] for t in r["types"])
 
 
 def test_api_add_device(tmp_path):
     async def steps(c, eng, n):
-        bad = await c.post("/api/devices/add", json={"device": {"type": "jk", "ble": "CC", "capacity_ah": 50}})
+        bad = await c.post("/api/devices/add", json={"device": {"type": "jbd", "ble": "CC", "capacity_ah": 50}})
         ok = await c.post("/api/devices/add", json={"device": {"type": "daly", "ble": "CC:00", "ble_name": "DL-CC00",
                                                                  "capacity_ah": 105}})
         return bad.status, await ok.json(), n.sent

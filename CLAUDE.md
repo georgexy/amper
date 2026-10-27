@@ -355,3 +355,17 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `GET /api/daly/found` (+ pozițiile auto, `free`), `POST /api/daly/reject` (keys sau binding din ghid; app_password).
 - UI: `#sh-disc` în fișa bateriei; `devoff`: „Caută din nou” (poziție liberă) / „Deconectează”, „Găsite la căutare”
   cu „Respinge”; panoul `excl`; ghid: valorile citite, nebifat dacă `ok:false`, „Respinge”.
+
+## BMS JK (1.0.0-beta.1, în pregătire; NETESTAT pe un JK real)
+- Cerut 2026-10-27: „configurare pentru majoritatea BMS-urilor” (JK vechi/noi, Daly vechi/noi; cablu și BT). Ordinea:
+  JK (prietenii utilizatorului au JK cu modul pe cablu + Bluetooth), apoi PowerCube (BMS Daren, Pylontech RS485;
+  prietenul la care e Pi-ul acum vrea unul), apoi Daly nou (Modbus). Pi-ul utilizatorului e acum la un prieten cu Daly.
+- `amper/drivers/jk.py`, după documentația publică esphome-jk-bms (syssi, Apache-2.0; cadrele din `tests/test_jk.py`
+  sunt capturi reale de acolo). BLE: 0xFFE0/0xFFE1 (`BleLink(target, service, notify, write)`, caracteristicile alese
+  după proprietăți), cerere 20 o. `AA 55 90 EB cmd …`, 0x97 → cadru 0x03 (model/hw/sw) → `protocol_for(hw)`:
+  ≥11 JK02_32S, 10 JK02_24S, <10 JK04 (refuzat, „încă nesuportat”); 0x96 → cadru 0x02 (300 o., sumă la 299) →
+  `decode_jk02` (offset +16/+32 la 32S; curent s32/1000, + = încărcare; erori → `JK02_ERRORS` protecții/alarme).
+- Cablu (modulul RS485/UART, „NW”, 115200): `UART_READ_ALL`, `uart_frame_ok` (sumă u16 la [n]), `parse_tlv`
+  (`TLV_LEN`), curent 0x84 = bitul 15 încărcare, temperaturi >100 → negative. `__main__.probe` încearcă JK după Daly.
+- Tip config `jk` (`ble:` sau `port:`); `BLE_TYPES` jk suportat; `scan_ble` ghicește „jk” după nume (`JK_NAME`).
+- NEFĂCUTE: JK04, JK-PB pe RS485 Modbus (seria nouă „inverter BMS”), detectarea automată JK ca la Daly (`port: auto`).

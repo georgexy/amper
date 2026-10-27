@@ -39,7 +39,7 @@ DEFAULTS = {
     },
 }
 
-KNOWN_TYPES = {"daly", "seplos", "growatt_spf", "sim_daly", "sim_seplos", "sim_growatt"}
+KNOWN_TYPES = {"daly", "jk", "seplos", "growatt_spf", "sim_daly", "sim_seplos", "sim_growatt"}
 
 
 class ConfigError(Exception):
