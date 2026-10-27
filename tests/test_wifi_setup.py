@@ -12,6 +12,8 @@ def test_parse_scan_dedup_and_escapes():
         ":70:WPA2",                      # rețea ascunsă, fără nume
         "Cafenea:55:",                   # deschisă
         "Amper-Setup:90:WPA2",           # propriul hotspot nu apare
+        "Amper-Setup 10.42.0.1:90:WPA2",
+        "Amper gata 192.168.1.57:90:WPA2",
     ])
     nets = ws.parse_scan(out)
     assert [n["ssid"] for n in nets] == ["Casa", "Cafenea", "Vecin:2G"]
@@ -215,3 +217,11 @@ def test_home_address_shown_at_most_3_minutes(setup, monkeypatch):
     assert w.calls == []
     w.tick(False, 1000)
     assert w.calls == ["home"]
+
+
+def test_hotspot_name_shows_the_address():
+    w = ws.WifiSetup({"password": "amper-setup"})
+    assert w.ap_ssid() == "Amper-Setup 10.42.0.1"
+    w.result = {"ssid": "Casa", "ip": "192.168.100.157"}
+    assert w.ap_ssid() == "Amper gata 192.168.100.157" and len(w.ap_ssid()) <= 32
+    assert ws.ap_name("Un nume foarte lung de rețea WiFi", "10.42.0.1") == "Un nume foarte lung de rețea WiFi"
