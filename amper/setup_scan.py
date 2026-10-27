@@ -18,6 +18,50 @@ def used_ports(cfg: dict) -> dict[str, str]:
             if str(d.get("port", "")).startswith("/dev/")}
 
 
+# Tipurile de BMS care se pot alege pentru un modul Bluetooth (ecranul „Adaugă dispozitiv”).
+# supported=False: apar în listă, dar nu se pot adăuga încă (nu există driver).
+BLE_TYPES = [
+    {"type": "daly", "label": "Daly", "supported": True},
+    {"type": "jk", "label": "JK BMS (Jikong)", "supported": False},
+    {"type": "jbd", "label": "JBD / Xiaoxiang", "supported": False},
+    {"type": "ant", "label": "ANT BMS", "supported": False},
+]
+
+
+def used_ble(cfg: dict) -> set[str]:
+    """Adresele/numele Bluetooth folosite deja: din config și din legăturile găsite automat (daly-auto.json)."""
+    out = {str(d["ble"]).upper() for d in cfg.get("devices", []) if d.get("ble")}
+    try:
+        from .drivers.daly_auto import load_bindings
+        for b in load_bindings().values():
+            for k in ("ble", "name"):
+                if b.get(k):
+                    out.add(str(b[k]).upper())
+    except Exception:
+        pass
+    return out
+
+
+def scan_cable(cfg: dict, progress=lambda msg: None) -> dict:
+    """Doar porturile USB libere (cele folosite de dispozitivele din config nu se ating și nu apar)."""
+    res = scan(cfg, progress, ble_seconds=0)
+    return {"found": res["found"], "ports": [p for p in res["ports"] if not p["result"].startswith("folosit de")]}
+
+
+def scan_ble(cfg: dict, seconds: float = 10) -> dict:
+    """Toate modulele Bluetooth din jur care au nume, fără cele legate deja. Un modul conectat la telefon
+    (sau la Amper) nu se anunță, deci nu apare."""
+    from .drivers import ble
+    used = used_ble(cfg)
+    found = []
+    for d in ble.scan(seconds):
+        if not d["name"] or d["address"].upper() in used or d["name"].upper() in used:
+            continue
+        found.append({"ble": d["address"], "name": d["name"], "rssi": d["rssi"],
+                      "guess": "daly" if ble.is_daly_name(d["name"]) else None})
+    return {"found": found, "types": BLE_TYPES}
+
+
 def scan(cfg: dict, progress=lambda msg: None, ble_seconds: float = 8) -> dict:
     from .__main__ import list_ports, probe
     used = used_ports(cfg)
@@ -39,8 +83,10 @@ def scan(cfg: dict, progress=lambda msg: None, ble_seconds: float = 8) -> dict:
             item = {"type": typ, "port": p, "short": short, **json.loads(extra), "link": "cablu"}
             item["label"] = NAMES.get(typ, typ) + (f" (adresa {item['address']})" if typ == "seplos" else "")
             found.append(item)
-    progress("Caut modulele Daly prin Bluetooth (8 s)…")
     ble_note = ""
+    if not ble_seconds:
+        return {"found": found, "ports": ports, "ble_note": ble_note}
+    progress("Caut modulele Daly prin Bluetooth (8 s)…")
     try:
         from .drivers import ble
         for d in ble.scan(ble_seconds):
@@ -50,6 +96,31 @@ def scan(cfg: dict, progress=lambda msg: None, ble_seconds: float = 8) -> dict:
     except Exception as e:                           # fără adaptor, fără bleak
         ble_note = f"Bluetooth indisponibil ({e.__class__.__name__})"
     return {"found": found, "ports": ports, "ble_note": ble_note}
+
+
+def add_device(existing: list[dict], c: dict) -> dict:
+    """Un dispozitiv nou, adăugat la cele existente: id și nume care nu se repetă."""
+    typ = c.get("type")
+    if typ == "daly" and c.get("ble") is None and not str(c.get("port", "")).startswith("/dev/"):
+        raise ValueError("Alege un modul Bluetooth sau un port.")
+    if typ not in NAMES:
+        t = next((t for t in BLE_TYPES if t["type"] == typ), None)
+        raise ValueError(f"{t['label'] if t else typ}: nu e suportat încă.")
+    dev = build_devices([c])[0]
+    ids, names = {d["id"] for d in existing}, {d.get("name") for d in existing}
+    base = {"daly": "daly", "seplos": "seplos", "growatt_spf": "inverter"}[typ]
+    n = sum(1 for d in existing if d.get("type") == typ) + 1
+    while f"{base}{n}" in ids:
+        n += 1
+    dev["id"] = f"{base}{n}"
+    if not str(c.get("name") or "").strip():
+        dev["name"] = f"{NAMES[typ]} {n}"
+        while dev["name"] in names:
+            n += 1
+            dev["name"] = f"{NAMES[typ]} {n}"
+    if typ == "daly" and c.get("ble") and c.get("ble_name"):
+        dev["ble_name"] = str(c["ble_name"])[:40]
+    return dev
 
 
 def build_devices(chosen: list[dict]) -> list[dict]:

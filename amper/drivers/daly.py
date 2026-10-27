@@ -13,6 +13,7 @@ aceleași cadre. Pentru detectarea automată vezi daly_auto.py.
 from __future__ import annotations
 
 import logging
+import re
 import time
 
 from ..models import PackReading
@@ -180,6 +181,10 @@ class DalyProtocol:
             r.capacity_ah = round(r.remaining_ah / (r.soc / 100), 1)
         if self.link_desc:
             r.raw["link"] = self.link_desc
+        if isinstance(self, DalyBleDriver):                 # Bluetooth: cine e cine (numele din aplicația Daly)
+            r.raw["ble_name"] = getattr(self.link, "name", None) or self.ble_name
+            r.raw["ble_mac"] = getattr(self.link, "address", None) or (
+                str(self.link.target).upper() if ":" in str(self.link.target) else None)
         self._check_glitch(r)
         return r
 
@@ -247,7 +252,18 @@ class DalyBleDriver(DalyProtocol, Driver):
         self._init_daly(cfg, 0x80)
         from .ble import BleLink
         self.link = BleLink(str(cfg["ble"]))
-        self.link_desc = f"Bluetooth {cfg['ble']}"
+        self.ble_name = cfg.get("ble_name")                # numele știut de la căutare (DL-…)
+
+    @property
+    def link_desc(self) -> str:
+        """„Bluetooth DL-40D63C2A1F2B” (numele din aplicația Daly) + adresa, dacă numele n-o conține deja."""
+        name = getattr(self.link, "name", None) or self.ble_name
+        mac = getattr(self.link, "address", None)
+        if not mac and re.fullmatch(r"(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}", str(self.link.target)):
+            mac = str(self.link.target).upper()
+        if name and mac and mac.replace(":", "") not in name.upper():
+            return f"Bluetooth {name} · {mac}"
+        return f"Bluetooth {name or mac or self.link.target}"
 
     def _exchange(self, request: bytes, expected: int) -> bytes:
         # prin Bluetooth, răspunsurile întârziate ale comenzii anterioare pot sosi primele:

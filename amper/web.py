@@ -546,6 +546,50 @@ def make_app(engine) -> web.Application:
         import signal
         asyncio.get_running_loop().call_later(1.5, os.kill, os.getpid(), signal.SIGTERM)
 
+    # ---------------- „Adaugă dispozitiv” (Setări → Dispozitive conectate → +) ----------------
+    dev_job: dict = {"state": "idle"}
+
+    async def devices_scan_start(request):
+        body = await request.json()
+        what = "ble" if body.get("what") == "ble" else "cable"
+        if dev_job.get("state") == "running":
+            return _json(dev_job)
+        dev_job.clear()
+        dev_job.update(state="running", what=what, started=time.time(),
+                       message="Caut prin Bluetooth (10 s)…" if what == "ble" else "Caut pe porturile USB…")
+
+        def progress(msg):
+            dev_job["message"] = msg
+
+        async def run():
+            try:
+                fn = (lambda: setup_scan.scan_ble(cfg)) if what == "ble" else (lambda: setup_scan.scan_cable(cfg, progress))
+                dev_job.update(state="done", message="", **await asyncio.to_thread(fn))
+            except Exception as e:
+                log.warning("căutare %s: %s", what, e)
+                dev_job.update(state="failed", message=("Bluetooth indisponibil: " if what == "ble" else "Căutarea a eșuat: ") + str(e))
+        asyncio.get_running_loop().create_task(run())
+        return _json(dev_job)
+
+    async def devices_scan_get(request):
+        return _json(dev_job)
+
+    async def devices_add(request):
+        body = await request.json()
+        real = [dict(d) for d in cfg["devices"] if not d["type"].startswith("sim_")]
+        try:
+            dev = setup_scan.add_device(real, dict(body.get("device") or {}))
+            validate({**cfg, "devices": real + [dev]})
+        except (ValueError, TypeError, ConfigError) as e:
+            return _json({"error": str(e)}, 400)
+        await asyncio.to_thread(save_overlay, cfg, {"devices": real + [dev]})
+        sim = any(d["type"].startswith("sim_") for d in cfg["devices"])
+        log.warning("dispozitiv adăugat din aplicație: %s (%s)", dev["id"], dev.get("ble") or dev.get("port"))
+        engine.notifier.send(f"➕ Dispozitiv adăugat: {dev['name']}.", title="Amper")
+        if not sim:
+            restart_soon()                                  # se citește după repornire (câteva secunde)
+        return _json({"ok": True, "device": dev, "restart": not sim})
+
     async def setup_finish(request):
         if not auth_.enabled:
             return _json({"error": "Alege întâi o parolă pentru aplicație."}, 400)
@@ -720,6 +764,9 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/api/setup/scan", setup_scan_get)
     app.router.add_post("/api/setup/devices", setup_devices)
     app.router.add_post("/api/setup/finish", setup_finish)
+    app.router.add_post("/api/devices/scan", devices_scan_start)
+    app.router.add_get("/api/devices/scan", devices_scan_get)
+    app.router.add_post("/api/devices/add", devices_add)
     app.router.add_get("/api/security", security_get)
     app.router.add_post("/api/update/channel", update_channel)
     app.router.add_get("/api/update/status", update_status)

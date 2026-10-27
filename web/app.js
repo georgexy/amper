@@ -532,6 +532,13 @@ function renderNow() {
 }
 
 /* ------------------------------------------------------------------ ecranul BATERIILE */
+// Bluetooth: numele modulului (ca în aplicația Daly de pe telefon) și adresa — ca să știi care baterie e care
+function bleId(r) {
+  const n = r.raw?.ble_name, mac = r.raw?.ble_mac;
+  if (!n && !mac) return "";
+  const both = n && mac && !n.toUpperCase().includes(mac.replace(/:/g, ""));
+  return `<div class="pk-id"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>${esc(n || mac)}${both ? ` · ${esc(mac)}` : ""}</div>`;
+}
 function renderPacks() {
   const h = homeData(), b = h.b;
   $("#pk-soc").textContent = b.soc == null ? "–" : `${num(b.soc, 0)}%`;
@@ -563,7 +570,7 @@ function renderPacks() {
     el.innerHTML = `<div class="h"><div class="pk-mini"><i style="height:${Math.max(0, Math.min(100, r.soc ?? 0))}%"></i></div>
       <div class="t"><div class="n">${esc(d.name)} <span class="tag">${esc(label)}</span>${d.type === "daly" && !d.stale
         ? `<span class="pk-gear" data-bms="${esc(d.id)}" role="button" tabindex="0" aria-label="Setările BMS ${esc(d.name)}">⚙</span>` : ""}</div>
-      <div class="s">${d.stale ? `Nu comunică${d.error ? ": " + esc(d.error) : ""}` : facts}</div></div>
+      <div class="s">${d.stale ? `Nu comunică${d.error ? ": " + esc(d.error) : ""}` : facts}</div>${bleId(r)}</div>
       <div class="soc">${r.soc == null ? "–" : num(r.soc, 0)}<sup>%</sup></div></div>
       ${cells.length ? `<div class="pk-cells">${cells.map((v) => `<i class="${hi - lo > 0.005 ? (v === hi ? "hi" : v === lo ? "lo" : "") : ""}"
         style="height:${Math.max(8, ((v - floor) / span) * 100)}%"></i>`).join("")}</div>` : ""}
@@ -818,10 +825,100 @@ $("#daly-search").onclick = async () => {
   setTimeout(() => { b.disabled = false; b.textContent = "Caută acum modulele Daly"; }, 30000);
 };
 
+/* ---------- Adaugă dispozitiv: ce e nou pe cablu (căutat singur) + căutare prin Bluetooth, apoi tipul BMS ---------- */
+const da = { cable: null, ble: null, types: [], timer: 0 };
+const DA_NAME = { daly: "Daly", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
+function devAddOpen() {
+  da.ble = null;
+  $("#da-ble-list").innerHTML = ""; $("#da-form").hidden = true;
+  $("#da-ble-msg").textContent = "Un modul conectat acum la aplicația de pe telefon nu apare; închide-o înainte.";
+  devScan("cable");
+}
+async function devScan(what) {
+  try {
+    const j = await api("/api/devices/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ what }) });
+    devScanShow(j);
+  } catch {}
+}
+function devScanShow(j) {
+  clearTimeout(da.timer);
+  const running = j.state === "running";
+  $("#da-ble").disabled = running;
+  $("#da-cable-again").hidden = running;
+  if (j.what === "cable") {
+    if (running) { $("#da-cable-msg").textContent = j.message || "Caut…"; $("#da-cable").innerHTML = ""; }
+    else if (j.state === "failed") $("#da-cable-msg").textContent = j.message;
+    else {
+      da.cable = j.found || [];
+      $("#da-cable-msg").textContent = da.cable.length ? "" : (j.ports || []).length
+        ? "Niciun dispozitiv nou pe porturile USB libere." : "Niciun adaptor USB nou legat la Pi.";
+      $("#da-cable").innerHTML = da.cable.map((f, i) => `<button class="row row-link" data-cable="${i}"><span><b>${esc(f.label)}</b></span>
+        <span class="t">cablu ${esc(f.short)}${f.baudrate ? ` · ${f.baudrate} baud` : ""} · atinge ca să-l adaugi ›</span></button>`).join("");
+      $$("[data-cable]").forEach((b) => (b.onclick = () => devForm({ ...da.cable[+b.dataset.cable] })));
+    }
+  } else {
+    $("#da-ble").textContent = running ? "Caut… (10 s)" : da.ble ? "Caută din nou prin Bluetooth" : "Caută prin Bluetooth";
+    if (j.state === "failed") $("#da-ble-msg").textContent = j.message;
+    if (j.state === "done") {
+      da.ble = j.found || []; da.types = j.types || [];
+      $("#da-ble-msg").textContent = da.ble.length ? "Alege modulul pe care vrei să-l adaugi." : "N-am găsit niciun modul Bluetooth nou în jur.";
+      $("#da-ble-list").innerHTML = da.ble.map((f, i) => `<button class="row row-link" data-ble="${i}"><span><b>${esc(f.name)}</b></span>
+        <span class="t">${esc(f.ble)} · semnal ${f.rssi ?? "–"} dBm${f.guess ? ` · pare ${esc(DA_NAME[f.guess] || f.guess)}` : ""} ›</span></button>`).join("");
+      $$("[data-ble]").forEach((b) => (b.onclick = () => devForm({ ...da.ble[+b.dataset.ble], link: "Bluetooth" })));
+    }
+  }
+  if (running) da.timer = setTimeout(async () => { try { devScanShow(await api("/api/devices/scan")); } catch {} }, 1500);
+  else if (j.what === "cable") $("#da-cable-again").hidden = false;
+}
+$("#da-ble").onclick = () => devScan("ble");
+$("#da-cable-again").onclick = () => devScan("cable");
+
+// formularul: la Bluetooth, întâi tipul BMS-ului; apoi numele și capacitatea
+function devForm(c) {
+  const f = $("#da-form"), ble = c.link === "Bluetooth";
+  if (ble && !c.type) c.type = c.guess || "daly";
+  const types = ble ? da.types : [];
+  const pack = () => c.type !== "growatt_spf";
+  const draw = () => {
+    const t = types.find((x) => x.type === c.type);
+    const ok = !ble || t?.supported;
+    f.innerHTML = `<h3>${esc(ble ? c.name : c.label)}</h3>
+      ${ble ? `<p class="note">Ce BMS este?</p><div class="da-types">${types.map((x) => `<label class="row-check ${x.supported ? "" : "dis"}">
+        <input type="radio" name="da-type" value="${esc(x.type)}" ${x.type === c.type ? "checked" : ""}>
+        <span><b>${esc(x.label)}</b>${x.supported ? "" : "<small>Nu e suportat încă — spune-i autorului ce model ai.</small>"}</span></label>`).join("")}</div>` : ""}
+      ${ok ? `<label class="su-l" for="da-name">Nume</label><input class="ed-in" id="da-name" maxlength="40" placeholder="de ex. ${esc(DA_NAME[c.type] || "")} 4">
+        ${pack() ? `<label class="su-l" for="da-cap">Capacitate (Ah)</label><input class="ed-in" id="da-cap" type="number" inputmode="decimal" min="1" max="2000" placeholder="de ex. 105">` : ""}
+        <button class="btn ed-go" id="da-go">Adaugă dispozitivul</button>` : ""}
+      <button class="btn sm" id="da-cancel">Renunță</button>
+      <p class="note" id="da-msg"></p>`;
+    $$('input[name="da-type"]', f).forEach((r) => (r.onchange = () => { c.type = r.value; draw(); }));
+    $("#da-cancel").onclick = () => { f.hidden = true; };
+    if ($("#da-go")) $("#da-go").onclick = () => devAdd(c);
+  };
+  draw();
+  f.hidden = false;
+  f.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+async function devAdd(c) {
+  const cap = $("#da-cap") ? parseFloat(($("#da-cap").value || "").replace(",", ".")) : null;
+  if ($("#da-cap") && !(cap >= 1 && cap <= 2000)) { $("#da-msg").textContent = "Scrie capacitatea, între 1 și 2000 Ah."; return; }
+  const dev = { type: c.type, name: $("#da-name").value.trim(), capacity_ah: cap, port: c.port, address: c.address,
+    baudrate: c.baudrate, ble: c.ble, ble_name: c.link === "Bluetooth" ? c.name : undefined };
+  $("#da-go").disabled = true;
+  try {
+    const r = await fetch("/api/devices/add", { method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device: dev }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || `eroare ${r.status}`);
+    $("#da-msg").textContent = j.restart ? `${j.device.name} a fost adăugat. Amper repornește câteva secunde…` : `${j.device.name} a fost adăugat.`;
+    if (j.restart) setTimeout(() => location.reload(), 8000);
+  } catch (e) { $("#da-msg").textContent = e.message; $("#da-go").disabled = false; }
+}
+
 /* meniul setărilor: butoane → secțiuni (Teme, Notificări, Module Daly) */
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "notif", "daly", "devoff", "info", "update", "security", "remote", "auto", "about", "conn", "share", "wifi"])
+  for (const k of ["teme", "notif", "daly", "devoff", "devadd", "info", "update", "security", "remote", "auto", "about", "conn", "share", "wifi"])
     $("#set-" + k).hidden = k !== name;
   if (name === "about") $("#about-version").textContent = $("#version").textContent;
   if (name === "share") loadShare();
@@ -835,11 +932,12 @@ function showPanel(name) {
   if (name === "info") { loadInfo(); state.infoTimer = setInterval(() => !$("#set-info").hidden && loadInfo(), 5000); }
   if (name === "notif") renderNotif();
   if (name === "daly" || name === "devoff") renderDaly();
+  if (name === "devadd") devAddOpen();
   window.scrollTo(0, 0);
 }
 $$(".set-btn[data-panel]").forEach((b) => (b.onclick = () => showPanel(b.dataset.panel)));
 $("#set-wizard").onclick = () => openSetup(true);
-$("#dev-add").onclick = () => openSetup(true, "devices");
+$("#dev-add").onclick = () => showPanel("devadd");
 async function loadWifiNow() {
   try {
     const r = await api("/api/wifi/status");
@@ -1960,9 +2058,7 @@ const UPOV_MSG = { verify: "Verific semnătura…", space: "Verific spațiul lib
 function upovSet(pct, msg) {
   pct = Math.max(state.upPct || 0, Math.min(100, Math.round(pct)));     // cercul doar înaintează
   state.upPct = pct;
-  const c = 2 * Math.PI * 52;
-  $("#upov-arc").style.strokeDasharray = `${c}`;
-  $("#upov-arc").style.strokeDashoffset = `${c * (1 - pct / 100)}`;
+  $("#upov-fill").style.transform = `translateY(${294 * (1 - pct / 100)}px)`;   // bateria se umple de jos în sus
   $("#upov-pct").textContent = `${pct}%`;
   if (msg) $("#upov-msg").textContent = msg;
 }

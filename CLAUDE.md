@@ -317,3 +317,16 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - Panouri: `InverterReading.pv_current` / `pv2_current` = registrele de intrare 7/8 (Buck1Curr/Buck2Curr, ×0,1 A),
   CITITE din invertor (utilizatorul nu vrea valori calculate). DE CONFIRMAT pe Pi cu afișajul invertorului. Butonul `PV_I` (`data-pvinfo`) în toate temele → `#pvpop` (`pvInfoHtml`, actualizat
   la fiecare citire, se deschide deasupra dacă nu are loc deasupra barei de jos).
+
+## Identificarea BMS-urilor Bluetooth (0.3.0-beta.9, în pregătire)
+- `BleLink.name/address` (aflate la `_resolve`); `DalyBleDriver.link_desc` = proprietate „Bluetooth <nume> · <MAC>”
+  (MAC-ul doar dacă nu e deja în nume); `ble_name` vine din legătura salvată (`daly-auto.json`, `name`).
+  `DalyAutoDriver.link_desc` = proprietate a legăturii interne. `raw.ble_name/ble_mac` → `bleId()` pe cardurile din
+  Bateriile.
+
+## Adaugă dispozitiv (0.3.0-beta.9, în pregătire)
+- „+” din Dispozitive conectate → panoul `devadd` (nu mai e ghidul). `POST /api/devices/scan {what: cable|ble}` (job
+  comun `dev_job`, `GET` pentru stare): `setup_scan.scan_cable` (doar porturi libere) / `scan_ble` (toate modulele cu
+  nume, fără cele din config și din `daly-auto.json`; `guess` = daly după nume; `types` = `BLE_TYPES`).
+  `POST /api/devices/add {device}` → `setup_scan.add_device` (id/nume unice, `ble_name`), overlay `devices` = cele
+  reale + cel nou, notificare, repornire (nu în simulator). Doar Daly e suportat; JK/JBD/ANT = `supported: False`.

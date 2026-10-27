@@ -91,7 +91,7 @@ def _make(cfg: dict, b: dict):
         c.pop("address")
     if b["type"] == "uart":
         return DalyDriver({**c, "port": b["port"]})
-    return DalyBleDriver({**c, "ble": b["ble"]})
+    return DalyBleDriver({**c, "ble": b["ble"], "ble_name": b.get("name")})
 
 
 def _probe(cfg: dict, b: dict) -> bool:
@@ -116,7 +116,6 @@ class DalyAutoDriver(Driver):
         super().__init__(cfg)
         self.all_cfgs = all_cfgs or [cfg]
         self.inner = None
-        self.link_desc = ""
         self.state = "caut"
         self.started = time.monotonic()
         self._thread = None
@@ -126,6 +125,10 @@ class DalyAutoDriver(Driver):
         if b:
             self._bind(b, save=False)
 
+    @property
+    def link_desc(self) -> str:
+        return self.inner.link_desc if self.inner else ""
+
     # ---------- legare ----------
     def _bind(self, b: dict, save: bool = True) -> None:
         with _lock:
@@ -134,7 +137,6 @@ class DalyAutoDriver(Driver):
                 return
             _claimed[_key(b)] = self.id
         self.inner = _make(self.cfg, b)
-        self.link_desc = self.inner.link_desc
         self.state = "legat"
         if save:
             _save_binding(self.id, b)

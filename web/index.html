@@ -263,14 +263,28 @@
       </section>
 
       <section class="set-panel" id="set-daly" hidden>
-        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Dispozitive conectate</h2></div>
+        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Dispozitive conectate</h2>
+          <button class="icon-btn" id="dev-add" aria-label="Adaugă dispozitiv" title="Adaugă dispozitiv">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button></div>
         <div id="daly-list"></div>
-        <button class="btn ed-go" id="dev-add">+ Adaugă dispozitiv</button>
         <div class="set-menu">
           <button class="card set-btn" data-panel="devoff" id="dev-off-btn" hidden><span class="ic" style="--ic:var(--faint)">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg></span>
             <span><b>Dispozitive inactive</b><span id="dev-off-n"></span></span><i>›</i></button>
         </div>
+      </section>
+
+      <section class="set-panel" id="set-devadd" hidden>
+        <div class="pk-top"><button class="back set-back" data-back="daly" aria-label="Înapoi la dispozitive">‹</button><h2>Adaugă dispozitiv</h2></div>
+        <h2>Pe cablu</h2>
+        <p class="note" id="da-cable-msg"></p>
+        <div class="list" id="da-cable"></div>
+        <button class="btn sm" id="da-cable-again" hidden>Caută din nou pe cablu</button>
+        <h2>Bluetooth</h2>
+        <button class="btn" id="da-ble">Caută prin Bluetooth</button>
+        <p class="note" id="da-ble-msg">Un modul conectat acum la aplicația de pe telefon nu apare; închide-o înainte.</p>
+        <div class="list" id="da-ble-list"></div>
+        <div class="card da-form" id="da-form" hidden></div>
       </section>
 
       <section class="set-panel" id="set-devoff" hidden>
@@ -363,8 +377,15 @@
   <!-- actualizarea în curs: cerc care se umple; la final aplicația se reîncarcă singură -->
   <div id="upov" class="upov" hidden>
     <div class="upov-box">
-      <svg class="upov-ring" viewBox="0 0 120 120"><circle class="bg" cx="60" cy="60" r="52"/>
-        <circle class="fg" id="upov-arc" cx="60" cy="60" r="52"/></svg>
+      <!-- bateria din iconița aplicației, care se încarcă odată cu actualizarea -->
+      <svg class="upov-bat" viewBox="128 68 256 386" aria-hidden="true">
+        <defs><clipPath id="upov-clip"><rect x="164" y="124" width="184" height="294" rx="18"/></clipPath></defs>
+        <rect x="206" y="78" width="100" height="34" rx="10" fill="#3E5B72"/>
+        <rect x="146" y="106" width="220" height="330" rx="34" fill="#1D3040" stroke="#3E5B72" stroke-width="18"/>
+        <g clip-path="url(#upov-clip)"><rect id="upov-fill" class="fill" x="164" y="124" width="184" height="294"/></g>
+        <path d="M164 222h184M164 320h184" stroke="#101C24" stroke-opacity=".3" stroke-width="8"/>
+        <path class="bolt" d="M256 190l-38 66h28l-10 46 46-72h-30l14-40z" fill="#F3B840"/>
+      </svg>
       <div class="upov-pct" id="upov-pct">0%</div>
       <h2 id="upov-title">Actualizez Amper</h2>
       <p class="note" id="upov-msg">Pornesc…</p>
