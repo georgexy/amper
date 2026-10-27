@@ -190,6 +190,24 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   sub 46,0 V, înapoi peste 54,0 V, oprire 42,0 V, 230 V / 50 Hz, buzzer pornit. Ceasul invertorului e cu 1 h înainte
   (n-a trecut la ora de iarnă). **Nicio setare n-a fost scrisă în invertor de Claude** — decizia e a utilizatorului.
 
+## Actualizări semnate din GitHub (0.2.0, 2026-10-27)
+- `amper/update.py` = serviciul `amper-update` (root): API local 127.0.0.1:8092, token `/run/amper-update/token`
+  (`GET /status`, `POST /check|install|rollback`); stare în `/var/lib/amper-update/state.json`. Caută singur la
+  `update.check_days` (7) zile, notifică o dată pe versiune, NU instalează singur.
+- Pe Pi: `/opt/amper` = legătură → `/opt/amper-<ver>` (`install.sh` o creează; o instalare veche, folder, e
+  convertită). Se păstrează 3 versiuni în /opt și 3 copii în `/var/lib/amper/pre-update/<ver>/`
+  (DB prin API-ul sqlite3 backup, /etc/amper, /var/lib/amper/*.json).
+- Instalare: manifest + `.sig` (Ed25519, cheile din `amper/update_key.py`) → spațiu → arhivă (sha256) → stop amper →
+  copia datelor → despachetare sigură → legătura → `deploy/post-update.sh` (unități systemd noi) → restart →
+  `/api/health` (fără parolă) trebuie să raporteze versiunea nouă în 60 s, altfel revenire cod + date. După
+  succes `amper-update` iese și systemd îl repornește cu codul nou. Revenirea la cerere păstrează datele
+  (schimbările DB/config sunt DOAR adăugiri, deci versiunea veche le citește).
+- Web: `/api/update/status|check`, `POST /api/update/install|rollback` cer parola reintrodusă în corpul cererii
+  (merge și de pe HDMI; de pe telefon middleware-ul cere și cookie). `app_version` include `__version__`.
+- Lansare: `tools/release.py` (keygen/build/verify/notes) + `.github/workflows/release.yml` (workflow_dispatch sau
+  tag `v*`; versiunea din `amper/__init__.py`, notele din `CHANGELOG.md`; `-beta` → pre-release).
+  `tests.yml` rulează testele la push/PR. Secretul `AMPER_SIGNING_KEY` și cheia publică le pune utilizatorul.
+
 ## Lucru pe Pi
 - Datele de acces la Pi-ul autorului (utilizator, IP-uri, Tailscale): în `LOCAL.md`.
 - Serviciu: `systemctl status amper`, jurnal `journalctl -u amper -f`, config `/etc/amper/config.yaml`.

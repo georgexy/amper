@@ -64,7 +64,7 @@ async function boot() {
   setInterval(loadEnergy, 60000);
   loadDay();
   setInterval(loadDay, 300000);
-  $("#version").textContent = `Citire la fiecare ${state.info.poll_interval} s.`;
+  $("#version").textContent = `Amper ${state.info.version || ""} · citire la fiecare ${state.info.poll_interval} s.`;
   setInterval(tickConn, 1000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 }
@@ -692,8 +692,10 @@ $("#daly-search").onclick = async () => {
 /* meniul setărilor: butoane → secțiuni (Teme, Notificări, Module Daly) */
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "notif", "daly", "info"]) $("#set-" + k).hidden = k !== name;
+  for (const k of ["teme", "notif", "daly", "info", "update"]) $("#set-" + k).hidden = k !== name;
   clearInterval(state.infoTimer);
+  clearTimeout(upd.timer);
+  if (name === "update") loadUpdate();
   if (name === "info") { loadInfo(); state.infoTimer = setInterval(() => !$("#set-info").hidden && loadInfo(), 5000); }
   if (name === "notif") renderNotif();
   if (name === "daly") renderDaly();
@@ -808,6 +810,97 @@ $("#wifi-go").onclick = async () => {
     b.disabled = false;
   }
 };
+
+/* ---------- Setări → Actualizări (serviciul amper-update: GitHub, semnătură, copie a datelor, revenire) ---------- */
+const UP_STEPS = { verify: "Verificarea semnăturii", space: "Spațiu liber", download: "Descărcare și verificare",
+  backup: "Copia de siguranță a datelor", install: "Instalare", restart: "Repornire", health: "Verificare: pornește?" };
+const UP_RESULT = { ok: "reușit", failed: "eșuat", rolled_back: "revenit automat la versiunea veche" };
+const upd = { data: null, timer: 0, busy: false };
+const dateTime = (ts) => new Date(ts * 1000).toLocaleString("ro-RO", { day: "numeric", month: "short", year: "numeric",
+  hour: "2-digit", minute: "2-digit" });
+
+async function loadUpdate() {
+  clearTimeout(upd.timer);
+  let r;
+  try { r = await api("/api/update/status"); } catch (e) {
+    if (e.message !== "auth") upd.timer = setTimeout(loadUpdate, 5000);     // serviciul se repornește
+    return;
+  }
+  upd.data = r;
+  renderUpdate();
+  if (r.job?.state === "running" && !$("#set-update").hidden) upd.timer = setTimeout(loadUpdate, 2000);
+}
+function renderUpdate() {
+  const r = upd.data || {}, inst = r.installed || {};
+  if (r.error && !r.version) {
+    $("#up-now").innerHTML = `<div class="row"><span><b>Amper ${esc(r.running || state.info?.version || "")}</b></span>
+      <span class="t">${esc(r.error)}. Actualizările din aplicație merg doar pe Pi-ul instalat cu install.sh.</span></div>`;
+    $("#up-check").hidden = true;
+    return;
+  }
+  $("#up-check").hidden = false;
+  const last = r.last_check ? `${dateTime(r.last_check)} (${r.last_check_auto ? "automat" : "manual"})` : "niciodată";
+  $("#up-now").innerHTML = `
+    <div class="row"><span>Versiunea instalată: <b>${esc(r.version || "?")}</b>${r.channel === "beta" ? ' <span class="role">beta</span>' : ""}</span>
+      <span class="t">${inst.at ? "instalată la " + dateTime(inst.at) : ""}</span></div>
+    <div class="row"><span>Ultima căutare: ${esc(last)}</span>
+      <span class="t">${r.check_error ? esc(r.check_error) : r.latest && !r.available ? "Ai ultima versiune." : ""}</span></div>`;
+  $("#set-update-sub").textContent = r.available ? `Versiune nouă: ${r.latest.version}` : `Versiunea ${r.version || ""}`;
+  const job = r.job || {}, running = job.state === "running";
+  $("#up-new").hidden = !r.available || running || !r.can_install;
+  if (r.available) {
+    $("#up-new-title").textContent = `Versiune nouă: ${r.latest.version}`;
+    $("#up-notes").innerHTML = esc(r.latest.notes || "").replace(/^- /gm, "• ").replace(/\n/g, "<br>");
+  }
+  if (r.available && !r.can_install) $("#up-msg").textContent = "Versiunea instalată nu are cheia de verificare: actualizează manual o dată, cu install.sh.";
+  const shown = running ? job : (r.last_job && r.last_job.finished && Date.now() / 1000 - r.last_job.finished < 600 ? r.last_job : null);
+  $("#up-job").hidden = !shown;
+  if (shown) {
+    const steps = r.steps || Object.keys(UP_STEPS), cur = steps.indexOf(shown.step);
+    const done = shown.state === "ok";
+    $("#up-steps").innerHTML = steps.filter((k) => shown.kind !== "rollback" || !["download", "verify", "space"].includes(k)).map((k) => {
+      const i = steps.indexOf(k);
+      const mark = done || i < cur ? "✓" : i === cur ? (running ? "…" : shown.state === "ok" ? "✓" : "✗") : "";
+      return `<div class="row ${i === cur && !running && !done ? "warning" : ""}"><span>${mark ? `<b>${mark}</b> ` : ""}${UP_STEPS[k]}</span></div>`;
+    }).join("");
+    $("#up-job-msg").textContent = shown.message || "";
+  }
+  $("#up-prev").hidden = !r.previous || running;
+  if (r.previous) $("#up-prev-txt").textContent = `Revine la Amper ${r.previous.version || "anterior"}. Istoricul și setările rămân; se face totuși o copie înainte.`;
+  const h = r.history || [];
+  $("#up-hist").innerHTML = h.length ? h.map((x) => `<div class="row ${x.result === "ok" ? "" : "warning"}">
+      <span><b>${x.kind === "rollback" ? "Revenire" : "Actualizare"} ${esc(x.from || "?")} → ${esc(x.version || "?")}</b> · ${UP_RESULT[x.result] || esc(x.result)}</span>
+      <span class="t">${dateTime(x.at)}${x.result === "ok" ? "" : " · " + esc(x.message)}</span></div>`).join("")
+    : `<div class="empty">Nicio actualizare făcută încă din aplicație.</div>`;
+}
+$("#up-check").onclick = async () => {
+  const b = $("#up-check");
+  b.disabled = true; b.textContent = "Caut pe GitHub…"; $("#up-msg").textContent = "";
+  try {
+    const r = await api("/api/update/check", { method: "POST" });
+    upd.data = r; renderUpdate();
+    $("#up-msg").textContent = r.error || (r.available ? "" : "Ai ultima versiune.");
+  } catch (e) { if (e.message !== "auth") $("#up-msg").textContent = "Pi-ul nu răspunde."; }
+  b.disabled = false; b.textContent = "Caută actualizări acum";
+};
+async function updateAction(action, pwEl, btn) {
+  const pw = pwEl.value;
+  if (!pw) { $("#up-msg").textContent = "Scrie parola aplicației."; pwEl.focus(); return; }
+  const q = action === "install" ? `Instalez Amper ${upd.data?.latest?.version}? Amper se oprește un minut.`
+    : `Revin la Amper ${upd.data?.previous?.version}? Amper se oprește un minut.`;
+  if (!confirm(q)) return;
+  btn.disabled = true; $("#up-msg").textContent = "";
+  try {
+    const r = await fetch(`/api/update/${action}`, { method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: pw }) });
+    const j = await r.json();
+    if (!r.ok) $("#up-msg").textContent = j.error || "Nu a mers.";
+    else { pwEl.value = ""; setTimeout(loadUpdate, 800); }
+  } catch { $("#up-msg").textContent = "Pi-ul nu răspunde."; }
+  btn.disabled = false;
+}
+$("#up-go").onclick = () => updateAction("install", $("#up-pw"), $("#up-go"));
+$("#up-back").onclick = () => updateAction("rollback", $("#up-prev-pw"), $("#up-back"));
 
 function renderNotif() {
   $("#notif-state").textContent = state.info?.notifications

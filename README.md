@@ -196,11 +196,20 @@ Dacă ceva nu se potrivește, deschizi proiectul în Claude Code pe un calculato
 
 ## 9. Actualizarea programului
 
-De pe laptop, din folderul în care ai dezarhivat versiunea nouă:
-```
-scp -r amper <utilizator>@<IP-ul Pi-ului>:~/
-```
-apoi pe Pi:
+În aplicație: **Setări → Actualizări**.
+
+- Pi-ul caută singur o versiune nouă o dată pe săptămână și te anunță pe telefon; nu instalează nimic singur.
+- **Caută actualizări acum** caută imediat pe GitHub și arată notele versiunii noi.
+- **Actualizează** (cere parola aplicației): descărcare → verificarea semnăturii → copia datelor → instalare →
+  repornire → verificare. Dacă versiunea nouă nu pornește în 60 s, Pi-ul revine singur la cea veche, cu datele de
+  dinainte. Aplicația de pe telefon se reîncarcă singură la final.
+- **Revino la versiunea anterioară**: dacă ultima versiune nu-ți place. Istoricul și setările rămân.
+- Se instalează **numai** versiunile semnate de autor; o arhivă modificată e refuzată.
+- Datele (config, istoric, alerte, abonamente, legăturile Daly, Tailscale) nu se ating la actualizare. Înainte de
+  fiecare actualizare se face o copie în `/var/lib/amper/pre-update/` (ultimele 3).
+- Canalul de test (versiunile „beta”): în config, `update: channel: beta`.
+
+Manual (sau de pe un Pi cu o versiune fără butonul de actualizare): copiezi folderul `amper` pe Pi, apoi
 ```
 sudo bash ~/amper/deploy/install.sh
 ```
@@ -254,10 +263,19 @@ Oprești Pi-ul, pui cardul SolarAssistant și pornești. Totul revine cum era.
 ### Pentru dezvoltare (pe orice calculator)
 
 ```
-pip install aiohttp pyserial pyyaml pytest
+pip install aiohttp pyserial pyyaml cryptography pytest
 python -m amper simulate --hours 48      # aplicația cu date simulate la http://localhost:8080
 python -m pytest
 ```
+
+**Lansarea unei versiuni:** se mărește `__version__` în `amper/__init__.py` și se scrie secțiunea ei în
+`CHANGELOG.md` (în română, apare în aplicație), apoi GitHub → Actions → **Lansează versiunea** → *Run workflow*.
+Workflow-ul rulează testele, construiește `amper-<ver>.tar.gz` + `manifest.json`, le semnează cu cheia din secretul
+`AMPER_SIGNING_KEY` și le publică ca GitHub Release. O versiune `x.y.z-beta.N` iese ca pre-release (canalul beta).
+
+**Cheia de semnare (o singură dată):** `python tools/release.py keygen` pe laptop. Cheia privată → GitHub, repo →
+Settings → Secrets and variables → Actions → secretul `AMPER_SIGNING_KEY` (și o copie într-un loc sigur); cheia
+publică → `amper/update_key.py`.
 
 ---
 

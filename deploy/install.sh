@@ -46,12 +46,22 @@ say "Creez utilizatorul de sistem 'amper' (cu acces la porturile seriale)"
 id amper >/dev/null 2>&1 || useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin amper
 usermod -aG dialout amper
 
-say "Copiez programul în $APP"
-mkdir -p "$APP" "$ETC" "$DATA"
-rm -rf "$APP/amper" "$APP/web" "$APP/deploy"
-cp -r "$SRC/amper" "$SRC/web" "$SRC/deploy" "$APP/"
-cp "$SRC/config.example.yaml" "$APP/"
-find "$APP" -name "__pycache__" -type d -prune -exec rm -rf {} +
+# Programul stă în /opt/amper-<versiune>, iar /opt/amper e o legătură către versiunea folosită
+# (așa o schimbă și actualizările din aplicație, cu revenire la cea anterioară).
+VER="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' "$SRC/amper/__init__.py")"
+[ -n "$VER" ] || { echo "Nu găsesc versiunea în $SRC/amper/__init__.py"; exit 1; }
+say "Copiez programul (versiunea $VER) în $APP-$VER"
+mkdir -p "$ETC" "$DATA"
+if [ "$(readlink -f "$SRC")" != "$(readlink -f "$APP-$VER")" ]; then
+  rm -rf "$APP-$VER.new"
+  mkdir -p "$APP-$VER.new"
+  cp -r "$SRC/amper" "$SRC/web" "$SRC/deploy" "$APP-$VER.new/"
+  for f in config.example.yaml CHANGELOG.md LICENSE README.md; do [ -f "$SRC/$f" ] && cp "$SRC/$f" "$APP-$VER.new/"; done
+  find "$APP-$VER.new" -name "__pycache__" -type d -prune -exec rm -rf {} +
+  rm -rf "$APP-$VER" && mv "$APP-$VER.new" "$APP-$VER"
+fi
+[ -d "$APP" ] && [ ! -L "$APP" ] && rm -rf "$APP"          # instalare veche: folder în loc de legătură
+ln -sfn "$APP-$VER" "$APP.new" && mv -T "$APP.new" "$APP"
 
 # ---------------- restaurare dintr-o copie (opțional) ----------------
 if [ -n "$RESTORE" ]; then
@@ -128,6 +138,12 @@ if [ -f "$ETC/rclone.conf" ]; then
 else
   systemctl disable --now amper-backup.timer >/dev/null 2>&1 || true
 fi
+
+say "Actualizările din aplicație (Setări → Actualizări; caută singur o dată pe săptămână, nu instalează singur)"
+cp "$SRC/deploy/amper-update.service" /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable amper-update >/dev/null 2>&1
+systemctl restart amper-update
 
 say "Hotspotul de configurare WiFi (pornește doar când Pi-ul nu are internet)"
 rfkill unblock wifi 2>/dev/null || true
