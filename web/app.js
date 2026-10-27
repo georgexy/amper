@@ -169,14 +169,15 @@ function tickConn() {
 function checkVersion(v) {
   if (!v) return;
   if (!state.appVersion) { state.appVersion = v; return; }
-  if (v === state.appVersion || state.reloading) return;
+  if (v === state.appVersion || state.reloading || state.updating) return;
   if ($("#edit").open || $("#sheet").open || state.view === "bms" || document.activeElement?.matches?.("input, select")) return;
   let last = 0;
   try { last = +sessionStorage.getItem("reloadedAt") || 0; } catch {}
   if (Date.now() - last < 60000) return;
   state.reloading = true;
   try { sessionStorage.setItem("reloadedAt", Date.now()); } catch {}
-  const go = () => location.reload();
+  const go = () => fetch("/api/health", { cache: "no-store" }).then((r) => (r.ok ? location.reload() : (state.reloading = false)),
+    () => (state.reloading = false));
   navigator.serviceWorker?.getRegistration?.().then((r) => r?.update()).then(go, go) || go();
 }
 
@@ -732,7 +733,8 @@ $("#daly-search").onclick = async () => {
 /* meniul setărilor: butoane → secțiuni (Teme, Notificări, Module Daly) */
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "notif", "daly", "info", "update", "security"]) $("#set-" + k).hidden = k !== name;
+  for (const k of ["teme", "notif", "daly", "info", "update", "security", "remote"]) $("#set-" + k).hidden = k !== name;
+  if (name === "remote") renderRemote($("#remote-body"));
   if (name === "security") loadSecurity();
   clearInterval(state.infoTimer);
   clearTimeout(upd.timer);
@@ -864,7 +866,7 @@ $("#wifi-go").onclick = async () => {
 };
 
 /* ---------- Setări → Actualizări (serviciul amper-update: GitHub, semnătură, copie a datelor, revenire) ---------- */
-const UP_STEPS = { verify: "Verificarea semnăturii", space: "Spațiu liber", download: "Descărcare și verificare",
+const UP_STEPS = { verify: "Verificarea semnăturii", space: "Spațiu liber", download: "Descărcare", check: "Verificarea arhivei",
   backup: "Copia de siguranță a datelor", install: "Instalare", restart: "Repornire", health: "Verificare: pornește?" };
 const UP_RESULT = { ok: "reușit", failed: "eșuat", rolled_back: "revenit automat la versiunea veche" };
 const upd = { data: null, timer: 0, busy: false };
@@ -879,8 +881,9 @@ async function loadUpdate() {
     return;
   }
   upd.data = r;
+  if (r.job?.state === "running" && r.job.kind !== "download" && !state.updating) return startUpdateOverlay(r.job.kind);
   renderUpdate();
-  if (r.job?.state === "running" && !$("#set-update").hidden) upd.timer = setTimeout(loadUpdate, 2000);
+  if (r.job?.state === "running" && !$("#set-update").hidden) upd.timer = setTimeout(loadUpdate, 1000);
 }
 function renderUpdate() {
   const r = upd.data || {}, inst = r.installed || {};
@@ -902,13 +905,29 @@ function renderUpdate() {
       <span class="t">${r.check_error ? esc(r.check_error) : r.latest && !r.available ? "Ai ultima versiune." : ""}</span></div>`;
   $("#set-update-sub").textContent = r.available ? `Versiune nouă: ${r.latest.version}` : `Versiunea ${r.version || ""}`;
   const job = r.job || {}, running = job.state === "running";
-  $("#up-new").hidden = !r.available || running || !r.can_install;
+  const dl = job.kind === "download", dlRun = running && dl, instRun = running && !dl;
+  $("#up-new").hidden = !r.available || instRun || !r.can_install;
+  // 1) „Descarcă și verifică” → 2) bara cu procente → 3) „Instalează acum”
+  $("#up-dl").hidden = !!r.staged || dlRun;
+  $("#up-prog").hidden = !dlRun;
+  $("#up-ready").hidden = !r.staged || dlRun;
+  if (dlRun) {
+    // întreaga etapă pe o singură bară: semnătura și spațiul 0–5%, descărcarea 5–90%, verificarea 90–100%
+    const p = job.progress ?? 0, base = { verify: 0, space: 4, download: 5, check: 90 }[job.step] ?? 0;
+    const span = { download: 85, check: 10 }[job.step] ?? 0;
+    const pct = Math.min(100, Math.round(base + span * p / 100));
+    $("#up-bar-fill").style.width = `${pct}%`;
+    $("#up-prog-pct").textContent = `${pct}%`;
+    $("#up-prog-msg").textContent = (job.message || "").replace(/…\s*\d+%$/, "…");
+  }
+  if (r.staged) $("#up-ready-txt").textContent = `✓ Amper ${r.staged.version} e descărcat și verificat (semnătură validă).`;
+  if (!running && dl && job.state === "failed") $("#up-msg").textContent = job.message;
   if (r.available) {
     $("#up-new-title").textContent = `Versiune nouă: ${r.latest.version}`;
     $("#up-notes").innerHTML = esc(r.latest.notes || "").replace(/^- /gm, "• ").replace(/\n/g, "<br>");
   }
   if (r.available && !r.can_install) $("#up-msg").textContent = "Versiunea instalată nu are cheia de verificare: actualizează manual o dată, cu install.sh.";
-  const shown = running ? job : (r.last_job && r.last_job.finished && Date.now() / 1000 - r.last_job.finished < 600 ? r.last_job : null);
+  const shown = instRun ? job : dl ? null : (r.last_job && r.last_job.finished && Date.now() / 1000 - r.last_job.finished < 600 ? r.last_job : null);
   $("#up-job").hidden = !shown;
   if (shown) {
     const steps = r.steps || Object.keys(UP_STEPS), cur = steps.indexOf(shown.step);
@@ -939,18 +958,28 @@ $("#up-check").onclick = async () => {
   b.disabled = false; b.textContent = "Caută actualizări acum";
 };
 async function updateAction(action, btn) {
-  const q = action === "install" ? `Instalez Amper ${upd.data?.latest?.version}? Amper se oprește un minut.`
+  const q = action === "install" ? `Instalez acum Amper ${upd.data?.latest?.version}? Amper se oprește un minut.`
     : `Revin la Amper ${upd.data?.previous?.version}? Amper se oprește un minut.`;
   if (!confirm(q)) return;
   btn.disabled = true; $("#up-msg").textContent = "";
   try {
     const { r, j } = await securePost(`/api/update/${action}`);
     if (!r.ok) $("#up-msg").textContent = j.error || "Nu a mers.";
-    else setTimeout(loadUpdate, 800);
+    else startUpdateOverlay(action);
   } catch (e) { $("#up-msg").textContent = e.message === "Anulat." ? "" : e.message || "Pi-ul nu răspunde."; }
   btn.disabled = false;
 }
 $("#up-go").onclick = () => updateAction("install", $("#up-go"));
+$("#up-dl").onclick = async () => {
+  const b = $("#up-dl");
+  b.disabled = true; $("#up-msg").textContent = "";
+  try {
+    const r = await api("/api/update/download", { method: "POST" });
+    if (r.error) $("#up-msg").textContent = r.error;
+    setTimeout(loadUpdate, 300);
+  } catch (e) { if (e.message !== "auth") $("#up-msg").textContent = "Pi-ul nu răspunde."; }
+  b.disabled = false;
+};
 $("#up-back").onclick = () => updateAction("rollback", $("#up-back"));
 $("#up-beta").onchange = async (e) => {
   const on = e.target.checked;
@@ -1583,14 +1612,9 @@ function suRender() {
       ${suField("su-pw", d.has_password ? "Parola nouă" : "Alege parola", 'type="password" autocomplete="new-password"')}
       ${suField("su-pw2", "Scrie-o încă o dată", 'type="password" autocomplete="new-password"')}`;
   } else if (st.k === "remote") {
-    b.innerHTML = `<h2>Acces de oriunde</h2><p class="note" id="su-ts">Verific…</p>`;
-    api("/api/system").then((x) => {
-      const ts = x.network?.tailscale || {};
-      $("#su-ts").innerHTML = ts.state === "Running" && ts.name
-        ? `Tailscale e pornit. Adresa de oriunde: <b>https://${esc(ts.name)}</b>`
-        : `Acum aplicația merge în rețeaua de acasă. Accesul de oriunde (prin Tailscale, cu contul tău Google) se va
-           putea porni mai târziu. Poți trece mai departe.`;
-    }).catch(() => ($("#su-ts").textContent = "Poți trece mai departe; accesul de oriunde se pornește mai târziu."));
+    b.innerHTML = `<h2>Acces de oriunde</h2><div id="su-ts"></div>
+      <p class="note">Poți sări peste pasul ăsta („Mai departe”) și îl faci oricând din Setări → Acces de oriunde.</p>`;
+    renderRemote($("#su-ts"));
   } else if (st.k === "devices") {
     suRenderDevices();
   } else if (st.k === "capacity") {
@@ -1688,6 +1712,7 @@ async function suNext() {
       if (pw !== pw2) throw new Error("Parolele nu sunt la fel.");
       await post("/api/setup/password", { password: pw, repeat: pw2, old: $("#su-old")?.value || "" });
       su.d.has_password = true;
+      pwCache.v = pw; pwCache.until = Date.now() + 5 * 60000;
     }
   } else if (st.k === "devices") {
     if (su.keep) { su.chosen = null; su.i += 2; return suRender(); }       // sari peste capacități
@@ -1745,3 +1770,124 @@ $("#su-back").onclick = () => {
 navigator.serviceWorker?.addEventListener("message", (e) => {
   if (String(e.data?.open || "").includes("v=alerts") && !$("#app").hidden) show("alerts");
 });
+
+/* ---------- ecranul „Actualizez Amper”: cercul se umple după pașii serviciului de actualizare; cât Amper
+   repornește, serverul nu răspunde (normal); aplicația se reîncarcă singură când versiunea nouă răspunde. */
+const UPOV_PCT = { verify: 4, space: 7, download: 10, check: 55, backup: 62, install: 75, restart: 86, health: 93 };
+const UPOV_MSG = { verify: "Verific semnătura…", space: "Verific spațiul liber…", download: "Descarc…",
+  check: "Verific arhiva…", backup: "Fac copia de siguranță a datelor…", install: "Instalez versiunea nouă…",
+  restart: "Repornesc Amper…", health: "Verific că pornește…" };
+function upovSet(pct, msg) {
+  pct = Math.max(state.upPct || 0, Math.min(100, Math.round(pct)));     // cercul doar înaintează
+  state.upPct = pct;
+  const c = 2 * Math.PI * 52;
+  $("#upov-arc").style.strokeDasharray = `${c}`;
+  $("#upov-arc").style.strokeDashoffset = `${c * (1 - pct / 100)}`;
+  $("#upov-pct").textContent = `${pct}%`;
+  if (msg) $("#upov-msg").textContent = msg;
+}
+function startUpdateOverlay(kind) {
+  state.updating = true; state.upPct = 0;
+  const from = state.info?.version || upd.data?.version;
+  $("#upov-title").textContent = kind === "rollback" ? "Revin la versiunea anterioară" : "Actualizez Amper";
+  $("#upov-close").hidden = true;
+  $("#upov").hidden = false;
+  upovSet(1, "Pornesc…");
+  let down = 0;
+  const tick = async () => {
+    // 1) Amper răspunde cu altă versiune → gata
+    try {
+      const h = await (await fetch("/api/health", { cache: "no-store" })).json();
+      if (h.version && from && h.version !== from) {
+        upovSet(100, "Gata! Reîncarc aplicația…");
+        return setTimeout(() => location.replace(location.pathname), 1200);
+      }
+    } catch {}
+    // 2) pașii, de la serviciul de actualizare (prin Amper; nu răspunde cât Amper e oprit)
+    try {
+      const r = await (await fetch("/api/update/status", { credentials: "same-origin", cache: "no-store" })).json();
+      const j = r.job?.state === "running" ? r.job : r.last_job || r.job || {};
+      down = 0;
+      if (j.state === "running") {
+        const base = UPOV_PCT[j.step] ?? 0;
+        const pct = j.step === "download" && j.progress != null ? 10 + j.progress * 0.45 : base;
+        upovSet(pct, UPOV_MSG[j.step] || j.message);
+      } else if (["failed", "rolled_back"].includes(j.state) && Date.now() / 1000 - (j.finished || 0) < 600) {
+        $("#upov-title").textContent = j.state === "rolled_back" ? "Am revenit la versiunea veche" : "Actualizarea nu a reușit";
+        $("#upov-msg").textContent = j.message;
+        $("#upov-close").hidden = false;
+        state.updating = false;
+        return;
+      } else if (j.state === "ok" && r.version && from && r.version !== from) {
+        upovSet(100, "Gata! Reîncarc aplicația…");
+        return setTimeout(() => location.replace(location.pathname), 1200);
+      }
+    } catch {
+      // Amper e oprit/repornește: cercul înaintează încet, ca să se vadă că lucrează
+      down++;
+      upovSet(Math.max(state.upPct, 62) + (down < 40 ? 0.6 : 0), down > 3 ? "Repornesc Amper… (durează până la un minut)" : null);
+      if (down > 150) {                                 // ~3 minute fără răspuns
+        $("#upov-msg").textContent = "Pi-ul nu răspunde încă. Închide aplicația și redeschide-o peste un minut.";
+        $("#upov-close").hidden = false;
+      }
+    }
+    setTimeout(tick, 1200);
+  };
+  tick();
+}
+$("#upov-close").onclick = () => { $("#upov").hidden = true; state.updating = false; loadUpdate(); };
+
+/* ------------------------------------------------------------------ ACCES DE ORIUNDE (Tailscale + Funnel) */
+const remote = { timer: 0 };
+async function renderRemote(el) {
+  clearTimeout(remote.timer);
+  if (!el || el.closest("[hidden]")) return;
+  let r;
+  try { r = await api("/api/remote"); } catch (e) { if (e.message !== "auth") el.innerHTML = `<p class="note">Pi-ul nu răspunde.</p>`; return; }
+  const job = r.job || {}, waiting = job.state === "running";
+  let h = "";
+  if (r.error) h = `<p class="note">${esc(r.error)}. Accesul de oriunde se pornește doar pe Pi-ul instalat cu install.sh.</p>`;
+  else if (!r.installed) h = `<p class="note">Tailscale nu e instalat pe acest Pi.</p>`;
+  else if (r.state !== "Running") {
+    h = `<p class="note">Ca să deschizi Amper și când nu ești acasă, Pi-ul se leagă de un cont <b>Tailscale</b> (gratuit,
+      te loghezi cu contul Google). Contul e al tău; nimeni altcineva nu are acces.</p>`;
+    h += waiting && (job.url || r.auth_url)
+      ? `<p class="note"><b>1.</b> Deschide pagina de mai jos și loghează-te (cu Google). <b>2.</b> Revino aici: pagina se
+           actualizează singură.</p><a class="btn ed-go rm-link" href="${esc(job.url || r.auth_url)}" target="_blank" rel="noopener">Deschide pagina Tailscale</a>
+         <p class="note">Aștept logarea…</p>`
+      : `<button class="btn ed-go" id="rm-login">Conectează-te la Tailscale</button>`;
+  } else {
+    h = `<div class="list"><div class="row"><span>✓ Conectat la Tailscale${r.account ? ` (${esc(r.account)})` : ""}</span>
+      <span class="t">${esc(r.url || "")}</span></div></div>`;
+    if (r.funnel) {
+      h += `<p class="up-ok">✓ Accesul de oriunde e pornit.</p>
+        <p class="note">Deschide pe orice telefon, <b>fără aplicația Tailscale</b>:<br><b class="rm-url">${esc(r.url)}</b><br>
+          apoi adaug-o pe ecranul principal (Partajare → Adaugă pe ecranul principal). Intrarea cere parola aplicației.</p>
+        <button class="btn danger" id="rm-off">Oprește accesul de oriunde</button>`;
+    } else if (waiting && job.kind === "funnel" && job.url) {
+      h += `<p class="note">Tailscale cere o singură dată aprobarea ta pentru adresa publică (HTTPS și Funnel).
+          Deschide pagina, apasă „Enable” / „Approve”, apoi revino aici.</p>
+        <a class="btn ed-go rm-link" href="${esc(job.url)}" target="_blank" rel="noopener">Aprobă în Tailscale</a>
+        <p class="note">Aștept aprobarea…</p>`;
+    } else {
+      h += `<p class="note">Acum adresa merge doar pe telefoanele cu Tailscale. <b>Accesul de oriunde</b> o face să meargă pe
+          orice telefon, fără aplicația Tailscale. Adresa devine publică: o protejează parola aplicației, blocarea după
+          parole greșite și notificarea la fiecare dispozitiv nou.</p>
+        <button class="btn ed-go" id="rm-on" ${waiting ? "disabled" : ""}>${waiting ? "Pornesc…" : "Pornește accesul de oriunde"}</button>`;
+    }
+  }
+  if (job.state === "failed" && job.message) h += `<p class="err">${esc(job.message)}</p>`;
+  el.innerHTML = h;
+  const act = async (url, body) => {
+    try {
+      const { r: res, j } = await securePost(url, body);
+      if (!res.ok) throw new Error(j.error || `eroare ${res.status}`);
+    } catch (e) { if (e.message !== "Anulat.") alert(e.message); }
+    renderRemote(el);
+  };
+  if ($("#rm-login", el)) $("#rm-login", el).onclick = () => act("/api/remote/login", {});
+  if ($("#rm-on", el)) $("#rm-on", el).onclick = () => act("/api/remote/funnel", { on: true });
+  if ($("#rm-off", el)) $("#rm-off", el).onclick = () =>
+    confirm("Opresc accesul de oriunde? Telefoanele fără Tailscale nu vor mai putea deschide Amper.") && act("/api/remote/funnel", { on: false });
+  if (waiting) remote.timer = setTimeout(() => renderRemote(el), 2500);
+}

@@ -105,8 +105,11 @@ def test_password_required_through_tailscale_https_proxy():
             kiosk = await c.get("/api/info")                                     # direct de pe Pi (HDMI)
             phone = await c.get("/api/info", headers={"X-Forwarded-For": "100.70.157.126",
                                                        "Tailscale-User-Login": "utilizator"})
-            return kiosk.status, phone.status
-    assert asyncio.run(go()) == (200, 401)
+            # Tailscale Funnel (din internet, fără Tailscale pe telefon): orice antet de proxy → parolă
+            funnel = [(await c.get("/api/info", headers={h: v})).status for h, v in (
+                ("Tailscale-Funnel-Request", "?1"), ("X-Forwarded-Proto", "https"), ("X-Forwarded-Host", "amper.x.ts.net"))]
+            return kiosk.status, phone.status, funnel
+    assert asyncio.run(go()) == (200, 401, [401, 401, 401])
 
 
 def test_notification_shows_short_text_details_in_app(tmp_path, monkeypatch):

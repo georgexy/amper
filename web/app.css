@@ -446,3 +446,27 @@ nav.tabs .badge[data-n]::after { content: attr(data-n); position: absolute; top:
 .login-h { margin: 0; font-size: 30px; display: flex; align-items: center; }
 /* alerte: textul principal + detaliile (ce era în paranteze) */
 .det { display: block; font-size: 13px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+
+/* actualizare: bara de progres (descărcare și verificare) */
+#up-prog { margin: 14px 0; }
+.up-prog-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 14px; color: var(--muted); }
+.up-prog-top b { font: 700 22px "Barlow Condensed", sans-serif; color: var(--text); }
+.up-bar { height: 10px; border-radius: 99px; background: var(--panel-2); overflow: hidden; margin-top: 6px; }
+.up-bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #4FC3F7, #5BE08F);
+  transition: width .6s ease; }
+.up-ok { color: var(--charge); font-weight: 600; margin: 14px 0 4px; }
+
+/* ecranul „Actualizez Amper” */
+.upov { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px;
+  background: color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter: blur(6px); }
+.upov-box { text-align: center; max-width: 320px; position: relative; }
+.upov-ring { width: 170px; height: 170px; transform: rotate(-90deg); }
+.upov-ring circle { fill: none; stroke-width: 10; }
+.upov-ring .bg { stroke: var(--panel-2); }
+.upov-ring .fg { stroke: url(#none); stroke: #4FC3F7; stroke-linecap: round; transition: stroke-dashoffset .8s ease; }
+.upov-pct { position: absolute; top: 58px; left: 0; right: 0; font: 700 38px "Barlow Condensed", sans-serif; }
+.upov h2 { margin: 14px 0 4px; }
+
+/* acces de oriunde */
+.rm-link { display: block; text-align: center; text-decoration: none; margin: 10px 0; }
+.rm-url { word-break: break-all; color: var(--text); }

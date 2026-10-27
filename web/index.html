@@ -116,6 +116,9 @@
           <button class="card set-btn" data-panel="daly"><span class="ic" style="--ic:var(--charge)">
             <svg viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 10.5v3M7 10v4M11 10v4M15 10v4"/></svg></span>
             <span><b>Module Daly</b><span id="set-daly-sub">Cablu USB sau Bluetooth</span></span><i>›</i></button>
+          <button class="card set-btn" data-panel="remote"><span class="ic" style="--ic:var(--cell)">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>
+            <span><b>Acces de oriunde</b><span>Fără Tailscale pe telefon</span></span><i>›</i></button>
           <button class="card set-btn" data-panel="security"><span class="ic" style="--ic:var(--warn)">
             <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
             <span><b>Securitate</b><span>Parola, dispozitivele conectate</span></span><i>›</i></button>
@@ -172,9 +175,17 @@
         <div id="up-new" hidden>
           <h2 id="up-new-title"></h2>
           <div class="up-notes" id="up-notes"></div>
-          <p class="note">Înainte de actualizare se face o copie a datelor (istoric, alerte, config). Dacă versiunea
-            nouă nu pornește, Pi-ul revine singur la cea de acum. Aplicația se reîncarcă singură la final.</p>
-          <button class="btn ed-go" id="up-go">Actualizează</button>
+          <button class="btn ed-go" id="up-dl">Descarcă și verifică</button>
+          <div id="up-prog" hidden>
+            <div class="up-prog-top"><span id="up-prog-msg"></span><b id="up-prog-pct"></b></div>
+            <div class="up-bar"><i id="up-bar-fill"></i></div>
+          </div>
+          <div id="up-ready" hidden>
+            <p class="up-ok" id="up-ready-txt"></p>
+            <p class="note">La instalare se face întâi o copie a datelor (istoric, alerte, config). Dacă versiunea nouă
+              nu pornește, Pi-ul revine singur la cea de acum. Aplicația se reîncarcă singură la final.</p>
+            <button class="btn ed-go" id="up-go">Instalează acum</button>
+          </div>
         </div>
         <div id="up-job" hidden>
           <div class="list up-steps" id="up-steps"></div>
@@ -187,6 +198,11 @@
         </div>
         <h2>Istoric</h2>
         <div class="list" id="up-hist"></div>
+      </section>
+
+      <section class="set-panel" id="set-remote" hidden>
+        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Acces de oriunde</h2></div>
+        <div id="remote-body"></div>
       </section>
 
       <section class="set-panel" id="set-security" hidden>
@@ -285,6 +301,18 @@
       <p class="err" id="ed-err"></p>
     </div>
   </dialog>
+
+  <!-- actualizarea în curs: cerc care se umple; la final aplicația se reîncarcă singură -->
+  <div id="upov" class="upov" hidden>
+    <div class="upov-box">
+      <svg class="upov-ring" viewBox="0 0 120 120"><circle class="bg" cx="60" cy="60" r="52"/>
+        <circle class="fg" id="upov-arc" cx="60" cy="60" r="52"/></svg>
+      <div class="upov-pct" id="upov-pct">0%</div>
+      <h2 id="upov-title">Actualizez Amper</h2>
+      <p class="note" id="upov-msg">Pornesc…</p>
+      <button class="btn" id="upov-close" hidden>Închide</button>
+    </div>
+  </div>
 
   <dialog id="pwask" aria-labelledby="pwask-title">
     <div class="sheet">

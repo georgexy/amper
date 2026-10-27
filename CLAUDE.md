@@ -231,6 +231,20 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - Scrierile (BMS, invertor, WiFi, actualizare) cer `app_password` în corp (`web.confirm`); în pagină `securePost`
   + dialogul `#pwask`, parola ținută 5 min în memorie. Antete: CSP, X-Frame-Options, nosniff, Referrer-Policy.
 - Roluri admin/vizualizare: NEFĂCUTE (opționale în brief).
+- `web.local()` (scutirea kiosk-ului de parolă) e falsă la orice antet de proxy, inclusiv `Tailscale-Funnel-Request`
+  și `X-Forwarded-*` — condiție pentru Funnel (adresa publică, telefoane fără Tailscale).
+
+## Actualizare în doi pași + acces de oriunde (0.3.0-beta.4, 2026-10-27)
+- `Updater.download()` → arhiva verificată în `state_dir/staged` (+ `state.staged`); `install()` o reverifică.
+  Progres: `_fetch(progress=)`, `_check_sha`; job `{step, progress}`. UI: „Descarcă și verifică” → bară → „Instalează
+  acum”; în timpul instalării, ecranul `#upov` (cerc), reîncărcare când `/api/health` dă versiunea nouă.
+- Ecranul negru după actualizare (raportat de utilizator): cât Amper repornește, `tailscale serve` dă 502 cu
+  pagină goală; `sw.js` o afișa și o salva în cache. Acum răspunsurile !ok nu se afișează/salvează (v16).
+- `amper/remote.py` (în amper-update, root; API `/remote`, `/remote/login`, `/remote/funnel`): `tailscale up
+  --hostname=amper` și `tailscale funnel --bg --https=443 http://127.0.0.1:<port>`, rulate în fundal; linkurile
+  de logare/aprobare (orice `https://login.tailscale.com/...`) apar în aplicație. Oprit = `funnel reset` + `serve`.
+  Web: `/api/remote*` (funnel cere `app_password`), actualizează `webpush.subject` cu adresa Tailscale.
+  install.sh instalează mereu pachetul Tailscale (fără logare). NEVERIFICAT pe un cont Tailscale nou.
 
 ## Lucru pe Pi
 - Datele de acces la Pi-ul autorului (utilizator, IP-uri, Tailscale): în `LOCAL.md`.
