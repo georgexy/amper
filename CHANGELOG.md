@@ -5,6 +5,8 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 ## 0.3.0-beta.9 — în pregătire
 - Bateriile pe Bluetooth au pe card numele modulului (ex. „DL-40D63C2A1F2B”, același ca în aplicația Daly de pe
   telefon) și adresa, ca să știi care baterie e Daly 1, 2, 3. Apar și în Setări → Dispozitive conectate.
+- „Dispozitive conectate”: butonul de adăugare e acum un „+” mic, sus în dreapta.
+- Ecranul de actualizare: în loc de cerc, bateria din iconița Amper se umple pe măsură ce avansează actualizarea.
 
 ## 0.3.0-beta.8 — 2026-10-27
 - Imaginea SD Amper: se scrie pe card cu Raspberry Pi Imager („Use custom”) și Pi-ul pornește direct cu hotspotul

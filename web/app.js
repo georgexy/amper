@@ -1967,9 +1967,7 @@ const UPOV_MSG = { verify: "Verific semnătura…", space: "Verific spațiul lib
 function upovSet(pct, msg) {
   pct = Math.max(state.upPct || 0, Math.min(100, Math.round(pct)));     // cercul doar înaintează
   state.upPct = pct;
-  const c = 2 * Math.PI * 52;
-  $("#upov-arc").style.strokeDasharray = `${c}`;
-  $("#upov-arc").style.strokeDashoffset = `${c * (1 - pct / 100)}`;
+  $("#upov-fill").style.transform = `translateY(${294 * (1 - pct / 100)}px)`;   // bateria se umple de jos în sus
   $("#upov-pct").textContent = `${pct}%`;
   if (msg) $("#upov-msg").textContent = msg;
 }

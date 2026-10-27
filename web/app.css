@@ -461,11 +461,11 @@ nav.tabs .badge[data-n]::after { content: attr(data-n); position: absolute; top:
 .upov { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px;
   background: color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter: blur(6px); }
 .upov-box { text-align: center; max-width: 320px; position: relative; }
-.upov-ring { width: 170px; height: 170px; transform: rotate(-90deg); }
-.upov-ring circle { fill: none; stroke-width: 10; }
-.upov-ring .bg { stroke: var(--panel-2); }
-.upov-ring .fg { stroke: url(#none); stroke: #4FC3F7; stroke-linecap: round; transition: stroke-dashoffset .8s ease; }
-.upov-pct { position: absolute; top: 58px; left: 0; right: 0; font: 700 38px "Barlow Condensed", sans-serif; }
+.upov-bat { height: var(--upov-h, 190px); width: auto; display: block; margin: 0 auto; overflow: visible; }
+.upov-bat .fill { fill: #52C98F; transform: translateY(294px); transition: transform .8s ease; }
+.upov-bat .bolt { transform-origin: 256px 246px; animation: upov-bolt 1.6s ease-in-out infinite; }
+@keyframes upov-bolt { 50% { opacity: .55; transform: scale(.92); } }
+.upov-pct { margin-top: 12px; font: 700 38px/1 "Barlow Condensed", sans-serif; }
 .upov h2 { margin: 14px 0 4px; }
 
 /* acces de oriunde */
@@ -532,3 +532,9 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .pk-id { display: flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 12.5px; color: var(--muted);
   font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .pk-id svg { width: 13px; height: 13px; flex: none; fill: none; stroke: var(--acc); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* butonul mic „+” din colțul unui panou (ex. Adaugă dispozitiv) */
+.pk-top .icon-btn { margin-left: auto; }
+.icon-btn { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--acc); cursor: pointer; }
+.icon-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+
