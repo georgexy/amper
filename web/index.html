@@ -169,16 +169,14 @@
 
       <section class="set-panel" id="set-update" hidden>
         <div class="pk-top"><button class="back set-back" data-back="about" aria-label="Înapoi la Despre">‹</button><h2>Actualizări</h2></div>
-        <div class="list" id="up-now"></div>
-        <button class="btn" id="up-check">Caută actualizări acum</button>
         <label class="row-check" id="up-beta-row" hidden><input type="checkbox" id="up-beta">
           <span><b>Primește versiunile de test (beta)</b><small>Versiuni noi, încă în probă. Pentru cine vrea să le
             încerce primul; poți reveni oricând la versiunea anterioară.</small></span></label>
+        <div class="list" id="up-now"></div>
+        <button class="btn" id="up-check">Caută actualizări</button>
         <p class="note" id="up-msg"></p>
         <div id="up-new" hidden>
-          <h2 id="up-new-title"></h2>
-          <div class="up-notes" id="up-notes"></div>
-          <button class="btn ed-go" id="up-dl">Descarcă și verifică</button>
+          <div class="up-new-head"><h2 id="up-new-title"></h2><button class="btn sm ed-go" id="up-dl">Descarcă</button></div>
           <div id="up-prog" hidden>
             <div class="up-prog-top"><span id="up-prog-msg"></span><b id="up-prog-pct"></b></div>
             <div class="up-bar"><i id="up-bar-fill"></i></div>
@@ -189,6 +187,7 @@
               nu pornește, Pi-ul revine singur la cea de acum. Aplicația se reîncarcă singură la final.</p>
             <button class="btn ed-go" id="up-go">Instalează acum</button>
           </div>
+          <div class="up-notes" id="up-notes"></div>
         </div>
         <div id="up-job" hidden>
           <div class="list up-steps" id="up-steps"></div>

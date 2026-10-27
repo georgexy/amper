@@ -104,6 +104,7 @@ async function boot() {
   setInterval(loadDay, 300000);
   const v = new URLSearchParams(location.search).get("v");
   if (v === "alerts") { show("alerts"); history.replaceState(null, "", location.pathname); }
+  if (v === "update") { show("settings"); showPanel("update"); history.replaceState(null, "", location.pathname); }
   $("#version").textContent = `Amper ${state.info.version || ""} · citire la fiecare ${state.info.poll_interval} s.`;
   $("#set-about-sub").textContent = `Amper ${state.info.version || ""} · actualizări, Pi-ul`;
   setInterval(tickConn, 1000);
@@ -1150,13 +1151,13 @@ function renderUpdate() {
 }
 $("#up-check").onclick = async () => {
   const b = $("#up-check");
-  b.disabled = true; b.textContent = "Caut pe GitHub…"; $("#up-msg").textContent = "";
+  b.disabled = true; b.textContent = "Caut actualizări…"; $("#up-msg").textContent = "";
   try {
     const r = await api("/api/update/check", { method: "POST" });
     upd.data = r; renderUpdate();
     $("#up-msg").textContent = r.error || (r.available ? "" : "Ai ultima versiune.");
   } catch (e) { if (e.message !== "auth") $("#up-msg").textContent = "Pi-ul nu răspunde."; }
-  b.disabled = false; b.textContent = "Caută actualizări acum";
+  b.disabled = false; b.textContent = "Caută actualizări";
 };
 async function updateAction(action, btn) {
   const q = action === "install" ? `Instalez acum Amper ${upd.data?.latest?.version}? Amper se oprește un minut.`
@@ -2046,7 +2047,10 @@ $("#su-back").onclick = () => {
 
 /* atingerea unei notificări cu aplicația deja deschisă: service worker-ul trimite adresa */
 navigator.serviceWorker?.addEventListener("message", (e) => {
-  if (String(e.data?.open || "").includes("v=alerts") && !$("#app").hidden) show("alerts");
+  const u = String(e.data?.open || "");
+  if ($("#app").hidden) return;
+  if (u.includes("v=alerts")) show("alerts");
+  if (u.includes("v=update")) { show("settings"); showPanel("update"); }
 });
 
 /* ---------- ecranul „Actualizez Amper”: cercul se umple după pașii serviciului de actualizare; cât Amper

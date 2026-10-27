@@ -293,7 +293,8 @@ def cmd_notify(args) -> None:
 
     async def go():
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as http:
-            await n._deliver(http, {"message": args.message, "title": args.title, "priority": args.priority})
+            await n._deliver(http, {"message": args.message, "title": args.title, "priority": args.priority,
+                                    "url": args.url})
     asyncio.run(go())
 
 
@@ -323,6 +324,7 @@ def main(argv=None) -> None:
     nt.add_argument("message")
     nt.add_argument("--title", default="Amper")
     nt.add_argument("--priority", default="default", choices=["low", "default", "high"])
+    nt.add_argument("--url", help="ce deschide atingerea notificării în aplicație (ex. /?v=update)")
     nt.add_argument("-c", "--config", default="/etc/amper/config.yaml")
     sub.add_parser("update", help="actualizări fără aplicație: --check, --install, --rollback (cu sudo)")
     args = p.parse_args(argv)

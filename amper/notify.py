@@ -57,9 +57,10 @@ class Notifier:
     def enabled(self) -> bool:
         return self._ntfy_on() or self._tg_on() or bool(self.webpush and self.webpush.enabled)
 
-    def send(self, message: str, title: str = "amper", priority: str = "default") -> None:
+    def send(self, message: str, title: str = "amper", priority: str = "default", url: str | None = None) -> None:
+        """`url`: ce se deschide în aplicație la atingerea notificării (implicit Alerte)."""
         log.info("NOTIFICARE [%s] %s", priority, message)
-        item = {"message": message, "title": title, "priority": priority, "done": set()}
+        item = {"message": message, "title": title, "priority": priority, "url": url, "done": set()}
         self.sent.append(item)
         del self.sent[:-200]
         if self.enabled:
