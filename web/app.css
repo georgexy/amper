@@ -461,7 +461,7 @@ nav.tabs .badge[data-n]::after { content: attr(data-n); position: absolute; top:
 .upov { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px;
   background: color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter: blur(6px); }
 .upov-box { text-align: center; max-width: 320px; position: relative; }
-.upov-bat { height: var(--upov-h, 190px); width: auto; display: block; margin: 0 auto; overflow: visible; }
+.upov-bat { height: var(--upov-h, 130px); width: auto; display: block; margin: 0 auto; overflow: visible; }
 .upov-bat .fill { fill: #52C98F; transform: translateY(294px); transition: transform .8s ease; }
 .upov-bat .bolt { transform-origin: 256px 246px; animation: upov-bolt 1.6s ease-in-out infinite; }
 @keyframes upov-bolt { 50% { opacity: .55; transform: scale(.92); } }
