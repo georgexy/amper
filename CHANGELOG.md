@@ -2,6 +2,18 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 0.3.0-beta.11 — în pregătire
+- „Deconectează” pentru orice BMS: în fișa bateriei (atingi bateria în ecranul Bateriile) și la „Dispozitive
+  inactive”. Cere parola și o confirmare. Amper nu-l mai citește și nu mai dă alerte pentru el (alertele lui
+  deschise se închid fără notificare), fără repornire; modificarea apare în jurnal și primești o notificare.
+  Istoricul lui rămâne.
+- La Daly, poziția (ex. „Daly 2”) rămâne liberă, iar căutarea automată poate găsi alt modul; cel deconectat intră
+  pe lista „Module excluse” (Setări → Dispozitive conectate), de unde îl poți „Permite din nou”. La o poziție
+  liberă: „Caută din nou”. Seplos și celelalte se scot din configurare.
+- Egalizatoarele active (module Bluetooth tot „DL-…”) nu mai sunt luate drept BMS Daly: un modul se leagă doar dacă
+  răspunde ca un BMS (capacitate validă sau SOC și Ah rămași). La „Caută acum” și în ghidul de configurare vezi ce
+  s-a găsit, cu valorile citite, și poți „Respinge” un modul greșit (intră pe lista de excluse).
+
 ## 0.3.0-beta.10 — 2026-10-27
 - Actualizări: comutatorul „versiunile de test (beta)” e primul, sus; butonul se numește „Caută actualizări”;
   „Descarcă” stă în dreapta titlului „Versiune nouă”, iar bara și „Instalează acum” apar imediat sub el.

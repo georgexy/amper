@@ -26,6 +26,7 @@ class DeviceState:
         self.errors = 0
         # a răspuns măcar o dată (acum sau în istoricul recent); cele nelegate nu se afișează
         self.connected = False
+        self.gen = 0          # crește la deconectare: o citire pornită înainte nu mai e luată în seamă
 
     def to_dict(self, now: float, stale_after: float) -> dict:
         r = self.reading.to_dict() if self.reading else None
@@ -67,6 +68,7 @@ class Engine:
         for r in self.alerts.restore(self.db.open_alerts(), self.started):
             self.db.close_alert(r["id"], int(self.started))
         self.subscribers: set[asyncio.Queue] = set()
+        self._tasks: dict[str, asyncio.Task] = {}
         self._energy_t: dict[str, float] = {}
         self._energy_acc: dict[tuple, dict] = {}
         self._clock_offset = time.time() - time.monotonic()
@@ -138,6 +140,7 @@ class Engine:
             t0 = time.monotonic()
             try:
                 if pending is None:
+                    gen = st.gen
                     pending = loop.run_in_executor(executor, st.driver.read)
                     # eroarea unei citiri abandonate (ex. la oprire) nu mai e raportată ca „neprelucrată”
                     pending.add_done_callback(lambda f: f.cancelled() or f.exception())
@@ -146,6 +149,8 @@ class Engine:
                 finally:
                     if pending.done():
                         pending = None
+                if st.gen != gen:                # deconectat cât timp citirea era în curs
+                    continue
                 st.reading, st.last_ok, st.error, st.errors = r, time.time(), None, 0
                 if not st.connected:             # prima citire de la un dispozitiv nou (ex. un Daly abia legat)
                     how = getattr(st.driver, "link_desc", "")
@@ -239,13 +244,60 @@ class Engine:
         self._energy_acc.clear()
 
     async def run(self) -> None:
-        tasks = [asyncio.create_task(self.poll_device(st), name=f"poll:{k}") for k, st in self.devices.items()]
+        self._tasks = {k: asyncio.create_task(self.poll_device(st), name=f"poll:{k}") for k, st in self.devices.items()}
+        tasks = list(self._tasks.values())
         tasks += [asyncio.create_task(c) for c in (self.tick_loop(), self.store_loop(),
                                                    self.maintenance_loop(), self.notifier.run())]
         if self.cfg["database"] != ":memory:":
             from .presence import Presence          # pornire / revenire online / semnal de viață
             tasks.append(asyncio.create_task(Presence(self, self.cfg).run()))
         await asyncio.gather(*tasks)
+
+    # ---------------- deconectare din aplicație ----------------
+    def disconnect_device(self, dev_id: str, reason: str = "deconectat din aplicație") -> dict:
+        """Amper nu mai citește BMS-ul și nu mai dă alerte pentru el, fără repornirea serviciului.
+        Daly: poziția (ex. daly2) rămâne, liberă — legătura e uitată și pusă pe lista de excluse, iar căutarea automată
+        poate găsi alt modul. Celelalte (ex. Seplos): scoase din config. Istoricul rămâne în baza de date.
+        Întoarce {name, link, action: freed|removed, devices: lista nouă pentru config sau None}."""
+        from .drivers import daly_auto
+        st = self.devices[dev_id]
+        name = st.cfg.get("name", dev_id)
+        link = getattr(st.driver, "link_desc", "") or ""
+        raw = (st.reading.raw if st.reading is not None else {}) or {}
+        new_devices = None
+        st.gen += 1
+        if st.cfg["type"] == "daly":
+            if isinstance(st.driver, daly_auto.DalyAutoDriver):
+                b = st.driver.unbind()
+            else:                                          # legătură fixă în config: devine poziție liberă („auto”)
+                b = ({"type": "ble", "ble": st.cfg["ble"], "name": st.cfg.get("ble_name") or raw.get("ble_name")}
+                     if st.cfg.get("ble") else {"type": "uart", "port": st.cfg.get("port")})
+                st.driver.close()
+                keep = ("id", "name", "type", "capacity_ah", "invert_current")
+                cfg = {**{k: st.cfg[k] for k in keep if k in st.cfg}, "port": "auto"}
+                self.cfg["devices"] = [cfg if d["id"] == dev_id else d for d in self.cfg["devices"]]
+                st.cfg, st.driver = cfg, daly_auto.DalyAutoDriver(cfg, self.cfg["devices"])
+                new_devices = self.cfg["devices"]
+            if b and (b.get("ble") or b.get("port")):
+                daly_auto.exclude(b, f"{name}: {link or b.get('name') or b.get('ble') or b.get('port')}", reason)
+            st.reading, st.last_ok, st.error, st.errors, st.connected = None, None, None, 0, False
+            action = "freed"
+        else:
+            task = self._tasks.pop(dev_id, None)
+            if task:
+                task.cancel()
+            st.driver.close()
+            del self.devices[dev_id]
+            self.cfg["devices"] = [d for d in self.cfg["devices"] if d["id"] != dev_id]
+            new_devices = self.cfg["devices"]
+            action = "removed"
+        self.alerts.drop_device(dev_id)
+        self.db.log_setting(int(time.time()), dev_id, "conexiune", link or None, reason, True, None, "aplicație")
+        log.warning("%s (%s): %s", dev_id, link, reason)
+        self.notifier.send(f"🔌 {name} a fost deconectat{f' ({link})' if link else ''}. Amper nu-l mai citește.",
+                           title="Amper", priority="default")
+        self._push(self.snapshot())
+        return {"name": name, "link": link, "action": action, "devices": new_devices}
 
     def close(self) -> None:
         self._flush_energy()

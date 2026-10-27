@@ -88,11 +88,22 @@ def scan(cfg: dict, progress=lambda msg: None, ble_seconds: float = 8) -> dict:
         return {"found": found, "ports": ports, "ble_note": ble_note}
     progress("Caut modulele Daly prin Bluetooth (8 s)…")
     try:
-        from .drivers import ble
-        for d in ble.scan(ble_seconds):
-            if ble.is_daly_name(d["name"]):
-                found.append({"type": "daly", "ble": d["address"], "name": d["name"], "rssi": d["rssi"],
-                              "link": "Bluetooth", "label": f"Daly {d['name']}"})
+        from .drivers import ble, daly_auto
+        mods = [d for d in ble.scan(ble_seconds) if ble.is_daly_name(d["name"])
+                and not daly_auto.is_excluded({"type": "ble", "ble": d["address"], "name": d["name"]})]
+        for i, d in enumerate(mods, 1):
+            # citit, ca să se vadă dacă e BMS (un egalizator activ are tot nume „DL-…” și SOC 0)
+            progress(f"Citesc modulul {d['name']} ({i} din {len(mods)})…")
+            b = {"type": "ble", "ble": d["address"], "name": d["name"]}
+            try:
+                ok = daly_auto._probe({"id": "cautare", "name": d["name"], "type": "daly"}, b)
+            except Exception as e:                   # nu răspunde: îl arătăm, nebifat
+                log.warning("citire %s: %s", d["name"], e)
+                ok = False
+            found.append({"type": "daly", "ble": d["address"], "name": d["name"], "rssi": d["rssi"],
+                          "link": "Bluetooth", "label": f"Daly {d['name']}", "check": b.get("check") or {},
+                          "ok": ok, "keys": sorted(daly_auto.link_keys(b)), "binding": {"type": "ble", "ble": d["address"],
+                                                                                        "name": d["name"]}})
     except Exception as e:                           # fără adaptor, fără bleak
         ble_note = f"Bluetooth indisponibil ({e.__class__.__name__})"
     return {"found": found, "ports": ports, "ble_note": ble_note}

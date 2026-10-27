@@ -287,3 +287,27 @@ def test_api_add_device(tmp_path):
     over = yaml.safe_load((tmp_path / "settings.yaml").read_text())
     assert [d["id"] for d in over["devices"]] == ["daly1", "daly2"] and over["devices"][1]["ble_name"] == "DL-CC00"
     assert any("Dispozitiv adăugat" in m for m in sent)
+
+
+def test_api_disconnect_needs_password_and_excluded_list(tmp_path):
+    from amper.drivers import daly_auto
+    daly_auto.set_state_dir(str(tmp_path))
+    daly_auto.exclude({"type": "ble", "ble": "EE:01", "name": "DL-B77B"}, "daly2: DL-B77B", "respins din aplicație")
+
+    async def steps(c, eng, n):
+        await c.post("/api/login", json={"password": "pw-corecta"})
+        no = await c.post("/api/devices/seplos1/disconnect", json={})
+        bad = await c.post("/api/devices/seplos1/disconnect", json={"app_password": "gresit"})
+        ok = await c.post("/api/devices/seplos1/disconnect", json={"app_password": "pw-corecta"})
+        inv = await c.post("/api/devices/inv/disconnect", json={"app_password": "pw-corecta"})   # invertorul: nu e BMS
+        ex = await (await c.get("/api/devices/excluded")).json()
+        allow = await (await c.post("/api/devices/excluded/allow", json={"index": 0})).json()
+        return no.status, bad.status, ok.status, await ok.json(), inv.status, ex, allow, list(eng.devices)
+    no, bad, ok, okj, inv, ex, allow, devs = run({"web": {"password": "pw-corecta"}, "devices": [
+        {"id": "inv", "name": "Growatt", "type": "sim_growatt"},
+        {"id": "seplos1", "name": "Seplos 1", "type": "seplos", "port": "/dev/ttyX", "address": 1, "capacity_ah": 100}]},
+        steps, tmp_path)
+    assert no == 403 and bad == 403 and ok == 200 and okj["action"] == "removed" and inv == 404
+    assert devs == ["inv"] and ex["items"][0]["label"] == "daly2: DL-B77B" and allow["items"] == []
+    over = yaml.safe_load((tmp_path / "settings.yaml").read_text())
+    assert [d["id"] for d in over["devices"]] == ["inv"]

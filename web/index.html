@@ -270,6 +270,9 @@
           <button class="card set-btn" data-panel="devoff" id="dev-off-btn" hidden><span class="ic" style="--ic:var(--faint)">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg></span>
             <span><b>Dispozitive inactive</b><span id="dev-off-n"></span></span><i>›</i></button>
+          <button class="card set-btn" data-panel="excl" id="excl-btn" hidden><span class="ic" style="--ic:var(--alarm)">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg></span>
+            <span><b>Module excluse</b><span id="excl-n"></span></span><i>›</i></button>
         </div>
       </section>
 
@@ -286,6 +289,14 @@
         <div class="card da-form" id="da-form" hidden></div>
       </section>
 
+      <section class="set-panel" id="set-excl" hidden>
+        <div class="pk-top"><button class="back set-back" data-back="daly" aria-label="Înapoi la dispozitive">‹</button><h2>Module excluse</h2></div>
+        <p class="note">Module deconectate sau respinse: căutarea automată nu le mai leagă. „Permite din nou” le face din
+          nou disponibile.</p>
+        <div class="list" id="excl-list"></div>
+        <button class="btn" id="excl-all" hidden>Permite din nou pe toate</button>
+      </section>
+
       <section class="set-panel" id="set-devoff" hidden>
         <div class="pk-top"><button class="back set-back" data-back="daly" aria-label="Înapoi la dispozitive">‹</button><h2>Dispozitive inactive</h2></div>
         <p class="note">Dispozitive din configurare care nu comunică acum (nelegate, BMS adormit sau cablu scos). Apar
@@ -295,6 +306,10 @@
           <p class="note">Modulele Daly se găsesc singure, pe cablu USB sau prin Bluetooth (nume „DL-…”). Căutarea se
             face la 30 s în primele 10 minute după pornire, apoi la 3 minute.</p>
           <button class="btn" id="daly-search">Caută acum modulele Daly</button>
+          <h2 id="daly-found-h" hidden>Găsite la căutare</h2>
+          <p class="note" id="daly-found-note" hidden>Un egalizator activ are tot nume „DL-…”, dar răspunde cu SOC 0 și fără
+            capacitate: Amper nu-l leagă. Dacă totuși un modul greșit a fost legat, apasă „Respinge”.</p>
+          <div class="list" id="daly-found"></div>
         </div>
       </section>
     </main>
@@ -356,6 +371,7 @@
       <div class="cells" id="sh-cells"></div>
       <ul class="alarms" id="sh-alarms"></ul>
       <p class="note" id="sh-upd"></p>
+      <button class="btn danger sh-disc" id="sh-disc">Deconectează</button>
     </div>
   </dialog>
 

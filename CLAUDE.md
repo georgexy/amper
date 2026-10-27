@@ -336,3 +336,20 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `Updater._notify(msg, url="/?v=update")`, titlul „Amper”; versiune nouă = „Versiune nouă detectată. Atinge pentru a
   actualiza.” `app.js`: `?v=update` și mesajul SW deschid Setări → Actualizări.
 - Ecran: beta sus, `#up-check` „Caută actualizări”, `.up-new-head` (titlu + „Descarcă”), bara/instalarea înaintea notelor.
+
+## Deconectare BMS, module excluse, egalizatoare (0.3.0-beta.11, în pregătire)
+- Pe Pi-ul utilizatorului, căutarea a legat un EGALIZATOR ACTIV (BLE „DL-B77B020306D3”) ca daly2: răspunde la 0x90 cu
+  tensiuni reale, SOC 0, 0 cicluri, MOSFET 0. Utilizatorul a scos modulele BLE de pe egalizatoare și va deconecta daly2.
+- `daly_auto.check_bms(drv)`: 0x90 (+0x50 capacitate, 0x93 Ah rămași, 0x94 celule/cicluri); BMS = 5–100 V, SOC 0–100
+  și (capacitate 1–2000 Ah sau SOC>0 și Ah rămași>0). `_probe` pune valorile în `b["check"]`; `_note_found` →
+  `recent_found()` (ultimele 20, legate sau nu); respinse → `_not_bms` (golit de `trigger()`).
+- Excluse: `<state>/daly-excluded.json` = [{keys: ["ble:MAC","name:DL-…"|"uart:/dev/…"], label, reason, at}];
+  `exclude/is_excluded/allow_again(index|None)`; sărite la căutarea automată, în ghid și la legarea din daly-auto.json.
+  În backup.sh și în copia pre-update (*.json).
+- `Engine.disconnect_device(id)`: `st.gen += 1` (citirea în curs ignorată), Daly auto → `DalyAutoDriver.unbind()`;
+  Daly fix (ble:/port:) → config `port: auto` + driver auto nou; altele → task anulat, scos din `devices`/config.
+  `AlertManager.drop_device` (închide în DB, fără „Rezolvat”), `settings_log` („conexiune”), notificare.
+- API: `POST /api/devices/<id>/disconnect` (app_password), `GET /api/devices/excluded`, `POST .../excluded/allow`,
+  `GET /api/daly/found` (+ pozițiile auto, `free`), `POST /api/daly/reject` (keys sau binding din ghid; app_password).
+- UI: `#sh-disc` în fișa bateriei; `devoff`: „Caută din nou” (poziție liberă) / „Deconectează”, „Găsite la căutare”
+  cu „Respinge”; panoul `excl`; ghid: valorile citite, nebifat dacă `ok:false`, „Respinge”.

@@ -547,3 +547,11 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .up-new-head { margin: 20px 0 10px; }
 .up-new-head h2 { margin: 0 auto 0 0; }
 .up-new-head .btn { margin: 0; flex: none; width: auto; padding: 9px 20px; }
+/* Deconectează, module excluse, găsite la căutare */
+.bms-row .row-act { grid-column: 1 / -1; display: flex; gap: 8px; margin-top: 6px; }
+.bms-row .row-act .btn { margin: 0; }
+.sh-disc { width: 100%; margin-top: 18px; }
+.toast { position: fixed; left: 16px; right: 16px; bottom: 104px; z-index: 80; padding: 12px 14px; border-radius: 14px;
+  background: var(--panel-2); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,.45); font-size: 14.5px; }
+.su-rej { margin: -2px 0 8px 14px; }
+small.warnc { color: var(--warn); }
