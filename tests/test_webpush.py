@@ -107,3 +107,35 @@ def test_password_required_through_tailscale_https_proxy():
                                                        "Tailscale-User-Login": "utilizator"})
             return kiosk.status, phone.status
     assert asyncio.run(go()) == (200, 401)
+
+
+def test_notification_shows_short_text_details_in_app(tmp_path, monkeypatch):
+    """Pe telefon: doar textul principal; ce e în paranteze se vede în aplicație, la Alerte."""
+    from amper.notify import split_detail
+    assert split_detail("Daly 2: BMS-ul a OPRIT încărcarea (MOSFET încărcare OFF)") == \
+        ("Daly 2: BMS-ul a OPRIT încărcarea", "MOSFET încărcare OFF")
+    assert split_detail("Daly 1 NU se încarcă (curent 0,1 A, SOC 50%) în timp ce restul băncii se încarcă") == \
+        ("Daly 1 NU se încarcă în timp ce restul băncii se încarcă", "curent 0,1 A, SOC 50%")
+    assert split_detail("Daly 3: nu mai comunică de 3 min (timeout (2 s))") == ("Daly 3: nu mai comunică de 3 min",
+                                                                                 "timeout (2 s)")
+    assert split_detail("Daly 1: SOC scăzut 20%") == ("Daly 1: SOC scăzut 20%", "")
+    assert split_detail("ceva (neînchis") == ("ceva (neînchis", "")
+
+    from amper.db import Database
+    db = Database(":memory:")
+    db.add_push("https://push.example/x", "k", "a")
+    wp = webpush.WebPush(db, str(tmp_path), subject="https://amper.example")
+    sent = []
+    monkeypatch.setattr(webpush, "encrypt", lambda payload, p256dh, auth: sent.append(json.loads(payload)) or b"")
+
+    class Resp:
+        status = 201
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+
+    class Http:
+        def post(self, *a, **k): return Resp()
+    asyncio.run(wp.send(Http(), {"title": "Amper", "priority": "high",
+                                 "message": "Daly 2: BMS-ul a OPRIT încărcarea (MOSFET încărcare OFF)"}))
+    assert sent == [{"title": "Amper", "body": "Daly 2: BMS-ul a OPRIT încărcarea", "priority": "high",
+                     "url": "/?v=alerts"}]
