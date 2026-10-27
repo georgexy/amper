@@ -214,5 +214,5 @@ cat <<EOF
 EOF
 [ "$NEW_CONFIG" -eq 1 ] && echo "  Verificați în config capacitățile (capacity_ah) ale modulelor — din ele se calculează SOC-ul total."
 grep -q "by-id/REPLACE-" "$ETC/config.yaml" && [ "$DEMO" -eq 0 ] && \
-  echo "  ATENȚIE: unele dispozitive nu au fost găsite. Vedeți README, secțiunea 'Dacă un dispozitiv nu e găsit'."
+  echo "  ATENȚIE: unele dispozitive nu au fost găsite. Vedeți docs/instalare-avansata.md, „Dacă un dispozitiv nu e găsit”."
 exit 0

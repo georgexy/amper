@@ -7,6 +7,8 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
   „Amper-Setup”, apoi ghidul de configurare. Imaginea e aceeași pentru toți; ce trebuie să fie unic (topicul de
   notificări, cheile, baza de date) se face la prima pornire. SSH e oprit, numele în rețea e „amper”.
 - Hotspotul deblochează singur WiFi-ul la pornire (pe un card nou Raspberry Pi OS îl ține blocat).
+- Documentație nouă, simplă, pentru cei care primesc Amper (README): ce trebuie cumpărat, scrierea cardului,
+  prima pornire, ce faci dacă nu apare „Amper-Setup”. Instalarea manuală a trecut în docs/instalare-avansata.md.
 
 ## 0.3.0-beta.7 — 2026-10-27
 - Hotspotul de configurare arată adresa în nume: „Amper-Setup 10.42.0.1”; după ce Pi-ul s-a conectat la WiFi-ul
