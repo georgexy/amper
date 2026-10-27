@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 0.3.0-beta.8 — în pregătire
+## 0.3.0-beta.8 — 2026-10-27
 - Imaginea SD Amper: se scrie pe card cu Raspberry Pi Imager („Use custom”) și Pi-ul pornește direct cu hotspotul
   „Amper-Setup”, apoi ghidul de configurare. Imaginea e aceeași pentru toți; ce trebuie să fie unic (topicul de
   notificări, cheile, baza de date) se face la prima pornire. SSH e oprit, numele în rețea e „amper”.
