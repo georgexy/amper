@@ -365,6 +365,40 @@ def make_app(engine) -> web.Application:
         data, status = await update_api("POST", "/check")
         return _json({**data, "running": __version__}, status)
 
+    # ---------------- acces de oriunde: Tailscale + Funnel (prin amper-update, root) ----------------
+    def remote_seen(data: dict) -> dict:
+        # Pi-ul are acum o adresă Tailscale: notificările pe iPhone o folosesc imediat (Apple cere adresa reală)
+        wp = engine.notifier.webpush
+        if data.get("url") and wp and not (cfg.get("web") or {}).get("public_url") and wp.subject != data["url"]:
+            wp.subject = data["url"]
+            log.info("adresa pentru notificări: %s", data["url"])
+        return data
+
+    async def remote_get(request):
+        data, status = await update_api("GET", "/remote")
+        return _json(remote_seen(data), status)
+
+    async def remote_login(request):
+        body = await request.json() if request.can_read_body else {}
+        if auth_.enabled and (err := await confirm(request, body, "Tailscale")) is not None:
+            return err
+        data, status = await update_api("POST", "/remote/login")
+        return _json(remote_seen(data), status)
+
+    async def remote_funnel(request):
+        # deschide/închide adresa publică: cere parola din nou
+        body = await request.json()
+        if (err := await confirm(request, body, "acces de oriunde")) is not None:
+            return err
+        on = bool(body.get("on"))
+        data, status = await update_api("POST", "/remote/funnel", {"on": on})
+        if status == 200:
+            log.warning("acces de oriunde (Funnel) %s din aplicație (de la %s)", "pornit" if on else "oprit",
+                        client_ip(request))
+            engine.notifier.send(f"🌍 Accesul de oriunde a fost {'pornit' if on else 'oprit'} din aplicație.",
+                                 title="Amper: securitate", priority="high")
+        return _json(remote_seen(data), status)
+
     async def update_download(request):
         # doar descarcă și verifică (nu schimbă nimic pe Pi): ajunge logarea
         data, status = await update_api("POST", "/download")
@@ -635,6 +669,9 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/api/update/status", update_status)
     app.router.add_post("/api/update/check", update_check)
     app.router.add_post("/api/update/download", update_download)
+    app.router.add_get("/api/remote", remote_get)
+    app.router.add_post("/api/remote/login", remote_login)
+    app.router.add_post("/api/remote/funnel", remote_funnel)
     app.router.add_post("/api/update/{action:install|rollback}", update_action)
     app.router.add_get("/api/push/key", push_key)
     app.router.add_post("/api/push/subscribe", push_subscribe)

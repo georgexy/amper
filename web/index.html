@@ -116,6 +116,9 @@
           <button class="card set-btn" data-panel="daly"><span class="ic" style="--ic:var(--charge)">
             <svg viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 10.5v3M7 10v4M11 10v4M15 10v4"/></svg></span>
             <span><b>Module Daly</b><span id="set-daly-sub">Cablu USB sau Bluetooth</span></span><i>›</i></button>
+          <button class="card set-btn" data-panel="remote"><span class="ic" style="--ic:var(--cell)">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>
+            <span><b>Acces de oriunde</b><span>Fără Tailscale pe telefon</span></span><i>›</i></button>
           <button class="card set-btn" data-panel="security"><span class="ic" style="--ic:var(--warn)">
             <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
             <span><b>Securitate</b><span>Parola, dispozitivele conectate</span></span><i>›</i></button>
@@ -195,6 +198,11 @@
         </div>
         <h2>Istoric</h2>
         <div class="list" id="up-hist"></div>
+      </section>
+
+      <section class="set-panel" id="set-remote" hidden>
+        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Acces de oriunde</h2></div>
+        <div id="remote-body"></div>
       </section>
 
       <section class="set-panel" id="set-security" hidden>

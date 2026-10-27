@@ -153,10 +153,14 @@ systemctl daemon-reload
 systemctl enable amper-wifi >/dev/null 2>&1
 systemctl restart amper-wifi
 
-# ---------------- Tailscale (opțional) ----------------
-if [ "$TAILSCALE" -eq 1 ]; then
-  say "Instalez Tailscale (acces la aplicație de oriunde, fără porturi deschise în router)"
-  command -v tailscale >/dev/null || curl -fsSL https://tailscale.com/install.sh | sh
+# ---------------- Tailscale ----------------
+# Pachetul se instalează mereu (fără logare): accesul de oriunde se pornește din aplicație (Setări → Acces de
+# oriunde). Cu --tailscale, logarea se face și de aici, din linia de comandă.
+if ! command -v tailscale >/dev/null; then
+  say "Instalez Tailscale (pentru accesul de oriunde; se pornește din aplicație)"
+  curl -fsSL https://tailscale.com/install.sh | sh || echo "  (Tailscale nu s-a putut instala acum; accesul de oriunde nu va fi disponibil)"
+fi
+if [ "$TAILSCALE" -eq 1 ] && command -v tailscale >/dev/null; then
   echo "Deschideți linkul afișat mai jos (de pe telefon sau PC) și autentificați-vă:"
   tailscale up --hostname "$(hostname)" || true
 fi

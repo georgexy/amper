@@ -247,6 +247,8 @@ class Updater:
         self.clock = clock
         self.lock = threading.Lock()
         self.job: dict = {"state": "idle"}
+        from .remote import Remote                    # acces de oriunde (Tailscale + Funnel), tot ca root
+        self.remote = Remote(port=self.port)
         self.state = self._load_state()
         if self.state.get("channel") in ("stable", "beta"):     # ales din aplicație (Setări → Actualizări)
             self.channel = self.state["channel"]
@@ -726,11 +728,26 @@ class Updater:
             def do_GET(self):
                 if self.headers.get("X-Token") != token:
                     return self._json({"error": "neautorizat"}, 403)
+                if self.path.startswith("/remote"):
+                    return self._json(up.remote.status())
                 return self._json(up.status())
 
             def do_POST(self):
                 if self.headers.get("X-Token") != token:
                     return self._json({"error": "neautorizat"}, 403)
+                if self.path.startswith("/remote/"):
+                    n = int(self.headers.get("Content-Length") or 0)
+                    try:
+                        body = json.loads(self.rfile.read(min(n, 4096)) or b"{}")
+                    except ValueError:
+                        body = {}
+                    if self.path.startswith("/remote/login"):
+                        up.remote.login()
+                    elif self.path.startswith("/remote/funnel"):
+                        up.remote.funnel(bool(body.get("on")))
+                    else:
+                        return self._json({"error": "necunoscut"}, 404)
+                    return self._json(up.remote.status())
                 if self.path.startswith("/channel"):
                     n = int(self.headers.get("Content-Length") or 0)
                     try:

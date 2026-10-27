@@ -2,15 +2,17 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 0.3.0-beta.4 — în pregătire
+## 0.3.0-beta.4 — 2026-10-27
 - Actualizare în doi pași: „Descarcă și verifică”, cu bară de progres și procente pentru descărcare și verificare,
   apoi butonul „Instalează acum”. Arhiva descărcată se verifică din nou la instalare.
 - În timpul instalării apare un ecran cu un cerc care se umple pas cu pas; când versiunea nouă răspunde,
   aplicația se reîncarcă singură.
 - Reparat: după actualizare, aplicația putea rămâne cu ecranul negru (pagina de eroare a Tailscale din timpul
   repornirii era afișată și ținută minte). Acum se folosește ultima versiune bună până răspunde Pi-ul.
-- Pregătit pentru accesul fără Tailscale pe telefon (Tailscale Funnel): cererile venite prin Funnel cer
-  întotdeauna parola, ca și cele de pe telefon.
+- Acces de oriunde fără Tailscale pe telefon (Setări → Acces de oriunde, și în ghidul de configurare):
+  „Conectează-te la Tailscale” (logare cu Google, contul tău) și „Pornește accesul de oriunde” (Tailscale Funnel);
+  adresa https merge apoi pe orice telefon. Pornirea/oprirea cere parola și trimite notificare. Cererile venite
+  prin Funnel cer întotdeauna parola.
 
 ## 0.3.0-beta.3 — 2026-10-27
 - Sigla Amper (bateria cu fulger) sus, înaintea numelui.

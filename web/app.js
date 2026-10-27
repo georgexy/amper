@@ -733,7 +733,8 @@ $("#daly-search").onclick = async () => {
 /* meniul setărilor: butoane → secțiuni (Teme, Notificări, Module Daly) */
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "notif", "daly", "info", "update", "security"]) $("#set-" + k).hidden = k !== name;
+  for (const k of ["teme", "notif", "daly", "info", "update", "security", "remote"]) $("#set-" + k).hidden = k !== name;
+  if (name === "remote") renderRemote($("#remote-body"));
   if (name === "security") loadSecurity();
   clearInterval(state.infoTimer);
   clearTimeout(upd.timer);
@@ -1611,14 +1612,9 @@ function suRender() {
       ${suField("su-pw", d.has_password ? "Parola nouă" : "Alege parola", 'type="password" autocomplete="new-password"')}
       ${suField("su-pw2", "Scrie-o încă o dată", 'type="password" autocomplete="new-password"')}`;
   } else if (st.k === "remote") {
-    b.innerHTML = `<h2>Acces de oriunde</h2><p class="note" id="su-ts">Verific…</p>`;
-    api("/api/system").then((x) => {
-      const ts = x.network?.tailscale || {};
-      $("#su-ts").innerHTML = ts.state === "Running" && ts.name
-        ? `Tailscale e pornit. Adresa de oriunde: <b>https://${esc(ts.name)}</b>`
-        : `Acum aplicația merge în rețeaua de acasă. Accesul de oriunde (prin Tailscale, cu contul tău Google) se va
-           putea porni mai târziu. Poți trece mai departe.`;
-    }).catch(() => ($("#su-ts").textContent = "Poți trece mai departe; accesul de oriunde se pornește mai târziu."));
+    b.innerHTML = `<h2>Acces de oriunde</h2><div id="su-ts"></div>
+      <p class="note">Poți sări peste pasul ăsta („Mai departe”) și îl faci oricând din Setări → Acces de oriunde.</p>`;
+    renderRemote($("#su-ts"));
   } else if (st.k === "devices") {
     suRenderDevices();
   } else if (st.k === "capacity") {
@@ -1716,6 +1712,7 @@ async function suNext() {
       if (pw !== pw2) throw new Error("Parolele nu sunt la fel.");
       await post("/api/setup/password", { password: pw, repeat: pw2, old: $("#su-old")?.value || "" });
       su.d.has_password = true;
+      pwCache.v = pw; pwCache.until = Date.now() + 5 * 60000;
     }
   } else if (st.k === "devices") {
     if (su.keep) { su.chosen = null; su.i += 2; return suRender(); }       // sari peste capacități
@@ -1839,3 +1836,58 @@ function startUpdateOverlay(kind) {
   tick();
 }
 $("#upov-close").onclick = () => { $("#upov").hidden = true; state.updating = false; loadUpdate(); };
+
+/* ------------------------------------------------------------------ ACCES DE ORIUNDE (Tailscale + Funnel) */
+const remote = { timer: 0 };
+async function renderRemote(el) {
+  clearTimeout(remote.timer);
+  if (!el || el.closest("[hidden]")) return;
+  let r;
+  try { r = await api("/api/remote"); } catch (e) { if (e.message !== "auth") el.innerHTML = `<p class="note">Pi-ul nu răspunde.</p>`; return; }
+  const job = r.job || {}, waiting = job.state === "running";
+  let h = "";
+  if (r.error) h = `<p class="note">${esc(r.error)}. Accesul de oriunde se pornește doar pe Pi-ul instalat cu install.sh.</p>`;
+  else if (!r.installed) h = `<p class="note">Tailscale nu e instalat pe acest Pi.</p>`;
+  else if (r.state !== "Running") {
+    h = `<p class="note">Ca să deschizi Amper și când nu ești acasă, Pi-ul se leagă de un cont <b>Tailscale</b> (gratuit,
+      te loghezi cu contul Google). Contul e al tău; nimeni altcineva nu are acces.</p>`;
+    h += waiting && (job.url || r.auth_url)
+      ? `<p class="note"><b>1.</b> Deschide pagina de mai jos și loghează-te (cu Google). <b>2.</b> Revino aici: pagina se
+           actualizează singură.</p><a class="btn ed-go rm-link" href="${esc(job.url || r.auth_url)}" target="_blank" rel="noopener">Deschide pagina Tailscale</a>
+         <p class="note">Aștept logarea…</p>`
+      : `<button class="btn ed-go" id="rm-login">Conectează-te la Tailscale</button>`;
+  } else {
+    h = `<div class="list"><div class="row"><span>✓ Conectat la Tailscale${r.account ? ` (${esc(r.account)})` : ""}</span>
+      <span class="t">${esc(r.url || "")}</span></div></div>`;
+    if (r.funnel) {
+      h += `<p class="up-ok">✓ Accesul de oriunde e pornit.</p>
+        <p class="note">Deschide pe orice telefon, <b>fără aplicația Tailscale</b>:<br><b class="rm-url">${esc(r.url)}</b><br>
+          apoi adaug-o pe ecranul principal (Partajare → Adaugă pe ecranul principal). Intrarea cere parola aplicației.</p>
+        <button class="btn danger" id="rm-off">Oprește accesul de oriunde</button>`;
+    } else if (waiting && job.kind === "funnel" && job.url) {
+      h += `<p class="note">Tailscale cere o singură dată aprobarea ta pentru adresa publică (HTTPS și Funnel).
+          Deschide pagina, apasă „Enable” / „Approve”, apoi revino aici.</p>
+        <a class="btn ed-go rm-link" href="${esc(job.url)}" target="_blank" rel="noopener">Aprobă în Tailscale</a>
+        <p class="note">Aștept aprobarea…</p>`;
+    } else {
+      h += `<p class="note">Acum adresa merge doar pe telefoanele cu Tailscale. <b>Accesul de oriunde</b> o face să meargă pe
+          orice telefon, fără aplicația Tailscale. Adresa devine publică: o protejează parola aplicației, blocarea după
+          parole greșite și notificarea la fiecare dispozitiv nou.</p>
+        <button class="btn ed-go" id="rm-on" ${waiting ? "disabled" : ""}>${waiting ? "Pornesc…" : "Pornește accesul de oriunde"}</button>`;
+    }
+  }
+  if (job.state === "failed" && job.message) h += `<p class="err">${esc(job.message)}</p>`;
+  el.innerHTML = h;
+  const act = async (url, body) => {
+    try {
+      const { r: res, j } = await securePost(url, body);
+      if (!res.ok) throw new Error(j.error || `eroare ${res.status}`);
+    } catch (e) { if (e.message !== "Anulat.") alert(e.message); }
+    renderRemote(el);
+  };
+  if ($("#rm-login", el)) $("#rm-login", el).onclick = () => act("/api/remote/login", {});
+  if ($("#rm-on", el)) $("#rm-on", el).onclick = () => act("/api/remote/funnel", { on: true });
+  if ($("#rm-off", el)) $("#rm-off", el).onclick = () =>
+    confirm("Opresc accesul de oriunde? Telefoanele fără Tailscale nu vor mai putea deschide Amper.") && act("/api/remote/funnel", { on: false });
+  if (waiting) remote.timer = setTimeout(() => renderRemote(el), 2500);
+}
