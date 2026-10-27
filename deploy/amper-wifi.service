@@ -8,6 +8,8 @@ Type=simple
 Environment=PYTHONPATH=/opt/amper
 Environment=PYTHONUNBUFFERED=1
 # ca root: lucrează cu NetworkManager și pagina ascultă pe portul 80 al hotspotului
+# WiFi deblocat (pe un card nou Raspberry Pi OS îl ține blocat până se alege țara)
+ExecStartPre=-/usr/sbin/rfkill unblock wifi
 ExecStart=/usr/bin/python3 -m amper.wifi_setup -c /etc/amper/config.yaml
 Restart=always
 # token pentru API-ul local folosit de Setări → Info (citibil de grupul amper)

@@ -262,3 +262,15 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   folderul se schimbă cu `AMPER_BACKUP_REMOTE` în `/etc/amper/backup.env` (implicit `gdrive:back-up`).
 - Teste: `python -m pytest`; demo: `python -m amper simulate --hours 48`.
 - Preferință utilizator: nu face modificări nesolicitate. Propune-le și aplică doar ce cere.
+
+## Imaginea SD (3.3, 0.3.0-beta.8, 2026-10-27)
+- `tools/build-image.sh` (root): Raspberry Pi OS Lite 64-bit oficial → chroot (nativ pe arm64, altfel qemu-user-static)
+  → Tailscale din depozitul oficial → `deploy/install.sh --image` (nu pornește nimic, fără autoconfig, `devices: []`,
+  topicul rămâne REPLACE-TOPIC, marcaj `/etc/amper/.firstboot`) → hostname `amper`, SSH oprit, `userconfig` mascat,
+  `pi`/root blocați, țara WiFi (`COUNTRY`, implicit RO) în cmdline.txt → curățenie (machine-id gol, fără chei SSH,
+  /var/lib/amper și /var/lib/tailscale goale) → verificări → `resize2fs -M` + sfdisk (PARTUUID păstrat) → `.img.xz`.
+  Ales chroot, nu pi-gen: rulează exact install.sh, durează minute.
+- `deploy/firstboot.sh` + `amper-firstboot.service` (înaintea amper/amper-wifi/amper-update): topicul ntfy, cheile SSH,
+  machine-id. Cheile VAPID, cookie.key și DB le face amper la pornire.
+- `.github/workflows/image.yml`: pe `ubuntu-24.04-arm`; la PR doar construiește + verifică (Artifacts 3 zile);
+  „Run workflow” o adaugă la versiunea publicată v<ver>. NEVERIFICAT: pornirea imaginii pe un Pi real.
