@@ -60,7 +60,7 @@ def test_config_daly_without_port_is_auto():
 def auto_env(tmp_path, monkeypatch, fake_ble):
     daly_auto.set_state_dir(str(tmp_path))
     daly_auto._claimed.clear()
-    daly_auto._ble_cache.update(t=0.0, items=[])
+    daly_auto._ble_cache.update(t=None, items=[])
     ports = []
     ble_devices = []
     monkeypatch.setattr(daly_auto, "list_serial_ports", lambda: list(ports))
@@ -90,6 +90,14 @@ def test_auto_binds_bluetooth_modules_in_signal_order(auto_env):
     _, again = auto_devices()
     assert again[0].inner.link_desc == "Bluetooth AA:00:00:00:00:01"
     assert again[1].inner.link_desc == "Bluetooth AA:00:00:00:00:02"
+
+
+def test_auto_bluetooth_right_after_boot(auto_env, monkeypatch):
+    """Pi-ul (sau mașina de test) pornit de mai puțin de 30 s: prima căutare Bluetooth se face oricum."""
+    monkeypatch.setattr(daly_auto.time, "monotonic", lambda: 12.0)
+    auto_env["ble"].append({"address": "AA:00:00:00:00:01", "name": "DL-40D63C2A", "rssi": -50})
+    _, drvs = auto_devices()
+    assert drvs[0]._search_once()
 
 
 def test_auto_ignores_ports_of_other_devices_and_binds_new_usb(auto_env, monkeypatch):

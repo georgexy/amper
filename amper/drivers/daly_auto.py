@@ -28,7 +28,7 @@ _lock = threading.Lock()              # o singură căutare odată, pentru toate
 _claimed: dict[str, str] = {}         # legătură ("uart:/dev/..." / "ble:AA:BB..") → id dispozitiv
 _wake = threading.Condition()
 _wake_gen = [0]
-_ble_cache: dict = {"t": 0.0, "items": []}
+_ble_cache: dict = {"t": None, "items": []}     # t = None: încă nescanat (monotonic poate fi < 30 s după pornire)
 
 
 def set_state_dir(path: str) -> None:
@@ -65,7 +65,7 @@ def trigger() -> None:
     """Caută acum (nu aștepta următoarea rundă)."""
     with _wake:
         _wake_gen[0] += 1
-        _ble_cache["t"] = 0
+        _ble_cache["t"] = None
         _wake.notify_all()
 
 
@@ -163,7 +163,7 @@ class DalyAutoDriver(Driver):
         # 2) Bluetooth: rezultatul scanării e comun tuturor modulelor (30 s)
         from . import ble
         now = time.monotonic()
-        if now - _ble_cache["t"] > 30:
+        if _ble_cache["t"] is None or now - _ble_cache["t"] > 30:
             try:
                 found = [d for d in ble.scan(8) if ble.is_daly_name(d["name"])]
                 _ble_cache["items"] = sorted(found, key=lambda d: -(d.get("rssi") or -999))   # semnalul cel mai bun întâi
