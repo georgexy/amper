@@ -243,3 +243,47 @@ def test_password_reset_only_from_home_network(tmp_path):
     assert not after["password_reset"] and after["auth"]
     assert not (yaml.safe_load((tmp_path / "settings.yaml").read_text()) or {}).get("password_reset")
     assert any("ștearsă cu fișierul de pe card" in m for m in sent)
+
+
+# ---------------------------------------------------------------- Adaugă dispozitiv (Setări → Dispozitive conectate → +)
+def test_add_device_ids_and_unsupported():
+    from amper.setup_scan import add_device
+    existing = [{"id": "daly1", "name": "Daly 1", "type": "daly", "ble": "AA"}, {"id": "daly3", "name": "Daly 3", "type": "daly"},
+                {"id": "inverter", "name": "Invertor", "type": "growatt_spf", "port": "/dev/x"}]
+    d = add_device(existing, {"type": "daly", "ble": "BB:00", "ble_name": "DL-BB00", "capacity_ah": 105})
+    assert d["id"] == "daly4" and d["name"] == "Daly 4" and d["ble"] == "BB:00" and d["ble_name"] == "DL-BB00"
+    s = add_device(existing, {"type": "seplos", "port": "/dev/ttyUSB1", "address": 2, "capacity_ah": 100, "name": "Raft"})
+    assert s["id"] == "seplos1" and s["name"] == "Raft" and s["baudrate"] == 19200
+    with pytest.raises(ValueError, match="JK BMS.*nu e suportat"):
+        add_device(existing, {"type": "jk", "ble": "CC", "capacity_ah": 100})
+    with pytest.raises(ValueError, match="capacitatea"):
+        add_device(existing, {"type": "daly", "ble": "CC"})
+
+
+def test_scan_ble_hides_used_modules(monkeypatch, tmp_path):
+    from amper import setup_scan
+    from amper.drivers import ble, daly_auto
+    monkeypatch.setattr(ble, "scan", lambda s: [
+        {"address": "AA:00", "name": "DL-AA00", "rssi": -50},       # în config
+        {"address": "BB:00", "name": "DL-BB00", "rssi": -55},       # găsit automat (daly-auto.json)
+        {"address": "CC:00", "name": "JK_B2A8S20P", "rssi": -60},
+        {"address": "DD:00", "name": "", "rssi": -40}])            # fără nume: nu apare
+    monkeypatch.setattr(daly_auto, "load_bindings", lambda: {"daly2": {"type": "ble", "ble": "BB:00", "name": "DL-BB00"}})
+    r = setup_scan.scan_ble({"devices": [{"id": "daly1", "type": "daly", "ble": "aa:00"}]})
+    assert [f["ble"] for f in r["found"]] == ["CC:00"] and r["found"][0]["guess"] is None
+    assert any(t["type"] == "daly" and t["supported"] for t in r["types"])
+
+
+def test_api_add_device(tmp_path):
+    async def steps(c, eng, n):
+        bad = await c.post("/api/devices/add", json={"device": {"type": "jk", "ble": "CC", "capacity_ah": 50}})
+        ok = await c.post("/api/devices/add", json={"device": {"type": "daly", "ble": "CC:00", "ble_name": "DL-CC00",
+                                                                 "capacity_ah": 105}})
+        return bad.status, await ok.json(), n.sent
+    bad, ok, sent = run({"devices": [{"id": "inv", "name": "Growatt", "type": "sim_growatt"},
+                                     {"id": "daly1", "name": "Daly 1", "type": "daly", "ble": "AA:00", "capacity_ah": 105}]},
+                        steps, tmp_path)
+    assert bad == 400 and ok["device"]["id"] == "daly2" and ok["restart"] is False      # simulator: fără repornire
+    over = yaml.safe_load((tmp_path / "settings.yaml").read_text())
+    assert [d["id"] for d in over["devices"]] == ["daly1", "daly2"] and over["devices"][1]["ble_name"] == "DL-CC00"
+    assert any("Dispozitiv adăugat" in m for m in sent)

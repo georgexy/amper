@@ -537,4 +537,9 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .icon-btn { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 12px;
   border: 1px solid var(--line); background: var(--panel); color: var(--acc); cursor: pointer; }
 .icon-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
-
+/* Adaugă dispozitiv */
+.da-form { padding: 14px; margin-top: 14px; display: grid; gap: 8px; }
+.da-form h3 { margin: 0; }
+.da-types { display: grid; gap: 6px; }
+.da-types .dis { opacity: .55; }
+.da-types .row-check { padding: 8px 12px; min-height: 0; }
