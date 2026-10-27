@@ -23,6 +23,7 @@ starea fiecărui modul în timp real și să fie alertat pe telefon când un BMS
   „înghețate” după deconectarea panourilor. Utilizatorul plănuiește să-l înlocuiască cu un **Deye 8 kW monofazat** —
   atunci va fi nevoie de un driver Deye nou (Modbus, registre holding).
 - Posibil în viitor: acumulator Ecobat PowerCube P15A (BMS Daren Hi-Tec, RS485/CAN, protocol Pylon/Victron/Growatt).
+  Notele din manual (porturi, pini, DIP, 9600 bps, ipoteza PACE/Pylon): `docs/powercube-p15a.md` — de folosit la driver.
 
 ## Arhitectură
 - `amper/drivers/` — câte un driver pe tip (`daly.py`, `seplos.py`, `growatt_spf.py`, `simulator.py`); `read()` e
