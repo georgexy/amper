@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 0.3.0-beta.6 — în pregătire
+## 0.3.0-beta.6 — 2026-10-27
 - Setări: meniul nou „Despre” cuprinde Actualizări și Info.
 - Acces de oriunde: în loc de pagină goală, „Verific starea Tailscale…” și un mesaj clar dacă Pi-ul nu răspunde;
   fiecare comandă Tailscale are o limită de 10 secunde.
