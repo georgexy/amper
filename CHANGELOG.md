@@ -2,6 +2,10 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 0.3.0-beta.2 — 2026-10-27
+- Modulele Daly prin Bluetooth: prima căutare se face imediat și când Amper pornește în primele 30 de secunde
+  după alimentarea Pi-ului (înainte se amâna).
+
 ## 0.3.0-beta.1 — 2026-10-27
 - Ghid de configurare la prima pornire: numele instalației, parola aplicației, căutarea dispozitivelor (cablu USB
   și Daly prin Bluetooth), capacitățile modulelor, notificările pe telefon. Se poate relua din Setări.
