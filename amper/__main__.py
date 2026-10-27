@@ -60,7 +60,7 @@ def cmd_run(args) -> None:
         log.info("oprit")
 
 
-def sim_config(db_path: str, port: int, hours: float) -> dict:
+def sim_config(db_path: str, port: int, hours: float, setup: bool = False) -> dict:
     fault_after = max(60, hours * 3600 - 1800)    # Daly 2 "cade" cu 30 min înainte de pornire
     devices = [
         {"id": "daly1", "name": "Daly 1", "type": "sim_daly", "capacity_ah": 100, "start_soc": 55},
@@ -70,7 +70,9 @@ def sim_config(db_path: str, port: int, hours: float) -> dict:
         {"id": "seplos", "name": "Seplos", "type": "sim_seplos", "capacity_ah": 280, "start_soc": 60},
         {"id": "inverter", "name": "Growatt SPF 5000 ES", "type": "sim_growatt", "pv_peak_w": 4400},
     ]
-    cfg = _merge(DEFAULTS, {"database": db_path, "devices": devices, "web": {"port": port, "host": "0.0.0.0"}})
+    # ghidul de configurare apare doar la cerere (--ghid); setările din el merg lângă baza de date simulată
+    cfg = _merge(DEFAULTS, {"database": db_path, "devices": devices, "web": {"port": port, "host": "0.0.0.0"},
+                            "setup_done": not setup, "settings_file": db_path + ".settings.yaml"})
     validate(cfg)
     return cfg
 
@@ -109,7 +111,9 @@ def cmd_simulate(args) -> None:
         for suffix in ("", "-wal", "-shm"):
             if os.path.exists(db_path + suffix):
                 os.remove(db_path + suffix)
-    cfg = sim_config(db_path, args.port, args.hours)
+    cfg = sim_config(db_path, args.port, args.hours, setup=args.ghid)
+    if args.ghid and os.path.exists(cfg["settings_file"]):
+        os.remove(cfg["settings_file"])
     engine = Engine(cfg)
     if args.hours > 0:
         log.info("generez %.0f ore de istoric simulat...", args.hours)
@@ -303,6 +307,7 @@ def main(argv=None) -> None:
     s.add_argument("--port", type=int, default=8080)
     s.add_argument("--db", default="/tmp/amper-sim.db")
     s.add_argument("--keep", action="store_true", help="păstrează baza de date simulată existentă")
+    s.add_argument("--ghid", action="store_true", help="pornește cu ghidul de configurare (prima pornire)")
     sub.add_parser("scan")
     ac = sub.add_parser("autoconfig")
     ac.add_argument("-c", "--config", default="/etc/amper/config.yaml")

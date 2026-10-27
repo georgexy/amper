@@ -59,6 +59,11 @@ CREATE TABLE IF NOT EXISTS push_subs (
     endpoint TEXT PRIMARY KEY, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created INTEGER NOT NULL, ua TEXT);
 
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+
+-- securitate: încercările de logare și browserele care s-au logat (pentru „dispozitiv nou conectat”)
+CREATE TABLE IF NOT EXISTS login_log (ts INTEGER NOT NULL, ip TEXT, ok INTEGER NOT NULL, ua TEXT, note TEXT);
+CREATE TABLE IF NOT EXISTS login_devices (
+    id TEXT PRIMARY KEY, first_ts INTEGER NOT NULL, last_ts INTEGER NOT NULL, ip TEXT, ua TEXT);
 """
 
 
@@ -183,6 +188,31 @@ class Database:
     def push_subs(self) -> list[dict]:
         with self.lock:
             return [dict(r) for r in self.conn.execute("SELECT * FROM push_subs ORDER BY created").fetchall()]
+
+    def log_login(self, ts: int, ip: str, ok: bool, ua: str = "", note: str = "") -> None:
+        with self.lock:
+            self.conn.execute("INSERT INTO login_log VALUES (?,?,?,?,?)", (ts, ip, int(ok), ua[:200], note))
+            self.conn.execute("DELETE FROM login_log WHERE ts < ?", (ts - 90 * 86400,))
+
+    def login_log(self, limit: int = 30) -> list[dict]:
+        with self.lock:
+            return [dict(r) for r in self.conn.execute(
+                "SELECT * FROM login_log ORDER BY ts DESC, rowid DESC LIMIT ?", (limit,))]
+
+    def login_device(self, dev_id: str, ts: int, ip: str, ua: str) -> bool:
+        """Înregistrează browserul; True dacă e nou."""
+        with self.lock:
+            new = self.conn.execute("SELECT 1 FROM login_devices WHERE id=?", (dev_id,)).fetchone() is None
+            if new:
+                self.conn.execute("INSERT INTO login_devices VALUES (?,?,?,?,?)", (dev_id, ts, ts, ip, ua[:200]))
+            else:
+                self.conn.execute("UPDATE login_devices SET last_ts=?, ip=?, ua=? WHERE id=?",
+                                  (ts, ip, ua[:200], dev_id))
+            return new
+
+    def login_devices(self) -> list[dict]:
+        with self.lock:
+            return [dict(r) for r in self.conn.execute("SELECT * FROM login_devices ORDER BY last_ts DESC")]
 
     def seen_devices(self, since: int) -> set[str]:
         """Dispozitivele care au salvat cel puțin o citire după `since`."""

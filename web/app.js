@@ -57,8 +57,10 @@ async function boot() {
     return;
   }
   $("#login").hidden = true;
+  if (state.info.setup_needed) return openSetup(false);
   $("#app").hidden = false;
   $("#simnote").hidden = !state.info.simulated;
+  if (state.info.site_name) { $(".top h1").textContent = state.info.site_name; document.title = `Amper · ${state.info.site_name}`; }
   connect();
   loadEnergy();
   setInterval(loadEnergy, 60000);
@@ -77,9 +79,44 @@ function showLogin() {
 $("#pwgo").onclick = async () => {
   const r = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ password: $("#pw").value }) });
-  if (r.ok) boot(); else $("#pwerr").textContent = "Parola nu e corectă.";
+  if (r.ok) return boot();
+  const j = await r.json().catch(() => ({}));
+  $("#pwerr").textContent = r.status === 429 ? j.error : "Parola nu e corectă.";
 };
 $("#pw").addEventListener("keydown", (e) => e.key === "Enter" && $("#pwgo").click());
+
+/* Scrierile importante (BMS, invertor, WiFi, actualizare) cer parola aplicației din nou. O ținem minte doar în
+   memoria paginii, 5 minute, ca să nu fie cerută la fiecare setare dintr-o serie. */
+const pwCache = { v: "", until: 0 };
+function askPassword(msg) {
+  const d = $("#pwask");
+  $("#pwask-msg").textContent = msg || "Scrie parola aplicației ca să confirmi.";
+  $("#pwask-in").value = "";
+  d.showModal();
+  setTimeout(() => $("#pwask-in").focus(), 50);
+  return new Promise((res) => {
+    const done = (v) => { d.close(); $("#pwask-ok").onclick = $("#pwask-no").onclick = null; res(v); };
+    $("#pwask-ok").onclick = () => done($("#pwask-in").value);
+    $("#pwask-no").onclick = () => done(null);
+    $("#pwask-in").onkeydown = (e) => e.key === "Enter" && done($("#pwask-in").value);
+    d.oncancel = () => done(null);
+  });
+}
+async function securePost(url, body = {}) {
+  let msg = "";
+  for (let i = 0; i < 3; i++) {
+    const pw = Date.now() < pwCache.until ? pwCache.v : await askPassword(msg);
+    if (pw == null) throw new Error("Anulat.");
+    const r = await fetch(url, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...body, app_password: pw }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 403 && j.bad_password) { pwCache.until = 0; msg = "Parola nu e corectă. Încearcă din nou."; continue; }
+    if (r.status === 429) { pwCache.until = 0; throw new Error(j.error); }
+    if (r.ok) { pwCache.v = pw; pwCache.until = Date.now() + 5 * 60000; }
+    return { r, j };
+  }
+  throw new Error("Parola nu e corectă.");
+}
 
 /* ------------------------------------------------------------------ date live */
 function connect() {
@@ -577,9 +614,7 @@ async function writeInverter(path, body, btn) {
   const label = btn.textContent;
   btn.textContent = "Se scrie și se verifică…";
   try {
-    const r = await fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body || {}) });
-    const j = await r.json();
+    const { r, j } = await securePost(path, body || {});
     if (!r.ok || !j.ok) throw new Error(j.error || `eroare ${r.status}`);
     inv.data.settings = j.settings;
     if (j.clock) inv.data.clock = j.clock;
@@ -645,9 +680,7 @@ function renderBms() {
   $$(".iv-row", $("#bms-list")).forEach((el) => (el.onclick = () => {
     const x = bms.data.settings.find((s) => s.key === el.dataset.key);
     openEditor(x, "BMS", async (v) => {
-      const res = await fetch(`/api/daly/${encodeURIComponent(bms.id)}/settings`, { method: "POST", credentials: "same-origin",
-        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: x.key, value: v }) });
-      const j = await res.json();
+      const { r: res, j } = await securePost(`/api/daly/${encodeURIComponent(bms.id)}/settings`, { key: x.key, value: v });
       if (!res.ok || !j.ok) throw new Error(j.error || `eroare ${res.status}`);
       bms.data.settings = j.settings;
       renderBms();
@@ -692,7 +725,8 @@ $("#daly-search").onclick = async () => {
 /* meniul setărilor: butoane → secțiuni (Teme, Notificări, Module Daly) */
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "notif", "daly", "info", "update"]) $("#set-" + k).hidden = k !== name;
+  for (const k of ["teme", "notif", "daly", "info", "update", "security"]) $("#set-" + k).hidden = k !== name;
+  if (name === "security") loadSecurity();
   clearInterval(state.infoTimer);
   clearTimeout(upd.timer);
   if (name === "update") loadUpdate();
@@ -701,7 +735,20 @@ function showPanel(name) {
   if (name === "daly") renderDaly();
   window.scrollTo(0, 0);
 }
-$$(".set-btn").forEach((b) => (b.onclick = () => showPanel(b.dataset.panel)));
+$$(".set-btn[data-panel]").forEach((b) => (b.onclick = () => showPanel(b.dataset.panel)));
+$("#set-wizard").onclick = () => openSetup(true);
+
+async function loadSecurity() {
+  let r;
+  try { r = await api("/api/security"); } catch { return; }
+  $("#sec-devs").innerHTML = r.devices.length ? r.devices.map((d) => `<div class="row"><span><b>${esc(d.ua)}</b>${d.this ? " · acesta" : ""}</span>
+      <span class="t">prima dată ${dateTime(d.first)} · ultima ${dateTime(d.last)} · ${esc(d.ip)}</span></div>`).join("")
+    : `<div class="empty">Niciun dispozitiv încă (ecranul HDMI nu cere parola).</div>`;
+  $("#sec-log").innerHTML = r.log.length ? r.log.map((x) => `<div class="row ${x.ok ? "" : "warning"}">
+      <span>${x.ok ? "✓ reușit" : "✗ greșit"} · ${esc(x.note || "logare")}</span>
+      <span class="t">${dateTime(x.ts)} · ${esc(x.ip)} · ${esc(x.ua)}</span></div>`).join("")
+    : `<div class="empty">Nicio încercare.</div>`;
+}
 $$(".set-back").forEach((b) => (b.onclick = () => showPanel(null)));
 
 /* ---------- Setări → Info: Pi-ul, rețeaua, porturile; schimbarea rețelei WiFi ---------- */
@@ -786,9 +833,7 @@ $("#wifi-go").onclick = async () => {
   const b = $("#wifi-go");
   b.disabled = true;
   try {
-    const r = await fetch("/api/wifi/connect", { method: "POST", credentials: "same-origin",
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ssid: n.ssid, password: $("#wifi-pw").value }) });
-    const j = await r.json();
+    const { r, j } = await securePost("/api/wifi/connect", { ssid: n.ssid, password: $("#wifi-pw").value });
     if (!r.ok) throw new Error(j.error || `eroare ${r.status}`);
     $("#wifi-msg").textContent = `Mă conectez la „${n.ssid}”… legătura cu Pi-ul se poate întrerupe câteva secunde.`;
     const t0 = Date.now();
@@ -836,9 +881,12 @@ function renderUpdate() {
     $("#up-now").innerHTML = `<div class="row"><span><b>Amper ${esc(r.running || state.info?.version || "")}</b></span>
       <span class="t">${esc(r.error)}. Actualizările din aplicație merg doar pe Pi-ul instalat cu install.sh.</span></div>`;
     $("#up-check").hidden = true;
+    $("#up-beta-row").hidden = true;
     return;
   }
   $("#up-check").hidden = false;
+  $("#up-beta-row").hidden = false;
+  $("#up-beta").checked = r.channel === "beta";
   const last = r.last_check ? `${dateTime(r.last_check)} (${r.last_check_auto ? "automat" : "manual"})` : "niciodată";
   $("#up-now").innerHTML = `
     <div class="row"><span>Versiunea instalată: <b>${esc(r.version || "?")}</b>${r.channel === "beta" ? ' <span class="role">beta</span>' : ""}</span>
@@ -883,24 +931,29 @@ $("#up-check").onclick = async () => {
   } catch (e) { if (e.message !== "auth") $("#up-msg").textContent = "Pi-ul nu răspunde."; }
   b.disabled = false; b.textContent = "Caută actualizări acum";
 };
-async function updateAction(action, pwEl, btn) {
-  const pw = pwEl.value;
-  if (!pw) { $("#up-msg").textContent = "Scrie parola aplicației."; pwEl.focus(); return; }
+async function updateAction(action, btn) {
   const q = action === "install" ? `Instalez Amper ${upd.data?.latest?.version}? Amper se oprește un minut.`
     : `Revin la Amper ${upd.data?.previous?.version}? Amper se oprește un minut.`;
   if (!confirm(q)) return;
   btn.disabled = true; $("#up-msg").textContent = "";
   try {
-    const r = await fetch(`/api/update/${action}`, { method: "POST", credentials: "same-origin",
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: pw }) });
-    const j = await r.json();
+    const { r, j } = await securePost(`/api/update/${action}`);
     if (!r.ok) $("#up-msg").textContent = j.error || "Nu a mers.";
-    else { pwEl.value = ""; setTimeout(loadUpdate, 800); }
-  } catch { $("#up-msg").textContent = "Pi-ul nu răspunde."; }
+    else setTimeout(loadUpdate, 800);
+  } catch (e) { $("#up-msg").textContent = e.message === "Anulat." ? "" : e.message || "Pi-ul nu răspunde."; }
   btn.disabled = false;
 }
-$("#up-go").onclick = () => updateAction("install", $("#up-pw"), $("#up-go"));
-$("#up-back").onclick = () => updateAction("rollback", $("#up-prev-pw"), $("#up-back"));
+$("#up-go").onclick = () => updateAction("install", $("#up-go"));
+$("#up-back").onclick = () => updateAction("rollback", $("#up-back"));
+$("#up-beta").onchange = async (e) => {
+  const on = e.target.checked;
+  try {
+    const r = await api("/api/update/channel", jsonPost({ channel: on ? "beta" : "stable" }));
+    if (r.error) throw new Error(r.error);
+    upd.data = { ...upd.data, ...r }; renderUpdate();
+    $("#up-msg").textContent = on ? "Primești și versiunile de test. Apasă „Caută actualizări acum”." : "Doar versiunile finale.";
+  } catch (err) { e.target.checked = !on; if (err.message !== "auth") $("#up-msg").textContent = err.message; }
+};
 
 function renderNotif() {
   $("#notif-state").textContent = state.info?.notifications
@@ -1366,14 +1419,7 @@ $("#push-on").onclick = async () => {
       const s = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
       if (s) { await api("/api/push/unsubscribe", jsonPost({ endpoint: s.endpoint })); await s.unsubscribe(); }
     } else {
-      // întâi permisiunea, direct din apăsare (altfel iPhone-ul nu arată întrebarea)
-      if ((await Notification.requestPermission()) !== "granted") throw new Error("Notificările nu au fost permise.");
-      const { key, error } = await api("/api/push/key");
-      if (!key) throw new Error(error || "Pi-ul nu are cheia pentru notificări.");
-      const reg = await navigator.serviceWorker.ready;
-      const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
-      const r = await api("/api/push/subscribe", jsonPost({ subscription: s.toJSON() }));
-      if (!r.ok) throw new Error(r.error || "Abonarea a eșuat.");
+      await subscribePush();
       $("#test-res").textContent = "Gata. Apasă „Trimite o notificare de test” ca să verifici.";
     }
     await renderPush();
@@ -1383,6 +1429,16 @@ $("#push-on").onclick = async () => {
     b.disabled = false;
   }
 };
+async function subscribePush() {
+  // întâi permisiunea, direct din apăsare (altfel iPhone-ul nu arată întrebarea)
+  if ((await Notification.requestPermission()) !== "granted") throw new Error("Notificările nu au fost permise.");
+  const { key, error } = await api("/api/push/key");
+  if (!key) throw new Error(error || "Pi-ul nu are cheia pentru notificări.");
+  const reg = await navigator.serviceWorker.ready;
+  const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
+  const r = await api("/api/push/subscribe", jsonPost({ subscription: s.toJSON() }));
+  if (!r.ok) throw new Error(r.error || "Abonarea a eșuat.");
+}
 $("#test-notif").onclick = async () => {
   const r = await api("/api/test-notification", { method: "POST" });
   $("#test-res").textContent = r.ok ? "Trimisă. Ar trebui să apară pe telefon în câteva secunde." : r.error;
@@ -1476,3 +1532,204 @@ function loadPref(k, d) { try { return localStorage.getItem(k) || d; } catch { r
 function savePref(k, v) { try { localStorage.setItem(k, v); } catch {} }
 
 boot();
+
+/* ------------------------------------------------------------------ GHIDUL DE CONFIGURARE */
+const SU_STEPS = [
+  { k: "name", t: "Numele instalației" }, { k: "password", t: "Parola aplicației" }, { k: "remote", t: "Acces de oriunde" },
+  { k: "devices", t: "Dispozitivele" }, { k: "capacity", t: "Capacitățile" }, { k: "notif", t: "Notificări" },
+];
+const DEV_NAME = { daly: "Daly", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
+const su = { i: 0, d: null, chosen: null, keep: false, again: false, pollT: 0 };
+
+async function openSetup(again) {
+  su.again = again; su.i = 0; su.chosen = null; su.keep = false;
+  try { su.d = await api("/api/setup"); } catch { return; }
+  $("#app").hidden = true; $("#login").hidden = true; $("#setup").hidden = false;
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  suRender();
+}
+function suField(id, label, attrs = "") {
+  return `<label class="su-l" for="${id}">${label}</label><input class="ed-in" id="${id}" ${attrs}>`;
+}
+function suRender() {
+  const st = SU_STEPS[su.i], d = su.d;
+  $("#su-step").textContent = `Pasul ${su.i + 1} din ${SU_STEPS.length}`;
+  $("#su-dots").innerHTML = SU_STEPS.map((x, i) => `<i class="${i < su.i ? "done" : i === su.i ? "on" : ""}"></i>`).join("");
+  $("#su-err").textContent = "";
+  $("#su-back").hidden = su.i === 0 && !su.again;
+  $("#su-back").textContent = su.i === 0 ? "‹ Renunță" : "‹ Înapoi";
+  $("#su-next").textContent = su.i === SU_STEPS.length - 1 ? "Gata" : "Mai departe";
+  $("#su-next").disabled = false;
+  const b = $("#su-body");
+  if (st.k === "name") {
+    b.innerHTML = `<h2>${su.again ? "Ghid de configurare" : "Bun venit în Amper!"}</h2>
+      <p class="note">${su.again ? "Poți schimba orice pas; ce nu atingi rămâne cum e." :
+        "Câțiva pași și Amper începe să-ți urmărească bateriile și invertorul."}</p>
+      ${suField("su-name", "Cum se numește instalația?", `maxlength="60" placeholder="de ex. Casa de la munte" value="${esc(d.site_name)}"`)}
+      <p class="note">Apare sus în aplicație și te ajută să deosebești instalațiile, dacă ai mai multe.</p>`;
+  } else if (st.k === "password") {
+    b.innerHTML = `<h2>Parola aplicației</h2>
+      <p class="note">O vei scrie o singură dată pe fiecare telefon. E cerută din nou la schimbarea setărilor
+        bateriilor, ale invertorului și la actualizări. Minim 8 caractere.</p>
+      ${d.has_password ? `<p class="note"><b>Există deja o parolă.</b> Completează doar dacă vrei s-o schimbi.</p>
+        ${suField("su-old", "Parola de acum", 'type="password" autocomplete="current-password"')}` : ""}
+      ${suField("su-pw", d.has_password ? "Parola nouă" : "Alege parola", 'type="password" autocomplete="new-password"')}
+      ${suField("su-pw2", "Scrie-o încă o dată", 'type="password" autocomplete="new-password"')}`;
+  } else if (st.k === "remote") {
+    b.innerHTML = `<h2>Acces de oriunde</h2><p class="note" id="su-ts">Verific…</p>`;
+    api("/api/system").then((x) => {
+      const ts = x.network?.tailscale || {};
+      $("#su-ts").innerHTML = ts.state === "Running" && ts.name
+        ? `Tailscale e pornit. Adresa de oriunde: <b>https://${esc(ts.name)}</b>`
+        : `Acum aplicația merge în rețeaua de acasă. Accesul de oriunde (prin Tailscale, cu contul tău Google) se va
+           putea porni mai târziu. Poți trece mai departe.`;
+    }).catch(() => ($("#su-ts").textContent = "Poți trece mai departe; accesul de oriunde se pornește mai târziu."));
+  } else if (st.k === "devices") {
+    suRenderDevices();
+  } else if (st.k === "capacity") {
+    const packs = (su.chosen || []).filter((c) => c.type !== "growatt_spf");
+    b.innerHTML = `<h2>Numele și capacitățile</h2>
+      <p class="note">Capacitatea fiecărui modul (Ah) — din ea se calculează SOC-ul total și energia rămasă.
+        O găsești pe eticheta bateriei.</p>
+      ${(su.chosen || []).map((c, i) => `<div class="card su-dev">
+        ${suField(`su-n${i}`, `${esc(c.label || DEV_NAME[c.type])}${c.link ? ` · ${esc(c.link)}` : ""}`,
+          `maxlength="40" value="${esc(c.name || "")}" placeholder="${esc(suDefaultName(c, i))}"`)}
+        ${c.type === "growatt_spf" ? "" : suField(`su-c${i}`, "Capacitate (Ah)",
+          `type="number" inputmode="decimal" min="1" max="2000" step="1" value="${c.capacity_ah || ""}"`)}</div>`).join("")}
+      ${packs.length ? "" : `<p class="note">Niciun acumulator ales: nu e nimic de completat.</p>`}`;
+  } else if (st.k === "notif") {
+    const ok = window.isSecureContext && "PushManager" in window;
+    b.innerHTML = `<h2>Notificări pe telefon</h2>
+      <p class="note">Amper te anunță când un modul nu se mai încarcă, când un BMS oprește încărcarea, la baterie
+        descărcată și la defectele invertorului.</p>
+      ${ok ? `<button class="btn" id="su-push">Pornește notificările pe acest telefon</button>`
+        : `<p class="note">Notificările direct în aplicație merg de la adresa https (accesul de oriunde). Le poți
+           porni mai târziu din <b>Setări → Notificări</b>.</p>`}
+      <p class="note" id="su-push-msg"></p>`;
+    if (ok) $("#su-push").onclick = async () => {
+      try {
+        await subscribePush();
+        await api("/api/test-notification", { method: "POST" });
+        $("#su-push-msg").textContent = "Gata — ar trebui să primești acum o notificare de test.";
+      } catch (e) { $("#su-push-msg").textContent = e.message; }
+    };
+  }
+  const first = b.querySelector("input");
+  if (first && st.k !== "capacity") first.focus();
+}
+function suDefaultName(c, i) {
+  const same = (su.chosen || []).filter((x) => x.type === c.type);
+  return same.length > 1 || c.type !== "growatt_spf" ? `${DEV_NAME[c.type]} ${same.indexOf(c) + 1}` : DEV_NAME[c.type];
+}
+function suRenderDevices() {
+  const d = su.d, sc = d.scan || {}, b = $("#su-body");
+  const real = d.devices.filter((x) => !x.type.startsWith("sim_"));
+  const found = sc.found || [];
+  if (!su.chosen) su.chosen = null;
+  b.innerHTML = `<h2>Dispozitivele</h2>
+    <p class="note">Leagă acum la Pi cablurile USB (invertor, RS485, Daly) și pornește modulele Daly cu Bluetooth.
+      Apoi caută. Căutarea durează 1–2 minute.</p>
+    ${real.length ? `<div class="list">${real.map((x) => `<div class="row"><span><b>${esc(x.name)}</b></span>
+      <span class="t">${esc(x.port || x.ble || "")}${x.capacity_ah ? ` · ${x.capacity_ah} Ah` : ""}</span></div>`).join("")}</div>
+      <label class="row-check"><input type="checkbox" id="su-keep" ${su.keep ? "checked" : ""}>
+        <span><b>Păstrează dispozitivele de acum</b><small>Nu schimb nimic la dispozitive.</small></span></label>` : ""}
+    <button class="btn" id="su-scan" ${sc.state === "running" ? "disabled" : ""}>${sc.state === "running" ? "Caut…" : found.length ? "Caută din nou" : "Caută dispozitivele"}</button>
+    <p class="note" id="su-scan-msg">${esc(sc.state === "running" ? sc.message : sc.state === "failed" ? sc.message : sc.ble_note || "")}</p>
+    ${sc.state === "done" ? `<div class="list">${found.length ? found.map((f, i) => `<label class="row-check">
+        <input type="checkbox" class="su-f" data-i="${i}" checked>
+        <span><b>${esc(f.label)}</b><small>${esc(f.link)}${f.short ? " · " + esc(f.short) : ""}${f.rssi ? ` · semnal ${f.rssi} dBm` : ""}</small></span></label>`).join("")
+      : `<div class="empty">N-am găsit nimic. Verifică cablurile și că BMS-urile sunt treze (pornește un consumator), apoi caută din nou.</div>`}</div>` : ""}
+    <p class="note">Ai module Daly care nu sunt încă legate? Adaugă-le acum: se vor găsi singure când apar
+      (pe cablu sau Bluetooth).</p>
+    <div class="su-add"><button class="btn sm" id="su-add-daly">+ Daly (se găsește singur)</button>
+      <span class="note" id="su-add-n">${su.extraDaly ? `${su.extraDaly} adăugate` : ""}</span></div>`;
+  $("#su-scan").onclick = async () => {
+    su.keep = false;
+    su.d.scan = await api("/api/setup/scan", { method: "POST" });
+    suRenderDevices(); suPollScan();
+  };
+  $("#su-add-daly").onclick = () => { su.extraDaly = (su.extraDaly || 0) + 1; $("#su-add-n").textContent = `${su.extraDaly} adăugate`; };
+  if ($("#su-keep")) $("#su-keep").onchange = (e) => (su.keep = e.target.checked);
+  if (sc.state === "running") suPollScan();
+}
+function suPollScan() {
+  clearTimeout(su.pollT);
+  su.pollT = setTimeout(async () => {
+    try { su.d.scan = await api("/api/setup/scan"); } catch {}
+    if (SU_STEPS[su.i].k !== "devices") return;
+    if (su.d.scan.state === "running") { $("#su-scan-msg").textContent = su.d.scan.message; suPollScan(); }
+    else suRenderDevices();
+  }, 1500);
+}
+async function suNext() {
+  const st = SU_STEPS[su.i];
+  const post = async (url, body) => {
+    const r = await fetch(url, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || `eroare ${r.status}`);
+    return j;
+  };
+  if (st.k === "name") {
+    await post("/api/setup/name", { name: $("#su-name").value });
+    su.d.site_name = $("#su-name").value.trim();
+  } else if (st.k === "password") {
+    const pw = $("#su-pw").value, pw2 = $("#su-pw2").value;
+    if (su.d.has_password && !pw && !pw2) { /* păstrează parola */ }
+    else {
+      if (pw.length < 8) throw new Error("Parola trebuie să aibă cel puțin 8 caractere.");
+      if (pw !== pw2) throw new Error("Parolele nu sunt la fel.");
+      await post("/api/setup/password", { password: pw, repeat: pw2, old: $("#su-old")?.value || "" });
+      su.d.has_password = true;
+    }
+  } else if (st.k === "devices") {
+    if (su.keep) { su.chosen = null; su.i += 2; return suRender(); }       // sari peste capacități
+    const found = su.d.scan?.found || [];
+    const sel = $$(".su-f").filter((x) => x.checked).map((x) => ({ ...found[+x.dataset.i] }));
+    for (let k = 0; k < (su.extraDaly || 0); k++) sel.push({ type: "daly", link: "se găsește singur", label: "Daly" });
+    if (!sel.length) {
+      if (su.d.devices.some((x) => !x.type.startsWith("sim_")))
+        throw new Error("Alege dispozitivele găsite sau bifează „Păstrează dispozitivele de acum”.");
+      if (!confirm("N-ai ales niciun dispozitiv. Continui fără? Le poți adăuga mai târziu din Setări → Ghid de configurare.")) return;
+      su.chosen = []; su.i += 2; return suRender();
+    }
+    // ordinea: Daly, Seplos, invertor
+    const order = { daly: 0, seplos: 1, growatt_spf: 2 };
+    su.chosen = sel.sort((a, b) => order[a.type] - order[b.type]);
+  } else if (st.k === "capacity") {
+    su.chosen.forEach((c, i) => {
+      c.name = $(`#su-n${i}`).value.trim() || suDefaultName(c, i);
+      if (c.type !== "growatt_spf") c.capacity_ah = parseFloat(($(`#su-c${i}`).value || "").replace(",", "."));
+    });
+    const bad = su.chosen.find((c) => c.type !== "growatt_spf" && !(c.capacity_ah >= 1 && c.capacity_ah <= 2000));
+    if (bad) throw new Error(`Completează capacitatea pentru ${bad.name} (între 1 și 2000 Ah).`);
+    await post("/api/setup/devices", { devices: su.chosen });
+  } else if (st.k === "notif") {
+    const j = await post("/api/setup/finish", {});
+    $("#su-body").innerHTML = `<h2>Gata!</h2><p class="note">${j.restart
+      ? "Amper repornește cu dispozitivele alese (cam 10 secunde)…" : "Deschid aplicația…"}</p>`;
+    $(".su-nav").hidden = true;
+    const go = () => location.replace(location.pathname);
+    if (!j.restart) return setTimeout(go, 800);
+    const t0 = Date.now();
+    const wait = async () => {
+      await new Promise((r) => setTimeout(r, 3000));
+      try { const r = await fetch("/api/health", { cache: "no-store" }); if (r.ok && Date.now() - t0 > 4000) return go(); } catch {}
+      if (Date.now() - t0 < 90000) wait(); else go();
+    };
+    return wait();
+  }
+  su.i++;
+  suRender();
+}
+$("#su-next").onclick = async () => {
+  const b = $("#su-next");
+  b.disabled = true;
+  try { await suNext(); } catch (e) { $("#su-err").textContent = e.message === "auth" ? "" : e.message; }
+  b.disabled = false;
+};
+$("#su-back").onclick = () => {
+  if (su.i === 0) { $("#setup").hidden = true; $("#app").hidden = false; return; }   // reluat din Setări: renunță
+  su.i -= SU_STEPS[su.i].k === "notif" && !su.chosen ? 2 : 1;
+  suRender();
+};

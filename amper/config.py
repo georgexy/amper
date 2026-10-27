@@ -56,12 +56,66 @@ def _merge(base: dict, over: dict) -> dict:
     return out
 
 
+def overlay_path(cfg: dict) -> str | None:
+    """Setările făcute din aplicație (ghidul de configurare, parola): un fișier scris de serviciul amper,
+    lângă baza de date, aplicat peste /etc/amper/config.yaml (care rămâne neatins)."""
+    if cfg.get("settings_file"):
+        return cfg["settings_file"]
+    if not cfg.get("database") or cfg["database"] == ":memory:":
+        return None
+    return str(Path(cfg["database"]).parent / "settings.yaml")
+
+
+def apply_overlay(cfg: dict, over: dict) -> dict:
+    """Peste config: dicționarele se îmbină, listele (ex. `devices`) se înlocuiesc."""
+    return _merge(cfg, over or {})
+
+
+def read_overlay(cfg: dict) -> dict:
+    p = overlay_path(cfg)
+    if not p:
+        return {}
+    try:
+        with open(p, encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    except FileNotFoundError:
+        return {}
+
+
+def save_overlay(cfg: dict, updates: dict) -> dict:
+    """Adaugă/schimbă chei în fișierul de setări din aplicație (scriere atomică). Întoarce conținutul nou."""
+    p = overlay_path(cfg)
+    if not p:
+        raise ConfigError("setările din aplicație nu se pot salva (bază de date în memorie)")
+    data = _merge(read_overlay(cfg), updates)
+    tmp = p + ".tmp"
+    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+        f.write("# Setări făcute din aplicația Amper (ghidul de configurare). Se aplică peste /etc/amper/config.yaml.\n")
+        yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
+    import os
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, p)
+    return data
+
+
 def load_config(path: str | Path) -> dict:
     with open(path, encoding="utf-8") as f:
         user = yaml.safe_load(f) or {}
     cfg = _merge(DEFAULTS, user)
+    cfg = apply_overlay(cfg, read_overlay(cfg))
     validate(cfg)
     return cfg
+
+
+def password_set(cfg: dict) -> bool:
+    w = cfg.get("web") or {}
+    return bool(w.get("password") or w.get("password_hash"))
+
+
+def setup_needed(cfg: dict) -> bool:
+    """Ghidul de configurare apare la prima pornire: nicio parolă și ghidul neterminat.
+    O instalare existentă, cu parolă în config, nu-l vede."""
+    return not cfg.get("setup_done") and not password_set(cfg)
 
 
 def validate(cfg: dict) -> None:

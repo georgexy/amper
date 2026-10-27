@@ -169,18 +169,18 @@ def test_api_write_requires_password_set():
     assert run_api("", steps) == 403
 
 
-def test_api_write_requires_login_even_from_localhost():
+def test_api_write_requires_password_again_even_from_localhost():
     async def steps(c, eng):
         read = await c.get("/api/inverter/settings")              # citirea merge de pe localhost (kiosk)
         no = await c.post("/api/inverter/settings", json={"key": "buzzer", "value": 0})
-        await c.post("/api/login", json={"password": "pw"})
-        bad = await c.post("/api/inverter/settings", json={"key": "bulk_voltage", "value": 99})
-        ok = await c.post("/api/inverter/settings", json={"key": "buzzer", "value": 0})
+        wrong = await c.post("/api/inverter/settings", json={"key": "buzzer", "value": 0, "app_password": "x"})
+        bad = await c.post("/api/inverter/settings", json={"key": "bulk_voltage", "value": 99, "app_password": "pw"})
+        ok = await c.post("/api/inverter/settings", json={"key": "buzzer", "value": 0, "app_password": "pw"})
         j = await ok.json()
         log = eng.db.settings_log("inv")
-        return read.status, no.status, bad.status, ok.status, j, log, eng.notifier
-    read, no, bad, ok, j, log, notifier = run_api("pw", steps)
-    assert read == 200 and no == 401 and bad == 400 and ok == 200
+        return read.status, no.status, wrong.status, bad.status, ok.status, j, log, eng.notifier
+    read, no, wrong, bad, ok, j, log, notifier = run_api("pw", steps)
+    assert read == 200 and no == 403 and wrong == 403 and bad == 400 and ok == 200
     assert j["changed"] and j["old"] == "Pornit" and j["new"] == "Oprit"
     assert log[0]["ok"] == 1 and log[0]["new"] == "Oprit"
     assert any("Buzzer" in n["message"] for n in notifier.sent)

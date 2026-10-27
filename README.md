@@ -76,6 +76,20 @@ Pentru fiecare modul vezi pe telefon SOC-ul, curentul, celulele și starea MOSFE
 | **Istoric** | Grafice pe 6 ore, 24 ore, 7 sau 30 de zile: SOC și curent pe fiecare modul, puteri, energie pe zi. Ții degetul pe grafic ca să citești valorile. |
 | **Alerte** | Alertele active și istoricul lor, plus butonul pentru o notificare de test. |
 
+### Prima pornire: ghidul de configurare
+
+La prima deschidere, aplicația arată un ghid în 6 pași: numele instalației, **parola aplicației** (minim 8
+caractere), accesul de oriunde, **căutarea dispozitivelor** (cabluri USB și module Daly prin Bluetooth),
+capacitățile modulelor și notificările pe telefon. Se poate relua oricând din **Setări → Ghid de configurare**.
+
+### Securitate
+
+- Schimbarea setărilor bateriilor, ale invertorului, a rețelei WiFi și actualizarea cer parola din nou (ținută
+  minte 5 minute).
+- După 5 parole greșite de la aceeași adresă, încercările sunt încetinite și primești notificare.
+- La fiecare telefon sau calculator nou care intră în aplicație primești notificarea „🔐 Dispozitiv nou conectat”.
+- **Setări → Securitate** arată dispozitivele care au intrat și ultimele încercări de logare.
+
 ### Pe monitorul legat la Pi (HDMI)
 
 Aplicația poate rula pe tot ecranul unui monitor legat la portul HDMI al Pi-ului (kiosk: Chromium în
