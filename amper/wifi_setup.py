@@ -7,6 +7,9 @@ Rulează ca root (serviciul amper-wifi), separat de amper, pentru că lucrează 
     (SSID și parolă din config, secțiunea wifi_setup) și pagina de configurare la http://10.42.0.1
     (orice adresă cerută de telefon duce acolo, deci pagina se deschide singură).
   - Pagina arată rețelele WiFi din jur; alegi una, scrii parola, iar Pi-ul se conectează.
+  - După ce Pi-ul s-a conectat la rețeaua aleasă, hotspotul repornește 3 minute cu adresa Pi-ului din rețeaua de
+    acasă („Gata! Adresa ta acasă: http://192.168.x.y:8080”), ca telefonul s-o afle; apoi Pi-ul revine acasă.
+    (O singură placă WiFi: nu poate fi hotspot și conectat la rețeaua de acasă în același timp.)
   - Când revine internetul (rețeaua aleasă, cablul băgat, routerul repornit), hotspotul se oprește.
     Dacă nimeni nu e conectat la hotspot, la 5 minute îl oprește scurt și încearcă rețelele știute.
 Bluetooth-ul nu e folosit deloc (rămâne pentru modulele Daly).
@@ -32,6 +35,7 @@ AP_IP = "10.42.0.1"
 IFACE = "wlan0"
 DNSMASQ_CONF = "/etc/NetworkManager/dnsmasq-shared.d/amper-portal.conf"
 CHECK_HOSTS = [("1.1.1.1", 443), ("8.8.8.8", 53), ("9.9.9.9", 443)]
+ANNOUNCE_S = 180                         # cât stă hotspotul pornit ca să arate adresa de acasă
 
 
 def nmcli(*args, timeout: float = 30, check: bool = False) -> subprocess.CompletedProcess:
@@ -93,6 +97,8 @@ class WifiSetup:
         self.message = ""                      # rezultatul ultimei încercări, arătat pe pagină
         self.lock = threading.Lock()
         self.server = None
+        self.web_port = int(cfg.get("web_port") or 8080)
+        self.result: dict | None = None        # după o conectare reușită: adresa de acasă, arătată pe hotspot
 
     # ---------- rețele ----------
     def scan(self) -> list[dict]:
@@ -196,13 +202,40 @@ class WifiSetup:
             ok = up.returncode == 0 and self.wait_internet(40)
             if ok:
                 self.message = ""
-                log.warning("conectat la WiFi „%s”", ssid)
+                ip = self.home_address()
+                log.warning("conectat la WiFi „%s” (adresa %s)", ssid, ip)
+                if ip:                           # hotspotul revine scurt, ca telefonul să afle adresa de acasă
+                    self.result = {"ssid": ssid, "ip": ip, "host": socket.gethostname(), "profile": name,
+                                   "until": time.monotonic() + ANNOUNCE_S}
+                    try:
+                        self.start_ap()
+                    except Exception as e:
+                        log.warning("nu am putut reporni hotspotul pentru adresă: %s", e)
+                        self.result = None
                 return
             log.warning("conectarea la „%s” a eșuat: %s", ssid, (up.stderr or up.stdout).strip())
             nmcli("connection", "delete", name, timeout=15)       # parolă greșită: nu o păstrăm
             self.message = (f"Nu m-am putut conecta la „{ssid}”. Verificați parola și încercați din nou."
                             if up.returncode != 0 else f"M-am conectat la „{ssid}”, dar rețeaua nu are internet.")
             self.start_ap()
+
+    def home_address(self) -> str | None:
+        """Adresa IPv4 a Pi-ului în rețeaua WiFi (ex. 192.168.1.57)."""
+        out = nmcli("-g", "IP4.ADDRESS", "device", "show", IFACE, timeout=10).stdout
+        for part in out.replace("|", "\n").split():
+            ip = part.split("/")[0].strip()
+            if ip.count(".") == 3 and not ip.startswith(AP_IP.rsplit(".", 1)[0]):
+                return ip
+        return None
+
+    def finish_announce(self) -> None:
+        """Gata cu arătatul adresei: hotspotul se oprește, Pi-ul revine pe rețeaua de acasă."""
+        prof = (self.result or {}).get("profile")
+        self.result = None
+        self.stop_ap()
+        if prof:
+            nmcli("connection", "up", prof, timeout=60)
+        log.info("adresa de acasă arătată; hotspot oprit, revin pe rețea")
 
     @staticmethod
     def wait_internet(seconds: float) -> bool:
@@ -220,6 +253,12 @@ class WifiSetup:
     def tick(self, online: bool, now: float) -> None:
         """O verificare: pornește/oprește hotspotul după starea internetului."""
         if self.lock.locked():                  # o conectare cerută de pe pagină e în curs
+            return
+        if self.result:                         # hotspotul arată adresa de acasă: 3 minute sau până la „Am notat”
+            if now >= self.result["until"] or self.result.get("done"):
+                with self.lock:
+                    self.finish_announce()
+                self.offline_since = None
             return
         if online:
             self.offline_since = None
@@ -380,6 +419,8 @@ class WifiSetup:
                 self.wfile.write(b)
 
             def do_GET(self):
+                if setup.result:
+                    return self._send(result_page(setup.result, setup.web_port))
                 if self.path.startswith("/rescan"):
                     try:
                         setup.scan()
@@ -388,6 +429,11 @@ class WifiSetup:
                 self._send(page(setup))
 
             def do_POST(self):
+                if setup.result:
+                    if self.path.startswith("/gata"):
+                        setup.result["done"] = True
+                        return self._send(bye_page(setup.result, setup.web_port))
+                    return self._send(result_page(setup.result, setup.web_port))
                 n = int(self.headers.get("Content-Length") or 0)
                 form = urllib.parse.parse_qs(self.rfile.read(min(n, 4096)).decode(), keep_blank_values=True)
                 ssid = (form.get("ssid") or [""])[0].strip() or (form.get("other") or [""])[0].strip()
@@ -447,10 +493,31 @@ def done_page(ssid: str) -> str:
     return f"""<!doctype html><html lang="ro"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Amper — WiFi</title><style>{STYLE}</style></head>
 <body><main><h1>Mă conectez la „{html.escape(ssid)}”…</h1>
-<p>Rețeaua „Amper-Setup” dispare acum. Dacă totul e în regulă, în 1–2 minute Pi-ul e online și îl găsiți prin
-Tailscale, ca de obicei (http://amper:8080).</p>
-<p>Dacă „Amper-Setup” reapare peste un minut, conectarea nu a reușit (de obicei parola). Conectați-vă din nou la
-„Amper-Setup” și încercați iar: pagina vă arată ce s-a întâmplat.</p></main></body></html>"""
+<p>Rețeaua „Amper-Setup” dispare acum, cam un minut, cât Pi-ul încearcă rețeaua aleasă.</p>
+<p><b>Apoi „Amper-Setup” reapare.</b> Conectează-te din nou la ea: pagina îți arată fie <b>adresa Pi-ului din rețeaua
+ta</b> (dacă a mers), fie ce nu a mers (de obicei parola), ca să încerci din nou.</p></main></body></html>"""
+
+
+def result_page(r: dict, port: int) -> str:
+    ip, host = html.escape(r["ip"]), html.escape(r.get("host") or "amper")
+    return f"""<!doctype html><html lang="ro"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Amper — gata</title><style>{STYLE}
+.big{{font-size:24px;font-weight:700;color:#E7EFF3;word-break:break-all;margin:6px 0}}</style></head>
+<body><main><h1>Gata! Pi-ul e conectat la „{html.escape(r["ssid"])}”.</h1>
+<p>Adresa Amper în rețeaua ta (notează-o sau fă o captură de ecran):</p>
+<p class="big">http://{ip}:{port}</p>
+<p>sau, pe multe telefoane: <b>http://{host}.local:{port}</b></p>
+<p><b>Ce urmează:</b> apasă butonul de mai jos, conectează telefonul înapoi la WiFi-ul „{html.escape(r["ssid"])}” și
+deschide adresa în browser. Acolo te așteaptă ghidul de configurare (parola, dispozitivele, accesul de oriunde).</p>
+<form method="post" action="/gata"><button type="submit">Am notat — mă întorc pe WiFi-ul meu</button></form>
+<p>Rețeaua „Amper-Setup” se oprește singură în 3 minute.</p></main></body></html>"""
+
+
+def bye_page(r: dict, port: int) -> str:
+    return f"""<!doctype html><html lang="ro"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Amper</title><style>{STYLE}</style></head>
+<body><main><h1>Pe curând!</h1><p>Conectează telefonul la „{html.escape(r["ssid"])}” și deschide
+<b>http://{html.escape(r["ip"])}:{port}</b>.</p></main></body></html>"""
 
 
 def bars(signal: int) -> str:
@@ -465,7 +532,8 @@ def main(argv=None) -> None:
                    help="pornește hotspotul și pagina pentru un test, apoi le oprește")
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    cfg = load_config(args.config).get("wifi_setup") or {}
+    full = load_config(args.config)
+    cfg = {**(full.get("wifi_setup") or {}), "web_port": (full.get("web") or {}).get("port", 8080)}
     w = WifiSetup(cfg)
     if args.test_ap:
         w.start_ap()
