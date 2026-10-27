@@ -270,6 +270,9 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `pi`/root blocați, țara WiFi (`COUNTRY`, implicit RO) în cmdline.txt → curățenie (machine-id gol, fără chei SSH,
   /var/lib/amper și /var/lib/tailscale goale) → verificări → `resize2fs -M` + sfdisk (PARTUUID păstrat) → `.img.xz`.
   Ales chroot, nu pi-gen: rulează exact install.sh, durează minute.
+- Baza (2026-10): Raspberry Pi OS 13 Trixie, cu cloud-init: `/boot/firmware/user-data` e înlocuit cu `users: []`
+  (fără cont de logare). Imaginea comprimată ≈ 640 MB. cmdline.txt are `resize` (extindere la prima pornire).
+- README.md = ghidul simplu pentru cunoscuți (imaginea); instalarea manuală și detaliile în `docs/instalare-avansata.md`.
 - `deploy/firstboot.sh` + `amper-firstboot.service` (înaintea amper/amper-wifi/amper-update): topicul ntfy, cheile SSH,
   machine-id. Cheile VAPID, cookie.key și DB le face amper la pornire.
 - `.github/workflows/image.yml`: pe `ubuntu-24.04-arm`; la PR doar construiește + verifică (Artifacts 3 zile);
