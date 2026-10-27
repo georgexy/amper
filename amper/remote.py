@@ -29,7 +29,7 @@ URL_RE = re.compile(r"https://login\.tailscale\.com/\S+")
 class Remote:
     def __init__(self, port: int = 8080, hostname: str = "amper", run=None, popen=None, which=shutil.which):
         self.port, self.hostname = port, hostname
-        self.run = run or (lambda *a: subprocess.run(a, capture_output=True, text=True, timeout=30))
+        self.run = run or (lambda *a: subprocess.run(a, capture_output=True, text=True, timeout=10))
         self.popen = popen or (lambda *a: subprocess.Popen(a, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                                           text=True))
         self.which = which
@@ -108,8 +108,12 @@ class Remote:
             return self._background("funnel", ("tailscale", "funnel", "--bg", "--https=443", f"http://127.0.0.1:{self.port}"),
                                     "Accesul de oriunde e pornit.")
         # oprit: rămâne adresa https doar pentru aparatele din contul Tailscale (ca înainte)
-        self.run("tailscale", "funnel", "reset")
-        r = self.run("tailscale", "serve", "--bg", "--https=443", f"http://127.0.0.1:{self.port}")
+        try:
+            self.run("tailscale", "funnel", "reset")
+            r = self.run("tailscale", "serve", "--bg", "--https=443", f"http://127.0.0.1:{self.port}")
+        except (OSError, subprocess.SubprocessError) as e:
+            self.job = {"state": "failed", "kind": "funnel-off", "message": f"Tailscale nu răspunde: {e}"}
+            return self.job
         self.job = {"state": "ok" if r.returncode == 0 else "failed", "kind": "funnel-off",
                     "message": "Accesul public e oprit; adresa merge doar cu Tailscale pe telefon."
                     if r.returncode == 0 else f"Nu am putut opri: {(r.stdout or '')[-200:]}"}

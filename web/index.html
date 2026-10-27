@@ -110,9 +110,6 @@
           <button class="card set-btn" data-panel="notif"><span class="ic" style="--ic:var(--warn)">
             <svg viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4"/></svg></span>
             <span><b>Notificări</b><span id="set-notif-sub">Alertele pe telefon</span></span><i>›</i></button>
-          <button class="card set-btn" data-panel="info"><span class="ic" style="--ic:var(--cell)">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg></span>
-            <span><b>Info</b><span id="set-info-sub">Pi-ul, rețeaua, porturile</span></span><i>›</i></button>
           <button class="card set-btn" data-panel="daly"><span class="ic" style="--ic:var(--charge)">
             <svg viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 10.5v3M7 10v4M11 10v4M15 10v4"/></svg></span>
             <span><b>Module Daly</b><span id="set-daly-sub">Cablu USB sau Bluetooth</span></span><i>›</i></button>
@@ -128,12 +125,25 @@
           <button class="card set-btn" id="set-wizard"><span class="ic" style="--ic:var(--charge)">
             <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="18" cy="16" r="3"/></svg></span>
             <span><b>Ghid de configurare</b><span>Nume, parolă, dispozitive, capacități, notificări</span></span><i>›</i></button>
-          <button class="card set-btn" data-panel="update"><span class="ic" style="--ic:var(--acc)">
-            <svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></span>
-            <span><b>Actualizări</b><span id="set-update-sub">Versiunea Amper</span></span><i>›</i></button>
+          <button class="card set-btn" data-panel="about"><span class="ic" style="--ic:var(--faint)">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg></span>
+            <span><b>Despre</b><span id="set-about-sub">Versiunea, actualizări, Pi-ul</span></span><i>›</i></button>
         </div>
         <p class="note" id="version"></p>
       </div>
+
+      <section class="set-panel" id="set-about" hidden>
+        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Despre</h2></div>
+        <div class="set-menu">
+          <button class="card set-btn" data-panel="update"><span class="ic" style="--ic:var(--acc)">
+            <svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></span>
+            <span><b>Actualizări</b><span id="set-update-sub">Versiunea Amper</span></span><i>›</i></button>
+          <button class="card set-btn" data-panel="info"><span class="ic" style="--ic:var(--cell)">
+            <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M8 10h8M8 14h5"/></svg></span>
+            <span><b>Info</b><span id="set-info-sub">Pi-ul, rețeaua, porturile</span></span><i>›</i></button>
+        </div>
+        <p class="note" id="about-version"></p>
+      </section>
 
       <section class="set-panel" id="set-teme" hidden>
         <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Teme</h2></div>
@@ -152,7 +162,7 @@
       </section>
 
       <section class="set-panel" id="set-info" hidden>
-        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Info</h2></div>
+        <div class="pk-top"><button class="back set-back" data-back="about" aria-label="Înapoi la Despre">‹</button><h2>Info</h2></div>
         <div id="info-body"><p class="note">Citesc…</p></div>
         <h2>Schimbă rețeaua WiFi</h2>
         <p class="note">Pi-ul trece pe altă rețea din zonă. Dacă rețeaua nouă nu merge (parolă greșită, fără internet),
@@ -168,7 +178,7 @@
       </section>
 
       <section class="set-panel" id="set-update" hidden>
-        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Actualizări</h2></div>
+        <div class="pk-top"><button class="back set-back" data-back="about" aria-label="Înapoi la Despre">‹</button><h2>Actualizări</h2></div>
         <div class="list" id="up-now"></div>
         <button class="btn" id="up-check">Caută actualizări acum</button>
         <label class="row-check" id="up-beta-row" hidden><input type="checkbox" id="up-beta">

@@ -217,6 +217,8 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   lansează ca stabilă (`x.y.z`) — abia atunci o primesc cunoscuții. Lansare: workflow-ul `release.yml`
   (`actions_run_trigger`, `run_workflow`, ref `main`); verificare: `Updater.check()` real pe GitHub.
 - Utilizatorul nu lucrează cu git/PR; explică-i pe scurt, în română, ce s-a schimbat.
+- **NU publica (merge + release) până nu spune explicit „publică”** (cerut 2026-10-27, după ce beta.5 a ieșit prea
+  devreme). Lucrul se adună pe ramură; CHANGELOG are secțiunea „— în pregătire” până la publicare.
 
 ## Ghid de configurare + securitate (0.3.0, 2026-10-27)
 - Setările din aplicație stau în `/var/lib/amper/settings.yaml` (scris de serviciul amper, 600), aplicat peste

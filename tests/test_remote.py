@@ -152,3 +152,15 @@ def test_web_funnel_requires_password_and_updates_push_address(monkeypatch, tmp_
     assert calls == [("/remote/funnel", {"on": True})]
     assert eng.notifier.webpush.subject == "https://amper.t.ts.net"          # notificările pe iPhone: adresa reală
     assert any("Accesul de oriunde a fost pornit" in m["message"] for m in eng.notifier.sent)
+
+
+def test_slow_tailscale_does_not_block_status():
+    """`tailscale` care nu răspunde: starea vine oricum (fără blocaj), cu funnel oprit."""
+    import subprocess
+
+    def slow(*a):
+        raise subprocess.TimeoutExpired(a, 10)
+    r = Remote(run=slow, popen=lambda *a: None, which=lambda n: "/x")
+    st = r.status()
+    assert st["installed"] and st["state"] == "NoState" and st["funnel"] is False
+    assert r.funnel(False)["state"] == "failed"

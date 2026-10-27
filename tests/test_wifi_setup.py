@@ -178,3 +178,40 @@ def test_try_known_networks_none_works(monkeypatch):
     monkeypatch.setattr(w, "wait_internet", lambda s: False)
     assert not w.try_known_networks()
     assert [c[2] for c in nm.calls if c[:2] == ("connection", "up")] == ["wifi-Acasa_5G", "wifi-Acasa"]
+
+
+def test_after_connect_hotspot_shows_home_address_then_goes_home(setup, monkeypatch):
+    """Rețeaua aleasă merge → hotspotul revine 3 minute cu adresa de acasă → „Am notat” → Pi-ul revine acasă."""
+    from types import SimpleNamespace
+    w = setup
+    calls = []
+
+    def nm(*a, timeout=30, check=False):
+        calls.append(a)
+        out = "192.168.1.57/24" if a[:2] == ("-g", "IP4.ADDRESS") else ""
+        return SimpleNamespace(returncode=0, stdout=out, stderr="")
+    monkeypatch.setattr(ws, "nmcli", nm)
+    monkeypatch.setattr(ws.WifiSetup, "wait_internet", staticmethod(lambda s: True))
+    monkeypatch.setattr(ws.socket, "gethostname", lambda: "amper")
+    w.ap_on = True
+    w.connect("Casa", "parola123")
+    assert w.calls == ["stop", "start"] and w.result["ip"] == "192.168.1.57"
+    page = ws.result_page(w.result, 8080)
+    assert "http://192.168.1.57:8080" in page and "http://amper.local:8080" in page and "Casa" in page
+    t0 = w.result["until"] - ws.ANNOUNCE_S
+    w.tick(False, t0 + 60)                       # fără internet (e hotspot): nu se schimbă nimic
+    assert w.calls == ["stop", "start"] and w.result
+    w.result["done"] = True                      # „Am notat”
+    w.tick(False, t0 + 70)
+    assert w.calls == ["stop", "start", "stop"] and w.result is None
+    assert ("connection", "up", "wifi-Casa") in calls
+
+
+def test_home_address_shown_at_most_3_minutes(setup, monkeypatch):
+    w = setup
+    monkeypatch.setattr(w, "finish_announce", lambda: (w.calls.append("home"), setattr(w, "result", None)))
+    w.result = {"ssid": "Casa", "ip": "192.168.1.57", "profile": "wifi-Casa", "until": 1000.0}
+    w.tick(False, 999)
+    assert w.calls == []
+    w.tick(False, 1000)
+    assert w.calls == ["home"]

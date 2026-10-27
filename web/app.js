@@ -99,6 +99,7 @@ async function boot() {
   const v = new URLSearchParams(location.search).get("v");
   if (v === "alerts") { show("alerts"); history.replaceState(null, "", location.pathname); }
   $("#version").textContent = `Amper ${state.info.version || ""} · citire la fiecare ${state.info.poll_interval} s.`;
+  $("#set-about-sub").textContent = `Amper ${state.info.version || ""} · actualizări, Pi-ul`;
   setInterval(tickConn, 1000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 }
@@ -745,7 +746,8 @@ $("#daly-search").onclick = async () => {
 /* meniul setărilor: butoane → secțiuni (Teme, Notificări, Module Daly) */
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "notif", "daly", "info", "update", "security", "remote", "auto"]) $("#set-" + k).hidden = k !== name;
+  for (const k of ["teme", "notif", "daly", "info", "update", "security", "remote", "auto", "about"]) $("#set-" + k).hidden = k !== name;
+  if (name === "about") $("#about-version").textContent = $("#version").textContent;
   if (name === "auto") loadUserAlerts();
   if (name === "remote") renderRemote($("#remote-body"));
   if (name === "security") loadSecurity();
@@ -771,7 +773,7 @@ async function loadSecurity() {
       <span class="t">${dateTime(x.ts)} · ${esc(x.ip)} · ${esc(x.ua)}</span></div>`).join("")
     : `<div class="empty">Nicio încercare.</div>`;
 }
-$$(".set-back").forEach((b) => (b.onclick = () => showPanel(null)));
+$$(".set-back").forEach((b) => (b.onclick = () => showPanel(b.dataset.back || null)));
 
 /* ---------- Setări → Info: Pi-ul, rețeaua, porturile; schimbarea rețelei WiFi ---------- */
 const bars4 = (sig) => "▂▄▆█".slice(0, Math.max(1, Math.min(4, Math.floor((sig || 0) / 25) + 1)));
@@ -1855,8 +1857,18 @@ const remote = { timer: 0 };
 async function renderRemote(el) {
   clearTimeout(remote.timer);
   if (!el || el.closest("[hidden]")) return;
+  if (!el.innerHTML.trim()) el.innerHTML = `<p class="note">Verific starea Tailscale pe Pi…</p>`;
   let r;
-  try { r = await api("/api/remote"); } catch (e) { if (e.message !== "auth") el.innerHTML = `<p class="note">Pi-ul nu răspunde.</p>`; return; }
+  try {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 25000);
+    r = await api("/api/remote", { signal: ctl.signal }).finally(() => clearTimeout(t));
+  } catch (e) {
+    if (e.message === "auth") return;
+    el.innerHTML = `<p class="err">${e.name === "AbortError" ? "Pi-ul nu a răspuns în 25 de secunde (Tailscale nu răspunde)."
+      : "Pi-ul nu răspunde."}</p><button class="btn" id="rm-retry">Încearcă din nou</button>`;
+    $("#rm-retry", el).onclick = () => { el.innerHTML = ""; renderRemote(el); };
+    return;
+  }
   const job = r.job || {}, waiting = job.state === "running";
   let h = "";
   if (r.error) h = `<p class="note">${esc(r.error)}. Accesul de oriunde se pornește doar pe Pi-ul instalat cu install.sh.</p>`;
