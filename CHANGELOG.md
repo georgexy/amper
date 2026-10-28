@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.5 — în pregătire
+## 1.0.0-beta.5 — 2026-10-28
 - Un BMS sau invertor care n-a mai răspuns 5 zile se deconectează singur: nu mai apare pe ecran, alertele lui
   „nu mai comunică” se închid (fără notificări „Rezolvat”) și primești o singură notificare. Rămâne în listă: dacă
   răspunde din nou (ex. ai legat la loc cablul), revine singur. Până acum aștepta 14 zile.
