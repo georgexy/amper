@@ -148,7 +148,7 @@ button { font: inherit; color: inherit; }
 .f-batt .k { font: 600 17px "Barlow Condensed", sans-serif; margin-top: 8px; }
 .f-batt .s { font-size: 13px; color: var(--muted); }
 .f-batt .health { display: inline-block; margin-top: 4px; }
-.f-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
+.f-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 16px; }
 .f-cards > div { padding: 9px 10px; }
 .f-cards > div > span { display: block; font-size: 12px; color: var(--muted); }
 .f-cards b { font: 700 21px "Barlow Condensed", sans-serif; white-space: nowrap; }
@@ -157,7 +157,7 @@ button { font: inherit; color: inherit; }
 .c-head { margin-top: 8px; border-radius: 24px; padding: 16px 18px 74px; color: #fff;
   background: linear-gradient(135deg, #E08A2E 0%, #C9562A 55%, #8E3320 100%); }
 .c-head .st { font-size: 13px; opacity: .9; }
-.c-sum { display: flex; gap: 22px; margin-top: 10px; font-size: 13px; opacity: .95; }
+.c-sum { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 10px; font-size: 13px; opacity: .95; }
 .c-sum b { display: block; font: 700 22px "Barlow Condensed", sans-serif; }
 .c-sum .u { color: rgb(255 255 255 / .75); }
 .c-batt { width: 100%; margin: -62px 0 0; padding: 18px 18px 14px; color: inherit; position: relative;
@@ -603,3 +603,4 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .su-rej { margin: -2px 0 8px 14px; }
 small.warnc { color: var(--warn); }
 #daly-list + .set-menu { margin-top: 14px; }
+.nw { white-space: nowrap; }

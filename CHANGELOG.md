@@ -6,6 +6,8 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Istoric → „Energie pe zi”: a treia bară, „Din rețea” (energia intrată în invertor din rețea sau generator, din
   puterea de intrare AC citită din invertor), și totalul ei pe intervalul ales (7 zile, 30 de zile, un an, de la–până
   la; peste două luni, pe lună).
+- Pe ecranul principal, lângă „Produs azi”: „Din rețea azi”, în toate temele (Cadrane: în rândul „Azi”; Flux: o a
+  patra căsuță, cele patru pe două rânduri; Carduri: în banda de sus).
 
 ## 1.0.0-beta.3 — 2026-10-28
 - Reparat: în fereastra „Confirmă cu parola” (la actualizare, setările BMS și ale invertorului, WiFi) nu se putea

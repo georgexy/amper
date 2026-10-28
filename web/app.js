@@ -353,7 +353,9 @@ const cadrane = {
     }
     root.querySelector('[data-g="bat"]').style.stroke = h.mode === "discharging" ? "var(--cell)" : "var(--charge)";
     put(root, "l-bat", bp > 20 ? "Baterie, intră" : bp < -20 ? "Baterie, iese" : "Baterie");
-    put(root, "day", h.today.pv_kwh == null ? "" : `produs <b>${num(h.today.pv_kwh, 1)} kWh</b> · consumat <b>${num(h.today.load_kwh, 1)} kWh</b>`);
+    const part = (l, v) => `<span class="nw">${l} <b>${num(v, 1)} kWh</b></span>`;      // rândul se rupe doar între ele
+    put(root, "day", h.today.pv_kwh == null ? "" : [part("produs", h.today.pv_kwh), part("consumat", h.today.load_kwh),
+      part("din rețea", h.today.ac_in_kwh || 0)].join(" · "));
     put(root, "inv", invLine(h));
     drawDay(root.querySelector('[data-k="chart"]'));
   },
@@ -420,6 +422,7 @@ const flux = {
       <div class="k" data-k="kwh"></div><div class="s" data-k="eta"></div><span class="health" data-k="health"></span>
     </button>
     <div class="f-cards"><div class="card"><span>Produs azi</span><b data-k="tpv">–</b></div>
+      <div class="card"><span>Din rețea azi</span><b data-k="tgr">–</b></div>
       <div class="card"><span>Consumat azi</span><b data-k="tld">–</b></div>
       <div class="card"><span>Autonomie</span><b data-k="aut">–</b></div></div>`,
   update(root, h) {
@@ -456,6 +459,7 @@ const flux = {
     root.querySelector('[data-k="health"]').className = "health " + h.health.cls;
     put(root, "tpv", kv(h.today.pv_kwh, "kWh", 1));
     put(root, "tld", kv(h.today.load_kwh, "kWh", 1));
+    put(root, "tgr", h.today.pv_kwh == null ? "–" : kv(h.today.ac_in_kwh || 0, "kWh", 1));
     put(root, "aut", h.autonomy == null ? "–" : `~${duration(h.autonomy)}`);
   },
 };
@@ -464,7 +468,7 @@ const flux = {
 const carduri = {
   html: () => `
     <section class="c-head"><div class="st" data-k="st" data-open="inverter" role="button" tabindex="0"></div>
-      <div class="c-sum"><div>Produs azi<b data-k="tpv">–</b></div><div>Consumat azi<b data-k="tld">–</b></div><div>7 zile<b data-k="tw">–</b></div></div></section>
+      <div class="c-sum"><div>Produs azi<b data-k="tpv">–</b></div><div>Din rețea azi<b data-k="tgr">–</b></div><div>Consumat azi<b data-k="tld">–</b></div><div>7 zile<b data-k="tw">–</b></div></div></section>
     <button class="card c-batt" data-open="packs" aria-label="Bateria — vezi pachetele">
       <div class="c-row"><div class="soc"><span data-k="soc">–</span><sup>%</sup></div>
         <div class="r">Energie rămasă<b data-k="kwh">–</b><span data-k="volt"></span></div></div>
@@ -482,6 +486,7 @@ const carduri = {
     put(root, "st", `${h.ir ? esc(ir.status || "") : "Invertor: fără date"}${ir ? ` · ${num(ir.inverter_temp, 0)} °C` : ""} ›`);
     put(root, "tpv", kv(h.today.pv_kwh, "kWh", 1));
     put(root, "tld", kv(h.today.load_kwh, "kWh", 1));
+    put(root, "tgr", h.today.pv_kwh == null ? "–" : kv(h.today.ac_in_kwh || 0, "kWh", 1));
     put(root, "tw", kv(h.week, "kWh", 1));
     modeClass(root.querySelector(".c-batt"), h, "card c-batt");
     put(root, "soc", b.soc == null ? "–" : num(b.soc, 0));
