@@ -132,7 +132,7 @@ def list_ports() -> list[str]:
 
 def probe(port: str) -> list[str]:
     """Ce dispozitive răspund pe un port. Întoarce o listă de 'tip {json cu parametri}'.
-    Pe RS485 pot fi mai multe pachete Seplos (adrese diferite) — le întoarce pe toate."""
+    Pe RS485 pot fi mai multe pachete Seplos / PACE (adrese diferite) — le întoarce pe toate."""
     from .drivers.daly import DalyDriver
     from .drivers.growatt_spf import GrowattSPFDriver
     from .drivers.seplos import SeplosDriver
@@ -154,10 +154,25 @@ def probe(port: str) -> list[str]:
         return ['jk {"baudrate": 115200}']
     if ok(GrowattSPFDriver({"id": "probe", "type": "growatt_spf", "port": port}), lambda d: d._read_block(0, 3)):
         return ['growatt_spf {"baudrate": 9600}']
+    from .drivers import pace                      # PACE (PowerCube / BMS Daren...), versiunea 0x25, adresele 0–15
+
+    def pace25(a):
+        d = pace.PaceDriver({"id": "probe", "type": "pace", "port": port, "address": a, "protocol": "25"})
+        d.answer_wait = pace.PROBE_WAIT
+        return d
+    found = [f"pace {json.dumps({'baudrate': 9600, 'address': a, 'protocol': 25})}" for a in range(16)
+             if ok(pace25(a), lambda d: d._analog())]
+    if found:
+        return found
+    # versiunea 0x20: Seplos V2 sau Pylon (aceeași cerere; se deosebesc după răspuns, pace.is_seplos)
     for baud in (19200, 9600):
-        found = [f"seplos {json.dumps({'baudrate': baud, 'address': a})}" for a in range(16)
-                 if ok(SeplosDriver({"id": "probe", "type": "seplos", "port": port,
-                                     "baudrate": baud, "address": a}), lambda d: d._query(0x42))]
+        found = []
+        for a in range(16):
+            info = []
+            if ok(SeplosDriver({"id": "probe", "type": "seplos", "port": port, "baudrate": baud, "address": a}),
+                  lambda d: info.append(d._query(0x42))):
+                found.append(f"seplos {json.dumps({'baudrate': baud, 'address': a})}" if pace.is_seplos(info[0])
+                             else f"pace {json.dumps({'baudrate': baud, 'address': a, 'protocol': 20})}")
         if found:
             return found
     return []

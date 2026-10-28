@@ -73,6 +73,16 @@ devices:
     address: 0             # adresa pachetului (DIP switch)
     capacity_ah: 280
 
+  # Ecobat PowerCube (BMS Daren) și alte baterii cu BMS PACE / Pylon, pe RS485 (mufa „RS485”, nu CAN) sau RS232:
+  # - id: pace1
+  #   name: "PowerCube 1"
+  #   type: pace
+  #   port: /dev/serial/by-id/usb-...
+  #   baudrate: 9600       # implicit la PowerCube
+  #   address: 0           # DIP switch: 0 = modulul principal, 1–15 = celelalte
+  #   protocol: auto       # 25 (PACE nou), 20 (Pylon) sau auto: se află singur la prima citire
+  #   capacity_ah: 280
+
   - id: inverter
     name: "Growatt SPF 5000 ES"
     type: growatt_spf

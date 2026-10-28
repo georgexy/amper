@@ -23,6 +23,7 @@ starea fiecărui modul în timp real și să fie alertat pe telefon când un BMS
   „înghețate” după deconectarea panourilor. Utilizatorul plănuiește să-l înlocuiască cu un **Deye 8 kW monofazat** —
   atunci va fi nevoie de un driver Deye nou (Modbus, registre holding).
 - Posibil în viitor: acumulator Ecobat PowerCube P15A (BMS Daren Hi-Tec, RS485/CAN, protocol Pylon/Victron/Growatt).
+  Notele din manual (porturi, pini, DIP, 9600 bps, ipoteza PACE/Pylon): `docs/powercube-p15a.md`; driverul: `pace.py`.
 
 ## Arhitectură
 - `amper/drivers/` — câte un driver pe tip (`daly.py`, `seplos.py`, `growatt_spf.py`, `simulator.py`); `read()` e
@@ -369,3 +370,22 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   (`TLV_LEN`), curent 0x84 = bitul 15 încărcare, temperaturi >100 → negative. `__main__.probe` încearcă JK după Daly.
 - Tip config `jk` (`ble:` sau `port:`); `BLE_TYPES` jk suportat; `scan_ble` ghicește „jk” după nume (`JK_NAME`).
 - NEFĂCUTE: JK04, JK-PB pe RS485 Modbus (seria nouă „inverter BMS”), detectarea automată JK ca la Daly (`port: auto`).
+
+## BMS PACE / PowerCube (1.0.0-beta.2, 2026-10-28; NETESTAT pe o baterie reală)
+- Cerut 2026-10-28 („Da, începe”), după notele din manual (`docs/powercube-p15a.md`, PR #15).
+- `amper/drivers/pace.py`, tip config `pace` (`port`, `address` 0–15 = DIP, `baudrate` 9600, `protocol` 25/20/auto).
+  Cadrul e cel Seplos (`length_field`, `frame_checksum` din `seplos.py`) cu VER variabil. Formatul răspunsurilor după
+  documentația publică esphome-pace-bms (nkinnan; repo fără licență → doar faptele protocolului, cod scris de noi);
+  cadrele 0x25 din `tests/test_pace.py` sunt exemplele de acolo (BMS PACE real).
+- `_analog`: fără `protocol` încearcă 0x25 apoi 0x20 și ține minte (`self.ver`). 0x42: flag, pachet, celule (mV),
+  temperaturi (4 celule + MOSFET + mediu), curent /100, tensiune (mV la 0x25, 10 mV la Pylon → scara aleasă după
+  suma celulelor), rămas /100, UD (3 = PACE, 2/4 = Pylon, 4 = capacități pe 3 octeți în mAh, 10 = Seplos →
+  `seplos.decode_telemetry`), total /100, cicluri, proiectat /100 (doar 0x25). SOC = rămas/total (BMS-ul nu-l dă).
+  0x44 la 0x25: avertismente pe celule/temperaturi/curent/tensiune, protecții 1/2, stare (bit1 MOSFET încărcare,
+  bit2 descărcare, bit5/3 încarcă/descarcă), defecte, echilibrare u16, avertismente 1/2 (`PROTECT1/2`, `FAULTS`,
+  `WARN1/2`); la Pylon stările 1–5 (`PYLON_S1`, MOSFET în starea 2, celule defecte în 4/5). 0xC1 = modelul plăcii.
+- `__main__.probe`: după Growatt, PACE 0x25 la 9600 pe adresele 0–15 (`PROBE_WAIT` 0,8 s), apoi bucla Seplos (0x20,
+  19200/9600) separă Seplos de Pylon cu `pace.is_seplos`. Ghid/„Adaugă dispozitiv”: `setup_scan` (NAMES „PowerCube”,
+  `protocol` păstrat), `app.js` (DEV_TYPE „PowerCube / PACE (RS485)”).
+- DE VERIFICAT la PowerCube: dacă răspunde la 0x25 sau 0x20 (programul lui e „BMS_Monitor”, nu PbmsTools), adresa
+  (master 0 pentru toate modulele?), semnul curentului, ordinea temperaturilor, biții de stare. Doar citire.
