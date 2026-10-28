@@ -1553,12 +1553,15 @@ function drawEnergy() {
   const keys = [...new Set(days.map((d) => (monthly ? d.slice(0, 7) : d)))];
   const sum = (k, field) => days.filter((d) => (monthly ? d.slice(0, 7) : d) === k).reduce((a, d) => a + (byDay.get(d)?.[field] || 0), 0);
   const pv = keys.map((k) => sum(k, "pv_kwh")), load = keys.map((k) => sum(k, "load_kwh"));
+  const grid = keys.map((k) => sum(k, "ac_in_kwh"));                    // intrarea AC a invertorului (rețea/generator)
+  const tot = (a) => num(a.reduce((x, y) => x + y, 0), 1);
   $("#ch-energy h3").textContent = monthly ? "Energie pe lună (kWh)" : "Energie pe zi (kWh)";
-  $("#en-total").innerHTML = `Total ${dayTime2(from)} – ${dayTime2(to)}: produs <b>${num(pv.reduce((a, b) => a + b, 0), 1)} kWh</b>` +
-    ` · consumat <b>${num(load.reduce((a, b) => a + b, 0), 1)} kWh</b>`;
+  $("#en-total").innerHTML = `Total ${dayTime2(from)} – ${dayTime2(to)}: produs <b>${tot(pv)} kWh</b>` +
+    ` · consumat <b>${tot(load)} kWh</b> · din rețea <b>${tot(grid)} kWh</b>`;
   barChart($("#ch-energy"), keys, [
     { name: "Produs", color: css.getPropertyValue("--sun").trim(), data: pv },
     { name: "Consumat", color: css.getPropertyValue("--load").trim(), data: load },
+    { name: "Din rețea", color: "#3FCB7E", data: grid },
   ]);
 }
 const dayTime2 = (d) => new Date(d + "T12:00").toLocaleDateString("ro-RO", { day: "numeric", month: "short", year: "numeric" });
