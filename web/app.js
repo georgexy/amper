@@ -133,14 +133,20 @@ const pwCache = { v: "", until: 0 };
 function askPassword(msg) {
   const d = $("#pwask");
   $("#pwask-msg").textContent = msg || "Scrie parola aplicației ca să confirmi.";
-  $("#pwask-in").value = "";
+  const inp = $("#pwask-in");
+  inp.value = "";
   d.showModal();
-  setTimeout(() => $("#pwask-in").focus(), 50);
+  inp.focus({ preventScroll: true });              // pe loc: pe iPhone, tastatura se deschide doar în aceeași atingere
   return new Promise((res) => {
     const done = (v) => { d.close(); $("#pwask-ok").onclick = $("#pwask-no").onclick = null; res(v); };
-    $("#pwask-ok").onclick = () => done($("#pwask-in").value);
+    const send = () => {
+      if (!inp.value) { $("#pwask-msg").textContent = "Scrie parola aplicației."; inp.focus(); return; }
+      done(inp.value);
+    };
+    $("#pwask-ok").onclick = send;
     $("#pwask-no").onclick = () => done(null);
-    $("#pwask-in").onkeydown = (e) => e.key === "Enter" && done($("#pwask-in").value);
+    // nu `e.key === "Enter" && send()`: un `false` întors de onkeydown anulează tasta, deci nu se mai putea scrie
+    inp.onkeydown = (e) => { if (e.key === "Enter") send(); };
     d.oncancel = () => done(null);
   });
 }

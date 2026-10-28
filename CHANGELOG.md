@@ -2,6 +2,10 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.3 — 2026-10-28
+- Reparat: în fereastra „Confirmă cu parola” (la actualizare, setările BMS și ale invertorului, WiFi) nu se putea
+  scrie parola de la tastatură. Cu câmpul gol, „Confirmă” cere acum parola, în loc să spună „Parola nu e corectă”.
+
 ## 1.0.0-beta.2 — 2026-10-28
 - Baterii cu BMS PACE pe RS485 sau RS232, încă netestat pe o baterie reală: Ecobat PowerCube (BMS Daren) și multe
   baterii de rack sau de perete care vorbesc „Pylon”. Amper citește SOC-ul, celulele, temperaturile, curentul,
