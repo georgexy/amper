@@ -1,0 +1,33 @@
+# Codul de activare Amper Pro pentru un Pi: GitHub → Actions → „Cod Pro” → Run workflow → ID-ul Pi-ului
+# (Setări → Despre în aplicația clientului, ex. 7K3F-Q9PA). Codul apare în rezumatul rulării; îl copiezi și i-l dai
+# clientului, care îl lipește în Setări → Despre → „Activează Pro”. Merge doar pe Pi-ul cu acel ID.
+# Semnat cu aceeași cheie ca actualizările (secretul AMPER_SIGNING_KEY); doar cine poate rula workflow-ul face coduri.
+name: Cod Pro
+
+on:
+  workflow_dispatch:
+    inputs:
+      pi_id:
+        description: "ID-ul Pi-ului (Setări → Despre), ex. 7K3F-Q9PA"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  code:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q cryptography pyyaml
+      - name: Generează codul
+        env:
+          AMPER_SIGNING_KEY: ${{ secrets.AMPER_SIGNING_KEY }}
+          PI_ID: ${{ inputs.pi_id }}
+        run: |
+          out="$(python tools/release.py pro "$PI_ID")"
+          echo "$out"
+          { echo "### Amper Pro"; echo; echo '```'; echo "$out"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

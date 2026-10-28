@@ -2,6 +2,12 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.6 — în pregătire
+- Două ediții, același program: **Amper Lite** (supraveghere: tot, mai puțin setările BMS și ale invertorului) și
+  **Amper Pro** (și setările). Pi-urile care au deja Amper rămân Pro; o instalare nouă de pe card pornește Lite.
+- Setări → Despre arată ediția și „ID Pi”. Pro se activează cu un cod primit pentru acel Pi (merge doar pe el și se
+  verifică fără internet): lipești codul și apeși „Activează Pro”.
+
 ## 1.0.0-beta.5 — 2026-10-28
 - Un BMS sau invertor care n-a mai răspuns 5 zile se deconectează singur: nu mai apare pe ecran, alertele lui
   „nu mai comunică” se închid (fără notificări „Rezolvat”) și primești o singură notificare. Rămâne în listă: dacă

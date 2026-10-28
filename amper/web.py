@@ -32,6 +32,12 @@ def make_app(engine) -> web.Application:
     state_dir = None if cfg["database"] == ":memory:" else os.path.dirname(os.path.abspath(cfg["database"]))
     auth_ = Auth(cfg, engine.db, engine.notifier, state_dir)
     engine.auth = auth_
+    from . import edition as edition_
+    edition_.init_base(cfg, engine.db)
+    pid = edition_.pi_id()
+    ed = {"v": edition_.current(cfg, pid)}          # „lite” / „pro”; se schimbă la activarea cu cod
+    # doar în Pro: setările BMS și ale invertorului și datele brute de depanare (serverul refuză, nu doar pagina)
+    PRO_ONLY = re.compile(r"^/api/(inverter/(settings|clock)|daly/[^/]+/(settings|params)|debug/[^/]+)$")
     COOKIE_AGE = 3600 * 24 * 365
 
     def client_ip(request) -> str:
@@ -97,6 +103,13 @@ def make_app(engine) -> web.Application:
         return await handler(request)
 
     @web.middleware
+    async def pro_only(request, handler):
+        if ed["v"] != "pro" and PRO_ONLY.match(request.path):
+            return _json({"error": "Disponibil doar în Amper Pro (Setări → Despre → Activează Pro).",
+                          "pro_required": True}, 403)
+        return await handler(request)
+
+    @web.middleware
     async def headers(request, handler):
         try:
             resp = await handler(request)
@@ -126,7 +139,7 @@ def make_app(engine) -> web.Application:
             resp.headers["Cache-Control"] = "no-cache"
         return resp
 
-    app = web.Application(middlewares=[headers, auth, no_cache_api])
+    app = web.Application(middlewares=[headers, auth, pro_only, no_cache_api])
     if reset_pending():
         engine.notifier.send("🔐 Parola aplicației a fost ștearsă cu fișierul de pe card. Deschide Amper din rețeaua "
                              "de acasă și alege una nouă.", title="Amper: securitate", priority="high")
@@ -185,10 +198,26 @@ def make_app(engine) -> web.Application:
         return _json(dict(devices=devs, auth=auth_.enabled, poll_interval=cfg["poll_interval"], version=__version__,
                           port=int((cfg.get("web") or {}).get("port") or 8080),
                           site_name=cfg.get("site_name") or "", setup_needed=setup_needed(cfg),
-                          password_reset=reset_pending(),
+                          password_reset=reset_pending(), edition=ed["v"], pi_id=pid,
                           public_url=wp.subject if wp else None,
                           notifications=engine.notifier.enabled,
                           simulated=any(d["type"].startswith("sim_") for d in cfg["devices"])))
+
+    async def pro_activate(request):
+        """Activează Pro cu codul primit de la autor (semnat pentru ID-ul acestui Pi). Cere parola aplicației."""
+        body = await request.json()
+        if (err := await confirm(request, body, "activare Pro")) is not None:
+            return err
+        code = "".join(str(body.get("code") or "").split())
+        if not edition_.code_ok(code, pid):
+            return _json({"error": f"Codul nu e valid pentru acest Pi (ID {pid}). Verifică să fie copiat întreg."}, 400)
+        from .config import save_overlay
+        await asyncio.to_thread(save_overlay, cfg, {"pro_code": code})
+        cfg["pro_code"] = code
+        ed["v"] = "pro"
+        log.warning("Amper Pro activat (ID %s, de la %s)", pid, client_ip(request))
+        engine.notifier.send("⭐ Amper Pro a fost activat pe acest Pi.", title="Amper", priority="default")
+        return _json({"ok": True, "edition": "pro"})
 
     async def history(request):
         device = request.query.get("device")
@@ -788,6 +817,7 @@ def make_app(engine) -> web.Application:
     app.router.add_post("/api/login", login)
     app.router.add_get("/api/info", info)
     app.router.add_get("/api/health", health)
+    app.router.add_post("/api/pro/activate", pro_activate)
     app.router.add_get("/api/live", live)
     app.router.add_get("/api/history", history)
     app.router.add_get("/api/history/all", history_many)

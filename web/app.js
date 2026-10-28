@@ -106,7 +106,7 @@ async function boot() {
   if (v === "alerts") { show("alerts"); history.replaceState(null, "", location.pathname); }
   if (v === "update") { show("settings"); showPanel("update"); history.replaceState(null, "", location.pathname); }
   $("#version").textContent = `Amper ${state.info.version || ""} · citire la fiecare ${state.info.poll_interval} s.`;
-  $("#set-about-sub").textContent = `Amper ${state.info.version || ""} · actualizări, Pi-ul`;
+  $("#set-about-sub").textContent = `Amper ${isPro() ? "Pro" : "Lite"} ${state.info.version || ""} · actualizări, Pi-ul`;
   setInterval(tickConn, 1000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 }
@@ -581,7 +581,7 @@ function renderPacks() {
       r.temps?.length ? `${num(Math.max(...r.temps), 0)} °C` : null, r.cycles != null ? `${r.cycles} cicluri` : null].filter(Boolean).join(" · ");
     el.innerHTML = `<div class="h"><div class="pk-mini"><i style="height:${Math.max(0, Math.min(100, r.soc ?? 0))}%"></i></div>
       <div class="t"><div class="n">${esc(d.name)} <span class="tag">${esc(label)}</span>${d.type === "daly" && !d.stale
-        ? `<span class="pk-gear" data-bms="${esc(d.id)}" role="button" tabindex="0" aria-label="Setările BMS ${esc(d.name)}">⚙</span>` : ""}</div>
+        && isPro() ? `<span class="pk-gear" data-bms="${esc(d.id)}" role="button" tabindex="0" aria-label="Setările BMS ${esc(d.name)}">⚙</span>` : ""}</div>
       <div class="s">${d.stale ? `Nu comunică${d.error ? ": " + esc(d.error) : ""}` : facts}</div>${bleId(r)}</div>
       <div class="soc">${r.soc == null ? "–" : num(r.soc, 0)}<sup>%</sup></div></div>
       ${cells.length ? `<div class="pk-cells">${cells.map((v) => `<i class="${hi - lo > 0.005 ? (v === hi ? "hi" : v === lo ? "lo" : "") : ""}"
@@ -1012,11 +1012,35 @@ function dalySearchNow(btn) {
 }
 
 /* meniul setărilor: butoane → secțiuni (Teme, Notificări, Module Daly) */
+/* ediția: Lite (supraveghere) sau Pro (și setările BMS și ale invertorului); serverul hotărăște (/api/info) */
+const isPro = () => state.info?.edition !== "lite";
+function renderEdition() {
+  const pro = isPro();
+  $("#ed-name").textContent = pro ? "Amper Pro" : "Amper Lite";
+  $("#ed-pid").textContent = state.info?.pi_id || "–";
+  $("#ed-act").hidden = pro;
+}
+$("#ed-go").onclick = async () => {
+  const code = $("#ed-code").value.replace(/\s+/g, "");
+  if (!code) { $("#ed-msg").textContent = "Lipește codul primit."; return; }
+  $("#ed-go").disabled = true;
+  try {
+    const { r, j } = await securePost("/api/pro/activate", { code });
+    if (!r.ok) throw new Error(j.error || `eroare ${r.status}`);
+    state.info.edition = "pro";
+    $("#ed-msg").textContent = "";
+    $("#set-about-sub").textContent = `Amper Pro ${state.info.version || ""} · actualizări, Pi-ul`;
+    renderEdition();
+    toast("Amper Pro e activat.");
+  } catch (e) { $("#ed-msg").textContent = e.message; }
+  $("#ed-go").disabled = false;
+};
+
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
   for (const k of ["teme", "notif", "daly", "devoff", "devadd", "excl", "info", "update", "security", "remote", "auto", "about", "conn", "share", "wifi"])
     $("#set-" + k).hidden = k !== name;
-  if (name === "about") $("#about-version").textContent = $("#version").textContent;
+  if (name === "about") { $("#about-version").textContent = $("#version").textContent; renderEdition(); }
   if (name === "share") loadShare();
   if (name === "wifi") loadWifiNow();
   if (name === "auto") loadUserAlerts();
@@ -1408,7 +1432,12 @@ function show(v) {
   $("#pvpop").hidden = true;
   if (v === "bms") loadBms();
   if (v === "packs") renderPacks();
-  if (v === "inverter") { renderInverterLive(); loadInverter(); }
+  if (v === "inverter") {
+    renderInverterLive();
+    $("#iv-pro").hidden = !isPro();                 // Lite: doar starea invertorului, fără setări
+    $("#iv-lite").hidden = isPro();
+    if (isPro()) loadInverter();
+  }
   if (v === "settings") { showPanel(null); renderSettingsMenu(); }
   window.scrollTo(0, 0);
   if (v === "hist") loadHistory();

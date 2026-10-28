@@ -157,6 +157,8 @@ def main() -> None:
     b.add_argument("--urgent", action="store_true", help="actualizare urgentă: Pi-urile o instalează singure")
     v = sub.add_parser("verify")
     v.add_argument("out", nargs="?", default="dist")
+    pr = sub.add_parser("pro", help="codul de activare Amper Pro pentru un Pi (ID-ul din Setări → Despre)")
+    pr.add_argument("pi_id")
     a = p.parse_args()
     if a.cmd == "keygen":
         keygen()
@@ -171,6 +173,17 @@ def main() -> None:
         m = build(Path(a.out), key, urgent=a.urgent)
         print(f"Amper {m['version']}: {m['tarball']} ({m['size'] / 1e6:.2f} MB), sha256 {m['sha256']}"
               + (" — URGENTĂ" if m.get("urgent") else ""))
+    elif a.cmd == "pro":
+        sys.path.insert(0, str(ROOT))
+        from amper import edition
+        key = os.environ.get("AMPER_SIGNING_KEY", "")
+        if not key:
+            sys.exit("Lipsește AMPER_SIGNING_KEY (secretul repo-ului).")
+        pid = edition.norm_id(a.pi_id)
+        if len(pid) != 9 or any(c not in edition.ALPHABET for c in pid.replace("-", "")):
+            sys.exit(f"ID-ul Pi-ului „{a.pi_id}” nu e valid (8 caractere, ex. 7K3F-Q9PA).")
+        print(f"ID Pi: {pid}")
+        print(f"Cod Amper Pro: {edition.make_code(_private_key(key), pid)}")
     elif a.cmd == "verify":
         m = verify(Path(a.out))
         print(f"semnătura e validă: Amper {m['version']}")
