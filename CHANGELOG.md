@@ -6,8 +6,8 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Reparat: la setările de echilibrare ale BMS-ului Daly, aplicația spunea „BMS-ul arată altceva decât s-a trimis”
   deși valoarea se schimbase. Unele Daly modifică singure alți octeți din același bloc; acum se verifică doar
   valoarea scrisă.
-- Setări → Despre: versiunea apare în cardul de sus, lângă ediție și ID Pi; textul de jos (versiunea și „citire
-  la fiecare 2 s”) a fost scos.
+- Setări → Despre: ediția, versiunea și ID-ul Pi-ului stau într-un card mic, sub butoane; textul de jos (versiunea
+  și „citire la fiecare 2 s”) a fost scos.
 
 ## 1.0.0-beta.6 — 2026-10-28
 - Două ediții, același program: **Amper Lite** (supraveghere: tot, mai puțin setările BMS și ale invertorului) și
