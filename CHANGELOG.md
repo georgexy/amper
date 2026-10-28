@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.3 — în pregătire
+## 1.0.0-beta.3 — 2026-10-28
 - Reparat: în fereastra „Confirmă cu parola” (la actualizare, setările BMS și ale invertorului, WiFi) nu se putea
   scrie parola de la tastatură. Cu câmpul gol, „Confirmă” cere acum parola, în loc să spună „Parola nu e corectă”.
 
