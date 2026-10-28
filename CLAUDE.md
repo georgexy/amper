@@ -407,4 +407,9 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `POST /api/pro/activate {code, app_password}`. `app.js`: `isPro()`, `renderEdition()`, `#ed-card`, `#iv-pro/#iv-lite`.
 - Coduri: `.github/workflows/pro-code.yml` (Actions → „Cod Pro” → ID; codul în rezumatul rulării — public, dar
   merge doar pe acel Pi) sau `AMPER_SIGNING_KEY=… python tools/release.py pro <ID>`.
+- Aplicația de coduri (cerută 2026-10-28): `site/coduri/index.html` → https://georgexy.github.io/amper/coduri/
+  (noindex, fără link de pe site). Cheia privată se lipește o dată, se verifică cu `PUBLIC_KEYS` (copiate din
+  `update_key.py` — țin-le sincron!) și se ține doar în localStorage; semnează cu WebCrypto Ed25519 (PKCS#8 din seed),
+  același cod ca `edition.make_code` (verificat în test cu Chromium). Evidența codurilor date: localStorage.
+- 1.0.0-beta.7: „Versiunea” în `#ed-card`; scoase `#version` și `#about-version` (cu „citire la fiecare 2 s”).
 

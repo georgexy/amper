@@ -105,7 +105,6 @@ async function boot() {
   const v = new URLSearchParams(location.search).get("v");
   if (v === "alerts") { show("alerts"); history.replaceState(null, "", location.pathname); }
   if (v === "update") { show("settings"); showPanel("update"); history.replaceState(null, "", location.pathname); }
-  $("#version").textContent = `Amper ${state.info.version || ""} · citire la fiecare ${state.info.poll_interval} s.`;
   $("#set-about-sub").textContent = `Amper ${isPro() ? "Pro" : "Lite"} ${state.info.version || ""} · actualizări, Pi-ul`;
   setInterval(tickConn, 1000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -1018,6 +1017,7 @@ function renderEdition() {
   const pro = isPro();
   $("#ed-name").textContent = pro ? "Amper Pro" : "Amper Lite";
   $("#ed-pid").textContent = state.info?.pi_id || "–";
+  $("#ed-ver").textContent = state.info?.version || "–";
   $("#ed-act").hidden = pro;
 }
 $("#ed-go").onclick = async () => {
@@ -1040,7 +1040,7 @@ function showPanel(name) {
   $("#set-menu").hidden = !!name;
   for (const k of ["teme", "notif", "daly", "devoff", "devadd", "excl", "info", "update", "security", "remote", "auto", "about", "conn", "share", "wifi"])
     $("#set-" + k).hidden = k !== name;
-  if (name === "about") { $("#about-version").textContent = $("#version").textContent; renderEdition(); }
+  if (name === "about") renderEdition();
   if (name === "share") loadShare();
   if (name === "wifi") loadWifiNow();
   if (name === "auto") loadUserAlerts();
