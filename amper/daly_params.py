@@ -13,10 +13,13 @@ din valori, nu din poziție.
 """
 from __future__ import annotations
 
+import logging
 import time
 
 from .drivers.base import DriverError
 from .drivers.daly import build_request
+
+log = logging.getLogger("amper.daly_params")
 
 # key, cmd, offset, size, tip, scară, unitate, min, max, grup, etichetă, pereche, sens („sus” = mai mare e mai sever)
 F = dict
@@ -147,7 +150,11 @@ def read_blocks(drv) -> dict[int, bytes]:
 
 
 def write_field(drv, key: str, value) -> dict:
-    """Scrie un câmp: citește blocul, schimbă doar câmpul, îl trimite, apoi îl citește înapoi și compară."""
+    """Scrie un câmp: citește blocul, schimbă doar câmpul, îl trimite, apoi îl citește înapoi și compară DOAR
+    octeții câmpului. La 0x5F (echilibrare) octeții 4..7 se schimbă singuri între două citiri, fără nicio scriere
+    (văzut pe hardware 2026-10-28, firmware 31_2306): compararea întregului bloc dădea eroare deși valoarea se
+    aplicase. Se trimite totuși înapoi blocul întreg, cu octeții citiți atunci și pentru câmpurile nedocumentate —
+    pe hardware n-a stricat nimic, dar e NEVERIFICAT ce reprezintă acei octeți."""
     f = BY_KEY.get(key)
     if f is None:
         raise ValueError(f"setare necunoscută: {key}")
@@ -167,10 +174,14 @@ def write_field(drv, key: str, value) -> dict:
     drv._exchange(build_request(drv.address, f["cmd"] - WRITE_OFFSET, bytes(new_block)), 13)
     time.sleep(0.5)
     back = drv._query(f["cmd"])[0]
-    if back != bytes(new_block):
-        now = raw_to_value(f, raw_get(back, f))
-        if back == old_block:
+    got = raw_get(back, f)
+    if got != raw:
+        now = raw_to_value(f, got)
+        if got == raw_get(old_block, f):
             raise DriverError(f"{res['label']}: BMS-ul nu a aplicat modificarea (a rămas {fmt(f, now)})")
         raise DriverError(f"{res['label']}: BMS-ul arată altceva decât s-a trimis ({fmt(f, now)}) — verificați în "
                           "aplicația Daly")
+    if back != bytes(new_block):
+        log.warning("Daly 0x%02X: după scrierea „%s” s-au schimbat și alți octeți: %s → %s (câmpul e corect)",
+                    f["cmd"], key, bytes(new_block).hex(), back.hex())
     return res

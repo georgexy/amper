@@ -181,6 +181,9 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   de citire − 0x40 cu blocul întreg de 8 octeți, apoi citire înapoi și comparare — regula protocolului, NEVERIFICATĂ
   — utilizatorul a confirmat pe 2026-10-26 că scrierea FUNCȚIONEAZĂ pe BMS-ul real. Rolul
   avertisment/protecție al fiecărui prag se calculează din valorile perechii (ordinea diferă între blocuri).
+- 2026-10-28 (1.0.0-beta.7): la 0x5F octeții 4..7 se schimbă singuri între citiri (Daly 1: `…00014b32` →
+  `…700c7232`); `write_field` compară acum doar octeții câmpului (restul → doar avertisment în jurnal). Scrierea
+  bal_start 3,40 V / bal_diff 20 mV s-a aplicat pe 3 Daly (firmware 31_2306, 31_2207, 11_2506).
 
 ## Setările invertorului (Growatt)
 - Protocolul de referință: „OffGrid Modbus RS485&RS232 RTU Protocol V0.17” (în Google Drive-ul utilizatorului,

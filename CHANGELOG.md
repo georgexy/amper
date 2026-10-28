@@ -2,6 +2,11 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.7 — în pregătire
+- Reparat: la setările de echilibrare ale BMS-ului Daly, aplicația spunea „BMS-ul arată altceva decât s-a trimis”
+  deși valoarea se schimbase. Unele Daly modifică singure alți octeți din același bloc; acum se verifică doar
+  valoarea scrisă.
+
 ## 1.0.0-beta.6 — 2026-10-28
 - Două ediții, același program: **Amper Lite** (supraveghere: tot, mai puțin setările BMS și ale invertorului) și
   **Amper Pro** (și setările). Pi-urile care au deja Amper rămân Pro; o instalare nouă de pe card pornește Lite.
