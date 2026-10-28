@@ -103,7 +103,7 @@ def build(out: Path, key_b64: str, root: Path = ROOT, mtime: int | None = None, 
     manifest = {"version": ver, "tarball": name, "sha256": hashlib.sha256(tar).hexdigest(), "size": len(tar),
                 "date": time.strftime("%Y-%m-%d", time.gmtime(_mtime(root) if mtime is None else mtime)),
                 "notes": note}
-    if urgent:                     # Pi-urile o instalează singure (semnat, deci nimeni altcineva nu poate cere asta)
+    if urgent:                     # anunțată ca importantă (până la 1.0.0-beta.2, Pi-urile o instalau singure)
         manifest["urgent"] = True
     mb = json.dumps(manifest, ensure_ascii=False, indent=1).encode()
     (out / "manifest.json").write_bytes(mb)
@@ -154,7 +154,7 @@ def main() -> None:
     n.add_argument("ver", nargs="?")
     b = sub.add_parser("build")
     b.add_argument("--out", default="dist")
-    b.add_argument("--urgent", action="store_true", help="actualizare urgentă: Pi-urile o instalează singure")
+    b.add_argument("--urgent", action="store_true", help="actualizare importantă (doar anunțată; Pi-urile până la 1.0.0-beta.2 o instalează singure!)")
     v = sub.add_parser("verify")
     v.add_argument("out", nargs="?", default="dist")
     a = p.parse_args()

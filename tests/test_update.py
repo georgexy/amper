@@ -550,7 +550,7 @@ def test_card_rollback_file(tmp_path):
     assert any("cerută de pe card" in n for n in e.notes)
 
 
-def test_urgent_release_installs_by_itself(tmp_path):
+def test_urgent_release_is_only_announced(tmp_path):
     e = Env(tmp_path)
     u = e.updater()
     out = tmp_path / "dist-urg"
@@ -569,6 +569,28 @@ def test_urgent_release_installs_by_itself(tmp_path):
     e.now += up.URGENT_EVERY
     assert u.due()                                                  # se caută la 6 ore, nu la 7 zile
     u.check(auto=True)
-    assert u.urgent_pending() and any("urgentă" in n for n in e.notes)
+    assert u.urgent_pending() and any("Actualizare importantă" in n for n in e.notes)
+    assert u.installed_version() == "0.2.0"                         # nu s-a instalat singură
     u.state["bad_version"] = "0.3.1"                               # a căzut deja aici: nu insistă
     assert not u.urgent_pending()
+
+
+def test_loop_never_installs(tmp_path, monkeypatch):
+    """Căutarea automată din `loop` doar anunță, chiar și o versiune urgentă (cerut 2026-10-28)."""
+    e = Env(tmp_path)
+    u = e.updater()
+    u.state["latest"] = {"version": "9.9.9", "urgent": True}
+    calls = []
+    monkeypatch.setattr(u, "card_rollback", lambda: None)
+    monkeypatch.setattr(u, "watchdog", lambda: None)
+    monkeypatch.setattr(u, "due", lambda: True)
+    monkeypatch.setattr(u, "check", lambda auto=False: calls.append("check"))
+    monkeypatch.setattr(u, "install", lambda *a, **k: calls.append("install") or True)
+
+    def stop(seconds):
+        if seconds == 3600:
+            raise KeyboardInterrupt
+    monkeypatch.setattr(up.time, "sleep", stop)
+    with pytest.raises(KeyboardInterrupt):
+        u.loop()
+    assert calls == ["check"]
