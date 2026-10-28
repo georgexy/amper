@@ -414,4 +414,9 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - 1.0.0-beta.7: „Versiunea” în `#ed-card`, mutat sub meniul Despre, scris 14 px; scoase `#version` și
   `#about-version` (cu „citire la fiecare 2 s”). `site/coduri/` are manifest + iconițe (se pune pe ecranul principal;
   pe iPhone aplicația de pe ecran are alt localStorage decât Safari → cheia se lipește din nou acolo).
+- 1.0.0-beta.7: bara de jos = model „J” ales de utilizator (2026-10-28): `nav.tabs` Istoric | `.nav-now` | Alerte;
+  `.nav-now` = inel SVG (r 34, `#nav-arc` dasharray = SOC bancă) + `#nav-soc`; `navState(homeData())` la fiecare
+  randare: `data-st` charging (verde, fulger mare) / discharging (albastru, căsuță) / idle (gri) / fault
+  (`health.cls === "fault"`, roșu, „!”). Pe alte ecrane cercul e la 78% opacitate; tabul activ = pastilă colorată.
+  `body` padding jos 104 px (cercul iese ~24 px peste bară).
 

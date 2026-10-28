@@ -9,6 +9,10 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Setări → Despre: ediția, versiunea și ID-ul Pi-ului stau într-un card mic, sub butoane; textul de jos (versiunea
   și „citire la fiecare 2 s”) a fost scos.
 
+- Bara de jos nouă: Istoric în stânga, Alerte în dreapta, iar la mijloc un cerc mare care arată SOC-ul băncii.
+  Inelul se umple cât bateria și își schimbă culoarea: verde cu fulger când se încarcă, albastru cu o căsuță
+  când alimentează casa, gri în repaus, roșu cu „!” la avarie. Atins, te duce pe ecranul principal.
+
 ## 1.0.0-beta.6 — 2026-10-28
 - Două ediții, același program: **Amper Lite** (supraveghere: tot, mai puțin setările BMS și ale invertorului) și
   **Amper Pro** (și setările). Pi-urile care au deja Amper rămân Pro; o instalare nouă de pe card pornește Lite.

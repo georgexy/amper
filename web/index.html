@@ -367,12 +367,15 @@
     </main>
 
     <nav class="tabs" aria-label="Secțiuni">
-      <button data-view="now" aria-current="page" aria-label="Acum">
-        <svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 2h6M8.5 14h7M8.5 10.5h7"/></svg><span class="lb">Acum</span></button>
-      <button data-view="hist" aria-label="Istoric">
-        <svg viewBox="0 0 24 24"><path d="M3 20h18M5 16l4-6 4 3 6-9"/></svg><span class="lb">Istoric</span></button>
-      <button data-view="alerts" aria-label="Alerte"><span class="badge" id="badge">
-        <svg viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4"/></svg></span><span class="lb">Alerte</span></button>
+      <button data-view="hist" aria-label="Istoric"><span class="ti">
+        <svg viewBox="0 0 24 24"><path d="M3 20h18M5 16l4-6 4 3 6-9"/></svg></span><span class="lb">Istoric</span></button>
+      <!-- „Acum”: inelul = SOC-ul băncii; culoarea și semnul = starea (navState în app.js) -->
+      <button data-view="now" class="nav-now" aria-current="page" aria-label="Acum">
+        <svg class="nring" viewBox="0 0 80 80"><circle class="nr-bg" cx="40" cy="40" r="34"/><circle class="nr-trk" cx="40" cy="40" r="34"/>
+          <circle class="nr-arc" id="nav-arc" cx="40" cy="40" r="34" transform="rotate(-90 40 40)"/></svg>
+        <span class="nin"><svg class="nic" id="nav-ic" viewBox="0 0 24 24"></svg><b id="nav-soc">–</b><small>%</small></span></button>
+      <button data-view="alerts" aria-label="Alerte"><span class="ti"><span class="badge" id="badge">
+        <svg viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4"/></svg></span></span><span class="lb">Alerte</span></button>
     </nav>
   </div>
 
