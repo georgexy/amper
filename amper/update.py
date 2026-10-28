@@ -12,9 +12,8 @@ Pe Pi:
 
 Pașii unei actualizări: manifest + semnătură → arhivă (sha256) → spațiu → copia datelor → despachetare în
 /opt/amper-<ver> → schimbarea legăturii → repornire → /api/health în 60 s; altfel revine la versiunea veche
-(cod + date din copia făcută înainte). Căutarea automată doar anunță: actualizarea o face omul, când vrea el
-(nici o versiune marcată „urgentă” cu `release.py build --urgent` nu se mai instalează singură; e doar anunțată
-ca importantă și căutată mai des, la 6 ore).
+(cod + date din copia făcută înainte). Căutarea automată (la 6 ore) doar anunță; o versiune marcată „urgentă” în
+manifestul semnat (`release.py build --urgent`) se instalează singură, cu aceleași verificări.
 Paznicul (la fiecare minut): Amper nu răspunde 5 minute → repornit; tot nu răspunde și actualizarea e din ultimele
 7 zile → revenire automată la versiunea anterioară. Fișierul `revenire.txt` pus pe card (bootfs) → revenire la pornire.
 API local pentru serverul web (utilizatorul amper): 127.0.0.1:8092, token în /run/amper-update/token.
@@ -47,7 +46,7 @@ TOKEN_PATH = "/run/amper-update/token"
 KEEP_BACKUPS = 3          # copii pre-update păstrate
 KEEP_VERSIONS = 3         # foldere /opt/amper-<ver> păstrate (curentă, anterioară și încă una)
 HEALTH_TIMEOUT = 60
-URGENT_EVERY = 6 * 3600   # cât de des se caută o versiune nouă (o urgentă e anunțată în câteva ore)
+URGENT_EVERY = 6 * 3600   # cât de des se caută o versiune urgentă (și se anunță una nouă)
 WATCH_EVERY = 60          # paznicul: cât de des întreabă Amper dacă răspunde
 DOWN_RESTART = 300        # nu răspunde de atâtea secunde → repornire
 RECENT_UPDATE = 7 * 86400  # o actualizare mai nouă de atât e suspectă dacă Amper nu mai pornește
@@ -488,14 +487,13 @@ class Updater:
             self.state["notified"] = m["version"]
             self.save()
             if self.urgent_pending():
-                self.notify("Actualizare importantă disponibilă. Atinge pentru a actualiza.")
+                self.notify("Actualizare urgentă detectată. Se instalează singură.")
             else:
                 self.notify("Versiune nouă detectată. Atinge pentru a actualiza.")
         return self.status()
 
     def urgent_pending(self) -> bool:
-        """Ultima versiune găsită e marcată urgentă (în manifestul semnat) și nu a căzut deja aici. Doar pentru
-        textul notificării: nicio versiune nu se instalează singură (cerut de utilizator, 2026-10-28)."""
+        """Ultima versiune găsită e marcată urgentă (în manifestul semnat) și nu a căzut deja aici."""
         lt = self.state.get("latest") or {}
         cur = self.installed_version()
         return bool(lt.get("urgent") and cur and newer(lt["version"], cur)
@@ -747,7 +745,7 @@ class Updater:
                   and prev["dir"] != self.current_dir())
         if self.wd["restarts"] >= 1 and recent:
             log.error("paznic: Amper %s nu răspunde nici după repornire; revin la %s", cur, prev.get("version"))
-            self.state["bad_version"] = cur           # nu mai e anunțată ca urgentă
+            self.state["bad_version"] = cur           # nu se reinstalează singură (actualizare urgentă)
             self.save()
             if self.rollback():
                 self.notify(f"⚠️ Amper {cur} nu mai răspundea; am revenit singur la {prev.get('version')}. "
@@ -807,7 +805,9 @@ class Updater:
         while True:
             if self.due() and not self.lock.locked():
                 try:
-                    self.check(auto=True)            # doar anunță; instalarea o pornește omul
+                    self.check(auto=True)
+                    if self.urgent_pending() and self.install():
+                        self._restart_self()         # actualizare urgentă: instalată singură
                 except UpdateError as e:
                     log.info("căutarea automată: %s", e)
                     self.state["last_check"] = int(self.clock()) - URGENT_EVERY + 3600

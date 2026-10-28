@@ -218,10 +218,10 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   lansează ca stabilă (`x.y.z`) — abia atunci o primesc cunoscuții. Lansare: workflow-ul `release.yml`
   (`actions_run_trigger`, `run_workflow`, ref `main`); verificare: `Updater.check()` real pe GitHub.
 - Utilizatorul nu lucrează cu git/PR; explică-i pe scurt, în română, ce s-a schimbat.
-- **Amper NU se actualizează singur** (cerut 2026-10-28, după ce utilizatorul a văzut o actualizare peste noapte):
-  doar notifică; actualizarea o pornește omul. Din 1.0.0-beta.3, `urgent` din manifest = doar „Actualizare importantă”
-  în notificare. **Nu lansa niciodată cu `urgent: true`**: Pi-urile cu versiuni până la 1.0.0-beta.2 inclusiv o
-  instalează singure. Revenirea automată a paznicului (versiune care nu pornește) rămâne.
+- Lansare urgentă (`release.yml` cu input `urgent: true` → `release.py build --urgent` → `"urgent": true` în
+  manifestul semnat): Pi-urile o instalează SINGURE. Doar pentru reparații care nu pot aștepta, doar stabile testate
+  pe beta, și tot doar după „publică”. Dacă după o urgentă vine repede altă versiune, marcheaz-o și pe ea urgentă
+  (un Pi offline la momentul urgentei vede doar ultima versiune).
 - Numerotare (stabilit 2026-10-27): după 0.3.0-beta.10 urmează 1.0.0-beta.N; **1.0.0** stabilă (prima pentru
   cunoscuți, cu imaginea SD) abia după testul complet al imaginii pe un card + Pi de rezervă. 0.3.0 stabilă nu se mai lansează.
 - **NU publica (merge + release) până nu spune explicit „publică”** (cerut 2026-10-27, după ce beta.5 a ieșit prea
@@ -304,8 +304,7 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - `card_rollback()` la pornirea amper-update: `revenire*`/`rollback*` în /boot/firmware → șters, `rollback()`.
   `password_reset.find_files(boot_dirs, names)` e comun.
 - Urgente: `state.latest.urgent`; `due()` = la 6 ore (`URGENT_EVERY`); `urgent_pending()` (mai nouă, nu
-  `bad_version`) → până la 1.0.0-beta.2 `install()` singur în `loop`; din 1.0.0-beta.3 doar notificarea
-  „Actualizare importantă disponibilă…” (`loop` nu mai instalează nimic, `test_loop_never_installs`).
+  `bad_version`) → `install()` singur în `loop`. Notificare „⬆️ Actualizare urgentă…”.
 - `app.js` `showDown()`: după 5 s fără /api/info, mesaj „Amper nu răspunde…” în locul ecranului negru.
 - ATENȚIE: protecțiile ajută doar Pi-urile care le au instalate (de la beta.8). Pi-ul utilizatorului pe beta.7 nu le are.
 

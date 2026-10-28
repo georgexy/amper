@@ -2,12 +2,6 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.3 — în pregătire
-- Amper nu se mai actualizează niciodată singur: când apare o versiune nouă primești doar o notificare, iar
-  actualizarea o pornești tu, din Setări → Actualizări, când vrei. Și o versiune „importantă” e doar anunțată
-  (de până acum se instala singură). Protecțiile rămân: dacă Amper nu mai răspunde după o actualizare, revine
-  singur la versiunea de dinainte.
-
 ## 1.0.0-beta.2 — 2026-10-28
 - Baterii cu BMS PACE pe RS485 sau RS232, încă netestat pe o baterie reală: Ecobat PowerCube (BMS Daren) și multe
   baterii de rack sau de perete care vorbesc „Pylon”. Amper citește SOC-ul, celulele, temperaturile, curentul,
