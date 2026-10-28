@@ -65,6 +65,10 @@ Android (Chrome) → ⋮ → *Instalează aplicația*. Pe iPhone, notificările 
 
 ## 5. Mai departe
 
+**Amper Lite și Amper Pro.** O instalare nouă e **Lite**: vezi tot, primești toate alertele și poți adăuga sau
+scoate dispozitive. **Pro** adaugă setările BMS-urilor și ale invertorului. Pentru Pro: Setări → Despre → trimite
+„ID Pi” celui care ți-a dat Amper, apoi lipește codul primit și apasă „Activează Pro”.
+
 - **Actualizări:** Setări → Despre → Actualizări. Pi-ul caută singur o dată pe săptămână și te anunță; tu alegi
   când instalezi. Datele și setările rămân; dacă versiunea nouă nu pornește, Pi-ul revine singur la cea veche.
 - **Dă adresa celor din casă:** Setări → Conectare → Partajează Amper.

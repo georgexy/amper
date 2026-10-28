@@ -89,6 +89,7 @@
       </div>
       <div class="pk-sum" id="iv-sum"></div>
       <p class="note" id="iv-state"></p>
+      <div id="iv-pro">
       <div id="iv-list"></div>
       <h2>Ceas</h2>
       <div class="card iv-clock"><div id="iv-clock"></div><button class="btn" id="iv-sync">Potrivește cu ora Pi-ului</button></div>
@@ -96,6 +97,9 @@
       <div class="list" id="iv-log"></div>
       <p class="note">Setările se scriu direct în invertor. Fiecare modificare e verificată prin citire înapoi,
         notată aici și trimisă ca notificare.</p>
+      </div>
+      <p class="note" id="iv-lite" hidden>Setările invertorului se văd și se schimbă în <b>Amper Pro</b>
+        (Setări → Despre → Activează Pro).</p>
     </main>
 
     <!-- ====================== SETĂRI ====================== -->
@@ -133,6 +137,17 @@
 
       <section class="set-panel" id="set-about" hidden>
         <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Despre</h2></div>
+        <div class="card ed-card" id="ed-card">
+          <div class="ed-row"><span>Ediția</span><b id="ed-name">–</b></div>
+          <div class="ed-row"><span>ID Pi</span><b id="ed-pid">–</b></div>
+          <div id="ed-act" hidden>
+            <p class="note">Amper Pro adaugă setările BMS și ale invertorului. Trimite ID-ul de mai sus celui care ți-a
+              instalat Amper și lipește aici codul primit.</p>
+            <input class="ed-in" id="ed-code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="codul de activare">
+            <button class="btn ed-go" id="ed-go">Activează Pro</button>
+            <p class="note" id="ed-msg"></p>
+          </div>
+        </div>
         <div class="set-menu">
           <button class="card set-btn" data-panel="update"><span class="ic" style="--ic:var(--acc)">
             <svg viewBox="0 0 24 24" class="ai ai-update"><g class="a-drop"><path d="M12 4v11M7 10l5 5 5-5"/></g><path d="M5 20h14"/></svg></span>

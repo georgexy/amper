@@ -226,6 +226,13 @@ class Database:
             out[d] = max(out.get(d, 0), ts)
         return out
 
+    def has_samples(self) -> bool:
+        """Baza de date are citiri (Pi folosit deja, nu o instalare nouă)."""
+        with self.lock:
+            return bool(self.conn.execute("SELECT 1 FROM pack_samples UNION ALL SELECT 1 FROM inverter_samples "
+                                          "UNION ALL SELECT 1 FROM pack_5m UNION ALL SELECT 1 FROM inverter_5m "
+                                          "LIMIT 1").fetchone())
+
     def seen_devices(self, since: int) -> set[str]:
         """Dispozitivele care au salvat cel puțin o citire după `since`."""
         with self.lock:
