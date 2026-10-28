@@ -214,6 +214,18 @@ class Database:
         with self.lock:
             return [dict(r) for r in self.conn.execute("SELECT * FROM login_devices ORDER BY last_ts DESC")]
 
+    def last_seen(self, since: int) -> dict[str, int]:
+        """Ultima citire salvată de fiecare dispozitiv după `since` (ts)."""
+        with self.lock:
+            rows = self.conn.execute(
+                "SELECT device, MAX(ts) FROM pack_samples WHERE ts >= ? GROUP BY device "
+                "UNION ALL SELECT device, MAX(ts) FROM inverter_samples WHERE ts >= ? GROUP BY device",
+                (since, since)).fetchall()
+        out: dict[str, int] = {}
+        for d, ts in rows:
+            out[d] = max(out.get(d, 0), ts)
+        return out
+
     def seen_devices(self, since: int) -> set[str]:
         """Dispozitivele care au salvat cel puțin o citire după `since`."""
         with self.lock:

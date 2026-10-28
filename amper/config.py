@@ -11,6 +11,8 @@ DEFAULTS = {
     "store_interval": 10,
     "database": "/var/lib/amper/amper.db",
     "raw_retention_days": 14,
+    # un dispozitiv care n-a răspuns atâtea zile se deconectează singur (nu se mai afișează, nu mai dă alerte)
+    "connected_days": 5,
     "web": {"host": "0.0.0.0", "port": 8080, "password": ""},
     # hotspot pentru configurarea WiFi de pe telefon, pornit doar când nu e internet (amper/wifi_setup.py)
     "wifi_setup": {"enabled": True, "ssid": "Amper-Setup", "password": "", "offline_minutes": 2},
