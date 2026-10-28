@@ -2,6 +2,12 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.2 — în pregătire
+- Baterii cu BMS PACE pe RS485 sau RS232, încă netestat pe o baterie reală: Ecobat PowerCube (BMS Daren) și multe
+  baterii de rack sau de perete care vorbesc „Pylon”. Amper citește SOC-ul, celulele, temperaturile, curentul,
+  ciclurile, MOSFET-urile, echilibrarea, alarmele și protecțiile; nu scrie nimic în BMS. Pe cablu e găsit singur
+  (adresele 0–15 din DIP switch, versiunea protocolului se află singură); fiecare modul apare separat.
+
 ## 1.0.0-beta.1 — 2026-10-27
 - Setări arată ca pe iPhone: o listă grupată, cu iconițe colorate care se mișcă puțin (clopoțelul se leagănă,
   bateria se umple, globul se rotește…), fără explicații sub butoane.

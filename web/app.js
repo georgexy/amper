@@ -768,7 +768,7 @@ function renderLooks() {
   }));
 }
 /* Setări → Dispozitive conectate: Invertoare și BMS-uri (grupate după tip, în ordinea adresei), cu legătura și starea */
-const DEV_TYPE = { daly: "Daly", jk: "JK", sim_daly: "Daly (simulat)", seplos: "Seplos V2 (RS485)", sim_seplos: "Seplos (simulat)",
+const DEV_TYPE = { daly: "Daly", jk: "JK", sim_daly: "Daly (simulat)", seplos: "Seplos V2 (RS485)", pace: "PowerCube / PACE (RS485)", sim_seplos: "Seplos (simulat)",
   growatt_spf: "Growatt SPF", sim_growatt: "Growatt (simulat)" };
 function devLink(info, d) {
   const live = d.reading?.raw?.link;                          // Daly: legătura găsită („Bluetooth AA:…”, „cablu …”)
@@ -776,7 +776,7 @@ function devLink(info, d) {
   if (info.ble) return `Bluetooth ${info.ble}`;
   const port = String(info.port || "");
   if (info.type === "daly" && (!port || port === "auto" || port.includes("REPLACE"))) return "se caută (cablu sau Bluetooth)";
-  if (port.startsWith("/dev/")) return `${info.type.includes("seplos") ? "RS485" : "cablu"} ${port.replace(/^.*\//, "")}`;
+  if (port.startsWith("/dev/")) return `${info.type.includes("seplos") || info.type === "pace" ? "RS485" : "cablu"} ${port.replace(/^.*\//, "")}`;
   return info.type.startsWith("sim_") ? "simulare" : "";
 }
 function devRow(x, devs, actions = false) {
@@ -837,7 +837,7 @@ $("#daly-search").onclick = async () => {
 
 /* ---------- Adaugă dispozitiv: ce e nou pe cablu (căutat singur) + căutare prin Bluetooth, apoi tipul BMS ---------- */
 const da = { cable: null, ble: null, types: [], timer: 0 };
-const DA_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
+const DA_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", pace: "PowerCube", growatt_spf: "Invertor Growatt SPF" };
 function devAddOpen() {
   da.ble = null;
   $("#da-ble-list").innerHTML = ""; $("#da-form").hidden = true;
@@ -913,7 +913,7 @@ async function devAdd(c) {
   const cap = $("#da-cap") ? parseFloat(($("#da-cap").value || "").replace(",", ".")) : null;
   if ($("#da-cap") && !(cap >= 1 && cap <= 2000)) { $("#da-msg").textContent = "Scrie capacitatea, între 1 și 2000 Ah."; return; }
   const dev = { type: c.type, name: $("#da-name").value.trim(), capacity_ah: cap, port: c.port, address: c.address,
-    baudrate: c.baudrate, ble: c.ble, ble_name: c.link === "Bluetooth" ? c.name : undefined };
+    baudrate: c.baudrate, protocol: c.protocol, ble: c.ble, ble_name: c.link === "Bluetooth" ? c.name : undefined };
   $("#da-go").disabled = true;
   try {
     const r = await fetch("/api/devices/add", { method: "POST", credentials: "same-origin",
@@ -1907,7 +1907,7 @@ const SU_STEPS = [
   { k: "name", t: "Numele instalației" }, { k: "password", t: "Parola aplicației" }, { k: "remote", t: "Acces de oriunde" },
   { k: "devices", t: "Dispozitivele" }, { k: "capacity", t: "Capacitățile" }, { k: "notif", t: "Notificări" },
 ];
-const DEV_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", growatt_spf: "Invertor Growatt SPF" };
+const DEV_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", pace: "PowerCube", growatt_spf: "Invertor Growatt SPF" };
 const su = { i: 0, d: null, chosen: null, keep: false, again: false, pollT: 0 };
 
 // Pi-ul nu răspunde (Amper oprit sau blocat, Pi fără curent/internet): un mesaj în loc de ecran negru.
@@ -2108,7 +2108,7 @@ async function suNext() {
       su.chosen = []; su.i += 2; return suRender();
     }
     // ordinea: Daly, Seplos, invertor
-    const order = { daly: 0, jk: 1, seplos: 2, growatt_spf: 3 };
+    const order = { daly: 0, jk: 1, seplos: 2, pace: 3, growatt_spf: 4 };
     su.chosen = sel.sort((a, b) => order[a.type] - order[b.type]);
   } else if (st.k === "capacity") {
     su.chosen.forEach((c, i) => {

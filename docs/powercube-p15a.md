@@ -10,7 +10,8 @@
 
 ## Context
 - Prietenul la care e acum Pi-ul lui George vrea un PowerCube; e următorul BMS după JK (vezi CLAUDE.md, „BMS JK”).
-- În Amper: **nu există driver**. Nimic de aici nu a fost verificat pe o baterie reală.
+- În Amper: driverul `amper/drivers/pace.py` (tip `pace`, din 1.0.0-beta.2), făcut după ipoteza de mai jos.
+  Nimic de aici nu a fost verificat pe o baterie reală.
 - Producător/distribuitor: SC Ecobat Energy S.R.L., Crevedia (Dâmbovița), support@ecobatenergy.com.
 
 ## Date tehnice (un modul)
