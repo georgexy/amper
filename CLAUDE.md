@@ -371,7 +371,7 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - Tip config `jk` (`ble:` sau `port:`); `BLE_TYPES` jk suportat; `scan_ble` ghicește „jk” după nume (`JK_NAME`).
 - NEFĂCUTE: JK04, JK-PB pe RS485 Modbus (seria nouă „inverter BMS”), detectarea automată JK ca la Daly (`port: auto`).
 
-## BMS PACE / PowerCube (1.0.0-beta.2, în pregătire; NETESTAT pe o baterie reală)
+## BMS PACE / PowerCube (1.0.0-beta.2, 2026-10-28; NETESTAT pe o baterie reală)
 - Cerut 2026-10-28 („Da, începe”), după notele din manual (`docs/powercube-p15a.md`, PR #15).
 - `amper/drivers/pace.py`, tip config `pace` (`port`, `address` 0–15 = DIP, `baudrate` 9600, `protocol` 25/20/auto).
   Cadrul e cel Seplos (`length_field`, `frame_checksum` din `seplos.py`) cu VER variabil. Formatul răspunsurilor după

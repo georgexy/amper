@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.2 — în pregătire
+## 1.0.0-beta.2 — 2026-10-28
 - Baterii cu BMS PACE pe RS485 sau RS232, încă netestat pe o baterie reală: Ecobat PowerCube (BMS Daren) și multe
   baterii de rack sau de perete care vorbesc „Pylon”. Amper citește SOC-ul, celulele, temperaturile, curentul,
   ciclurile, MOSFET-urile, echilibrarea, alarmele și protecțiile; nu scrie nimic în BMS. Pe cablu e găsit singur
