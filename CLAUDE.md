@@ -43,9 +43,11 @@ starea fiecărui modul în timp real și să fie alertat pe telefon când un BMS
 - Teme (`app.js`, `LOOKS`: `cadrane`, `flux`, `carduri`), toate întunecate (tema luminoasă a fost scoasă): fiecare
   are `html()` (schelet, desenat o dată) și `update(root, homeData())`. Alegerea e în localStorage (`look`), din
   Setări (rotița); `?tema=<nume>` în adresă o impune (pentru kiosk). Bateria deschide ecranul `view-packs`.
-- Dispozitive „conectate”: `DeviceState.connected` = a răspuns de la pornire sau are citiri în DB în ultimele
-  `raw_retention_days` (`Database.seen_devices`). Cele neconectate nu se afișează (`app.js`, `connected()`) și nu
-  dau `comm_lost`.
+- Dispozitive „conectate”: `DeviceState.connected` = a răspuns în ultimele `connected_days` (5) zile, la pornire
+  după DB (`Database.last_seen`), apoi după `seen_at`. Cele neconectate nu se afișează (`app.js`, `connected()`) și
+  nu dau `comm_lost`. `Engine.expire_devices` (la fiecare tick): după 5 zile fără răspuns → deconectat automat
+  (`alerts.drop_device`, o notificare), rămâne în config și revine singur dacă răspunde (cerut 2026-10-28, după
+  alertele Seplos rămase din 26.10 cu adaptorul scos). `check_clock` mută și `seen_at`.
 - `deploy/install.sh` — instalare/actualizare idempotentă, cu `autoconfig` (scanare porturi → completează config).
 - `deploy/kiosk.sh` — kiosk pe HDMI: utilizator `kiosk`, serviciul `amper-kiosk` (cage + Chromium `--kiosk` la
   `http://localhost:8080`, PAM pe tty1, `Conflicts=getty@tty1`), `graphical.target`; `--remove` revine la consolă.

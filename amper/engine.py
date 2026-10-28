@@ -24,8 +24,9 @@ class DeviceState:
         self.last_ok: float | None = None
         self.error: str | None = None
         self.errors = 0
-        # a răspuns măcar o dată (acum sau în istoricul recent); cele nelegate nu se afișează
+        # a răspuns în ultimele `connected_days` zile (acum sau în istoric); cele nelegate nu se afișează
         self.connected = False
+        self.seen_at: float | None = None    # ultimul răspuns (ora sistemului), pentru deconectarea automată
         self.gen = 0          # crește la deconectare: o citire pornită înainte nu mai e luată în seamă
 
     def to_dict(self, now: float, stale_after: float) -> dict:
@@ -60,9 +61,9 @@ class Engine:
         for d in cfg["devices"]:
             self.devices[d["id"]] = DeviceState(d, make_driver(d, cfg["devices"]))
         self.started = time.time()
-        seen = self.db.seen_devices(int(self.started - cfg["raw_retention_days"] * 86400))
+        seen = self.db.last_seen(int(self.started - self.connected_days() * 86400))
         for k, st in self.devices.items():
-            st.connected = k in seen
+            st.connected, st.seen_at = k in seen, seen.get(k)
         # alertele deschise rămân deschise peste o repornire (nu se mai trimit o dată);
         # cele vechi, fără cheie, se închid ca înainte
         for r in self.alerts.restore(self.db.open_alerts(), self.started):
@@ -87,6 +88,7 @@ class Engine:
         for st in self.devices.values():
             if st.last_ok is not None:
                 st.last_ok += delta
+                st.seen_at = st.last_ok          # răspuns în rularea asta: aceeași oră greșită, același salt
             if st.reading is not None:
                 st.reading.ts += delta
         for k in self._energy_t:
@@ -152,6 +154,7 @@ class Engine:
                 if st.gen != gen:                # deconectat cât timp citirea era în curs
                     continue
                 st.reading, st.last_ok, st.error, st.errors = r, time.time(), None, 0
+                st.seen_at = st.last_ok
                 if not st.connected:             # prima citire de la un dispozitiv nou (ex. un Daly abia legat)
                     how = getattr(st.driver, "link_desc", "")
                     log.info("%s: conectat%s", st.cfg["id"], f" ({how})" if how else "")
@@ -177,6 +180,7 @@ class Engine:
         while True:
             await asyncio.sleep(self.cfg["poll_interval"])
             self.check_clock()
+            self.expire_devices()
             snap = self.snapshot()
             try:
                 self.alerts.process(snap)
@@ -184,6 +188,31 @@ class Engine:
                 log.exception("eroare la evaluarea alertelor")
             snap["alerts"] = self.alerts.active_list()
             self._push(snap)
+
+    def connected_days(self) -> float:
+        return float(self.cfg.get("connected_days") or 5)
+
+    def expire_devices(self, now: float | None = None) -> list[str]:
+        """Dispozitivele care n-au răspuns `connected_days` zile se deconectează singure: nu se mai afișează,
+        nu mai dau `comm_lost`, iar alertele lor se închid fără „Rezolvat”. Dacă răspund din nou, revin singure
+        (rămân în configurare; citirea continuă). Cerut de utilizator 2026-10-28."""
+        now = now or time.time()
+        limit = self.connected_days() * 86400
+        out = []
+        for k, st in self.devices.items():
+            if not st.connected:
+                continue
+            seen = st.seen_at if st.seen_at is not None else self.started
+            if now - seen <= limit:
+                continue
+            st.connected, st.reading = False, None
+            self.alerts.drop_device(k, now)
+            name = st.cfg.get("name", k)
+            log.info("%s: deconectat automat (fără răspuns de %d zile)", k, self.connected_days())
+            self.notifier.send(f"🔌 {name}: deconectat automat — n-a mai răspuns de {self.connected_days():g} zile. "
+                               "Dacă răspunde din nou, revine singur.", title="Amper", priority="default")
+            out.append(k)
+        return out
 
     def _push(self, snap: dict) -> None:
         for q in list(self.subscribers):

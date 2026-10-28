@@ -168,3 +168,44 @@ def test_open_alerts_survive_restart_without_new_notification(tmp_path):
     e2.alerts.process(e2.snapshot(now=t2), now=t2)
     assert e2.notifier.sent == [] and len(e2.alerts.active_list()) == 1
     assert len(e2.db.open_alerts()) == 1
+
+
+def test_device_silent_5_days_disconnects_itself(tmp_path):
+    """Un dispozitiv fără răspuns 5 zile (`connected_days`) se deconectează singur: alertele lui se închid în
+    tăcere, nu se mai afișează și nu mai dă `comm_lost`; dacă răspunde din nou, revine (cerut 2026-10-28)."""
+    from amper.config import DEFAULTS, _merge
+    from amper.drivers.simulator import SimWorld
+    from amper.models import PackReading
+    path = str(tmp_path / "c.db")
+    SimWorld._instance = None
+    cfg = _merge(DEFAULTS, {"database": path, "devices": [{"id": "s1", "name": "Seplos 1", "type": "sim_seplos"},
+                                                          {"id": "s2", "name": "Seplos 2", "type": "sim_seplos"}]})
+    db = Database(path)
+    now = time.time()
+    db.insert_pack(PackReading(device_id="s1", ts=now, soc=50), ts=int(now - 4 * 86400))   # acum 4 zile
+    db.insert_pack(PackReading(device_id="s2", ts=now, soc=50), ts=int(now - 6 * 86400))   # acum 6 zile
+    eng = Engine(cfg, db, Notifier({}))
+    assert eng.devices["s1"].connected and not eng.devices["s2"].connected
+    eng.started = now - 300                                                   # pornit de 5 min, fără răspuns
+    eng.alerts.process(eng.snapshot(now=now), now=now)
+    assert [a["device"] for a in eng.alerts.active_list()] == ["s1"]          # comm_lost doar la cel conectat
+    eng.notifier.sent.clear()
+    assert eng.expire_devices(now=now) == []
+    later = now + 1.5 * 86400                                                 # s1: 5,5 zile fără răspuns
+    assert eng.expire_devices(now=later) == ["s1"]
+    assert not eng.devices["s1"].connected and eng.alerts.active_list() == []
+    assert db.open_alerts() == []                                             # închisă în DB
+    assert len(eng.notifier.sent) == 1 and "deconectat automat" in eng.notifier.sent[0]["message"]
+    eng.alerts.process(eng.snapshot(now=later), now=later)
+    assert eng.alerts.active_list() == []                                     # nu mai dă comm_lost
+    assert eng.expire_devices(now=later + 86400) == []                        # o singură dată
+
+
+def test_clock_jump_does_not_disconnect_a_live_device():
+    eng = make_engine()
+    st = eng.devices["daly1"]
+    st.connected, st.last_ok = True, time.time() - 10
+    st.seen_at = st.last_ok
+    eng._clock_offset -= 7 * 86400                                            # ceasul sare 7 zile înainte
+    eng.check_clock()
+    assert eng.expire_devices() == [] and st.connected
