@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.6 — în pregătire
+## 1.0.0-beta.6 — 2026-10-28
 - Două ediții, același program: **Amper Lite** (supraveghere: tot, mai puțin setările BMS și ale invertorului) și
   **Amper Pro** (și setările). Pi-urile care au deja Amper rămân Pro; o instalare nouă de pe card pornește Lite.
 - Setări → Despre arată ediția și „ID Pi”. Pro se activează cu un cod primit pentru acel Pi (merge doar pe el și se

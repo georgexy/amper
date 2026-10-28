@@ -392,7 +392,7 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - DE VERIFICAT la PowerCube: dacă răspunde la 0x25 sau 0x20 (programul lui e „BMS_Monitor”, nu PbmsTools), adresa
   (master 0 pentru toate modulele?), semnul curentului, ordinea temperaturilor, biții de stare. Doar citire.
 
-## Ediții Lite / Pro (1.0.0-beta.6, în pregătire)
+## Ediții Lite / Pro (1.0.0-beta.6, 2026-10-28)
 - Cerut 2026-10-28: AmperLite (supraveghere) și AmperPro (cu setări), Pro va fi cu bani (încă nimic stabilit: fără
   firmă; licența rămâne PolyForm Noncommercial până atunci). Un singur program, două moduri.
 - Lite = tot, mai puțin: setările BMS Daly (⚙ în Bateriile), setările și ceasul invertorului, `/api/daly/*/params`,
