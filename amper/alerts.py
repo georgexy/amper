@@ -66,6 +66,8 @@ def evaluate(snapshot: dict, cfg: dict, now: float) -> list[Condition]:
     for d, v in devices.items():
         if not v.get("connected", True):      # nelegat încă (n-a răspuns niciodată)
             continue
+        if v.get("restarting"):               # repornit din Amper (comandă Daly): cel mult 2 minute
+            continue
         last = v.get("last_ok")
         age = now - last if last else now - snapshot["started"]
         if age > a["comm_lost_seconds"]:
@@ -87,6 +89,18 @@ def evaluate(snapshot: dict, cfg: dict, now: float) -> list[Condition]:
         out.append(Condition(f"comm:{d}", "comm_lost", d, "critical",
                              f"{names[d]}: nu mai comunică de {int(age // 60)} min"
                              + (f" ({v['error']})" if v.get("error") else "")))
+
+    # --- MOSFET oprit din Amper și uitat așa ---
+    forced_min = a.get("mos_forced_minutes", 30)
+    for d, v in devices.items():
+        r = v.get("reading") or {}
+        for mos, since in (v.get("forced") or {}).items():
+            field = "charge_mos" if mos == "chg" else "discharge_mos"
+            mins = int((now - since) // 60)
+            if r.get(field) is not True and mins >= forced_min:
+                what = "încărcarea" if mos == "chg" else "descărcarea"
+                out.append(Condition(f"forced:{d}:{mos}", "mos_forced_off", d, "warning",
+                                     f"{names[d]}: {what} e oprită din Amper de {mins} min"))
 
     bank = snapshot.get("bank", {})
     bank_charging = (bank.get("current") or 0) > a["bank_charging_amps"]

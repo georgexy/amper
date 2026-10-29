@@ -28,6 +28,8 @@ class DeviceState:
         self.connected = False
         self.seen_at: float | None = None    # ultimul răspuns (ora sistemului), pentru deconectarea automată
         self.gen = 0          # crește la deconectare: o citire pornită înainte nu mai e luată în seamă
+        self.restart_until: float | None = None   # repornit din Amper: fără „nu comunică” până atunci (max. 2 min)
+        self.forced: dict[str, float] = {}       # MOSFET oprit din Amper: {"chg"|"dsg": momentul opririi}
 
     def port_missing(self) -> bool:
         """Portul serial din config nu mai există (adaptorul USB scos din Pi)."""
@@ -42,7 +44,8 @@ class DeviceState:
                     kind=self.driver.kind, reading=r, last_ok=self.last_ok, error=self.error,
                     connected=self.connected, port=self.cfg.get("port"), port_missing=self.port_missing(),
                     stale=self.last_ok is None or now - self.last_ok > stale_after,
-                    capacity_ah=self.cfg.get("capacity_ah") or (r or {}).get("capacity_ah"))
+                    capacity_ah=self.cfg.get("capacity_ah") or (r or {}).get("capacity_ah"),
+                    restarting=bool(self.restart_until and now < self.restart_until), forced=dict(self.forced))
 
 
 class Engine:
@@ -73,11 +76,48 @@ class Engine:
         # cele vechi, fără cheie, se închid ca înainte
         for r in self.alerts.restore(self.db.open_alerts(), self.started):
             self.db.close_alert(r["id"], int(self.started))
+        self._load_forced()
         self.subscribers: set[asyncio.Queue] = set()
         self._tasks: dict[str, asyncio.Task] = {}
         self._energy_t: dict[str, float] = {}
         self._energy_acc: dict[tuple, dict] = {}
         self._clock_offset = time.time() - time.monotonic()
+
+    # ---------------- MOSFET-uri oprite din Amper (comenzile Daly) ----------------
+    FORCED_META = "daly_forced"
+
+    def _load_forced(self) -> None:
+        import json
+        try:
+            data = json.loads(self.db.get_meta(self.FORCED_META) or "{}")
+        except ValueError:
+            data = {}
+        for k, st in self.devices.items():
+            st.forced = {m: float(t) for m, t in (data.get(k) or {}).items()}
+
+    def _save_forced(self) -> None:
+        import json
+        self.db.set_meta(self.FORCED_META, json.dumps({k: st.forced for k, st in self.devices.items() if st.forced}))
+
+    def set_forced(self, dev_id: str, mos: str, off: bool, now: float | None = None) -> None:
+        """Ține minte (și peste reporniri) că MOSFET-ul `mos` a fost oprit din Amper, ca să nu rămână uitat."""
+        st = self.devices[dev_id]
+        if off:
+            st.forced[mos] = now or time.time()
+        else:
+            st.forced.pop(mos, None)
+        self._save_forced()
+
+    def _clear_forced(self, st: DeviceState, r) -> None:
+        """MOSFET-ul pornit la loc (din Amper, din aplicația Daly sau de BMS): nu mai e „oprit din Amper”."""
+        if not st.forced or not isinstance(r, PackReading):
+            return
+        on = {"chg": r.charge_mos, "dsg": r.discharge_mos}
+        gone = [m for m in st.forced if on.get(m)]
+        for m in gone:
+            st.forced.pop(m)
+        if gone:
+            self._save_forced()
 
     # ---------------- ceas ----------------
     def check_clock(self) -> float:
@@ -96,6 +136,10 @@ class Engine:
                 st.seen_at = st.last_ok          # răspuns în rularea asta: aceeași oră greșită, același salt
             if st.reading is not None:
                 st.reading.ts += delta
+            if st.restart_until:
+                st.restart_until += delta
+            for m in st.forced:
+                st.forced[m] += delta
         for k in self._energy_t:
             self._energy_t[k] += delta
         self.alerts.shift_clock(delta)
@@ -166,6 +210,7 @@ class Engine:
                     self.notifier.send(f"🔌 {st.cfg.get('name', st.cfg['id'])}: conectat" + (f" ({how})" if how else ""),
                                        title="Amper: modul nou", priority="default")
                 st.connected = True
+                self._clear_forced(st, r)
                 if isinstance(r, InverterReading):
                     self._integrate_energy(r)
                 self._push(self.snapshot())      # pe ecran imediat, nu la următorul tick

@@ -592,6 +592,15 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .list .row.ua-rule { align-items: start; }
 .ua-rule .ua-act input[type=checkbox] { margin-top: -4px; }
 
+/* comenzile BMS */
+.cmd-list { display: grid; gap: 1px; background: var(--line); border-radius: var(--radius-l); overflow: hidden; margin-bottom: 10px; }
+.cmd-list .row-check { border-radius: 0; margin: 0; }
+#bms-cmds .why, #bms-cmds small.why { color: var(--warn); }
+#bms-cmds .iv-row .k small { display: block; margin-top: 2px; }
+#bms-cmds .btn.danger { margin-top: 12px; width: 100%; color: #fff; background: var(--alarm); border-color: var(--alarm); font-weight: 600; }
+#bms-cmds .btn.danger:disabled { opacity: .45; }
+.banner.ok { border-left-color: var(--charge); }
+
 /* partajează Amper */
 .list .row.share-row { grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; }
 .share-row small { display: block; color: var(--muted); font-size: 13px; }

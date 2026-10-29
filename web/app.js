@@ -33,7 +33,7 @@ const SERIES = ["#63B7E6", "#4FD1B5", "#B39DF5", "#F48FB1", "#F0A35E", "#9CCC65"
 const FAULT_RULES = { not_charging: "nu se încarcă", charge_mos_off: "încărcare oprită", discharge_mos_off: "descărcare oprită",
   comm_lost: "fără date", cell_low: "celulă descărcată", temp_high: "prea cald", temp_low_charge: "prea rece",
   low_soc: "aproape goală", cell_high: "celulă prea sus", cell_delta: "dezechilibrată", soc_divergence: "rămâne în urmă",
-  bms_alarm: "avertisment BMS", bms_protection: "protecție BMS" };
+  bms_alarm: "avertisment BMS", bms_protection: "protecție BMS", mos_forced_off: "oprit din Amper" };
 
 /* „Daly 2: BMS-ul a OPRIT încărcarea (MOSFET încărcare OFF)” → textul principal + detaliile (ce e în paranteze) */
 function splitDetail(m) {
@@ -605,7 +605,7 @@ function renderPacks() {
     el.innerHTML = `<div class="h"><div class="pk-mini"><i style="height:${Math.max(0, Math.min(100, r.soc ?? 0))}%"></i></div>
       <div class="t"><div class="n">${esc(d.name)} <span class="tag">${esc(label)}</span>${d.type === "daly" && !d.stale
         && isPro() ? `<span class="pk-gear" data-bms="${esc(d.id)}" role="button" tabindex="0" aria-label="Setările BMS ${esc(d.name)}">⚙</span>` : ""}</div>
-      <div class="s">${d.stale ? `Nu comunică${d.error ? ": " + esc(d.error) : ""}` : facts}</div>${bleId(r)}</div>
+      <div class="s">${d.restarting ? "Repornește…" : d.stale ? `Nu comunică${d.error ? ": " + esc(d.error) : ""}` : facts}</div>${bleId(r)}</div>
       <div class="soc">${r.soc == null ? "–" : num(r.soc, 0)}<sup>%</sup></div></div>
       ${cells.length ? `<div class="pk-cells">${cells.map((v) => `<i class="${hi - lo > 0.005 ? (v === hi ? "hi" : v === lo ? "lo" : "") : ""}"
         style="height:${Math.max(8, ((v - floor) / span) * 100)}%"></i>`).join("")}</div>` : ""}
@@ -753,11 +753,85 @@ $("#bms-back").onclick = () => show("packs");
 function openBms(id) {
   bms.id = id;
   bms.data = null;
+  bms.cmds = null;
   show("bms");
+}
+/* ---- comenzile BMS (Bateriile → ⚙ → Comenzi): MOSFET-uri, SOC, repornire ---- */
+async function loadCmds() {
+  const box = $("#bms-cmds");
+  if (!bms.cmds) box.innerHTML = `<div class="note">Citesc starea din BMS…</div>`;
+  try {
+    const r = await api(`/api/daly/${encodeURIComponent(bms.id)}/actions`);
+    if (r.error) throw new Error(r.error);
+    bms.cmds = r;
+    renderCmds();
+  } catch (e) {
+    if (e.message !== "auth") box.innerHTML = `<div class="banner">${esc(e.message)}</div>`;
+  }
+}
+function renderCmds(msg = "") {
+  const r = bms.cmds, A = Object.fromEntries(r.actions.map((a) => [a.key, a]));
+  const mosRow = (mos, title) => {
+    const on = r.mos[mos], next = A[`${mos}_${on === false ? "on" : "off"}`];
+    const why = !r.can_write ? "Setați o parolă pentru aplicație." : !next.supported ? "Comanda nu e suportată de acest BMS."
+      : next.refused || "";
+    const since = r.forced?.[mos] ? ` · oprită din Amper ${ago(r.forced[mos])}` : "";
+    return `<label class="row-check cmd"><span><b>${title}</b><small>MOSFET ${on == null ? "–" : on ? "pornit" : "OPRIT"}${since}</small>
+      ${why ? `<small class="why">${esc(why)}</small>` : ""}</span>
+      <input type="checkbox" data-mos="${mos}" ${on === false ? "" : "checked"} ${why || on == null ? "disabled" : ""}></label>`;
+  };
+  const s = r.suggest, soc = A.set_soc, rs = A.restart;
+  const sug = s ? `după tensiunea celulelor ~${num(s.soc, 0)} %${s.rest ? "" : " (curentul nu e mic: estimare aproximativă)"}` : "";
+  $("#bms-cmds").innerHTML = (msg ? `<div class="banner ${msg.ok ? "ok" : "warning"}"><b>${esc(msg.t)}</b></div>` : "") +
+    `<div class="cmd-list">${mosRow("chg", "Încărcare")}${mosRow("dsg", "Descărcare")}</div>
+    <div class="list iv-set">${soc.supported ? `<button class="row iv-row" id="cmd-soc" ${r.can_write ? "" : "disabled"}>
+      <span class="k">Setează SOC…<small class="t">Acum ${r.soc == null ? "–" : num(r.soc, 1) + " %"}${sug ? " · " + sug : ""}</small></span>
+      <span class="ed">Setează ›</span></button>` : ""}</div>
+    ${rs.supported ? `<button class="btn danger" id="cmd-restart" ${rs.refused || !r.can_write || r.restarting ? "disabled" : ""}>
+      ${r.restarting ? "Repornește…" : "Repornește BMS"}</button>${rs.refused ? `<p class="note why">${esc(rs.refused)}</p>` : ""}` : ""}
+    ${r.unsupported.length ? `<p class="note">Nesuportate la acest BMS (firmware ${esc(r.firmware)}):
+      ${r.unsupported.map((k) => esc(A[k]?.label || k)).join(", ")}. <a href="#" id="cmd-retry">Încearcă din nou</a></p>` : ""}`;
+  $$("[data-mos]", $("#bms-cmds")).forEach((el) => (el.onchange = () => {
+    const key = `${el.dataset.mos}_${el.checked ? "on" : "off"}`;
+    runCmd(key).finally(() => (el.checked = bms.cmds.mos[el.dataset.mos] !== false));
+  }));
+  const so = $("#cmd-soc");
+  if (so) so.onclick = () => openEditor({ key: "set_soc", label: "SOC", group: "Setează SOC", text: r.soc == null ? "–" : num(r.soc, 1) + " %",
+    value: s ? s.soc : r.soc, min: 0, max: 100, step: 0.1, unit: "%", risky: true,
+    note: soc.warn + (sug ? ` Sugestie: ${sug}.` : "") }, "BMS", (v) => runCmd("set_soc", v, true));
+  const rb = $("#cmd-restart");
+  if (rb) rb.onclick = () => runCmd("restart");
+  const rt = $("#cmd-retry");
+  if (rt) rt.onclick = async (e) => {
+    e.preventDefault();
+    await fetch(`/api/daly/${encodeURIComponent(bms.id)}/actions/retry`, { method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" }, body: "{}" });
+    loadCmds();
+  };
+}
+async function runCmd(key, value, fromEditor = false) {
+  const a = bms.cmds.actions.find((x) => x.key === key);
+  if (!fromEditor && !confirm(`${a.label}?\n\n${a.warn}`)) return;
+  if (key === "restart") {
+    bms.cmds.restarting = true;
+    renderCmds({ ok: true, t: "BMS-ul repornește… poate dura până la un minut." });
+  }
+  let res;
+  try {
+    const { r, j } = await securePost(`/api/daly/${encodeURIComponent(bms.id)}/action`, { action: key, value });
+    res = r.ok && j.ok ? { ok: true, t: `${a.label}: gata${j.old ? ` (${j.old} → ${j.new})` : ""}${j.seconds ? `, în ${j.seconds} s` : ""}.` }
+      : { ok: false, t: j.error || `eroare ${r.status}` };
+  } catch (e) {
+    res = { ok: false, t: e.message };
+  }
+  await loadCmds();
+  renderCmds(res);
+  if (fromEditor && !res.ok) throw new Error(res.t);
 }
 async function loadBms() {
   const d = state.snap?.devices?.[bms.id];
   $("#bms-title").textContent = `Setări BMS — ${d?.name || bms.id}`;
+  loadCmds();
   if (!bms.data) $("#bms-list").innerHTML = `<div class="note">Citesc setările din BMS…</div>`;
   try {
     const r = await api(`/api/daly/${encodeURIComponent(bms.id)}/settings`);

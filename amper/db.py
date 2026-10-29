@@ -169,6 +169,15 @@ class Database:
                 "INSERT INTO settings_log (ts, device, setting, old, new, ok, error, source) VALUES (?,?,?,?,?,?,?,?)",
                 (ts, device, setting, old, new, int(ok), error, source))
 
+    def get_meta(self, key: str) -> str | None:
+        with self.lock:
+            r = self.conn.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+        return r[0] if r else None
+
+    def set_meta(self, key: str, value: str) -> None:
+        with self.lock:
+            self.conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?,?)", (key, value))
+
     def settings_log(self, device: str, limit: int = 20) -> list[dict]:
         with self.lock:
             rows = self.conn.execute("SELECT * FROM settings_log WHERE device=? ORDER BY id DESC LIMIT ?",
