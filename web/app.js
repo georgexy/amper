@@ -860,7 +860,7 @@ function renderCmds(msg = "") {
     runCmd(key).finally(() => (el.checked = bms.cmds.mos[el.dataset.mos] !== false));
   }));
   const so = $("#cmd-soc");
-  if (so) so.onclick = () => openEditor({ key: "set_soc", label: "SOC", group: "Setează SOC", text: r.soc == null ? "–" : num(r.soc, 1) + " %",
+  if (so) so.onclick = () => openEditor({ key: "set_soc", label: "Setează SOC", group: "", text: r.soc == null ? "–" : num(r.soc, 1) + " %",
     value: s ? s.soc : r.soc, min: 0, max: 100, step: 0.1, unit: "%", risky: true,
     note: soc.warn + (sug ? ` Sugestie: ${sug}.` : "") }, "BMS", (v) => runCmd("set_soc", v, true));
   const rb = $("#cmd-restart");
@@ -1189,10 +1189,10 @@ function renderEdition() {
   $("#ed-ver").textContent = state.info?.version || "–";
   $("#ed-act").hidden = pro;
 }
-$("#ed-go").onclick = async () => {
+$("#pro-go").onclick = async () => {
   const code = $("#ed-code").value.replace(/\s+/g, "");
   if (!code) { $("#ed-msg").textContent = "Lipește codul primit."; return; }
-  $("#ed-go").disabled = true;
+  $("#pro-go").disabled = true;
   try {
     const { r, j } = await securePost("/api/pro/activate", { code });
     if (!r.ok) throw new Error(j.error || `eroare ${r.status}`);
@@ -1202,7 +1202,7 @@ $("#ed-go").onclick = async () => {
     renderEdition();
     toast("Amper Pro e activat.");
   } catch (e) { $("#ed-msg").textContent = e.message; }
-  $("#ed-go").disabled = false;
+  $("#pro-go").disabled = false;
 };
 
 function showPanel(name) {

@@ -449,6 +449,9 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   (noindex, fără link de pe site). Cheia privată se lipește o dată, se verifică cu `PUBLIC_KEYS` (copiate din
   `update_key.py` — țin-le sincron!) și se ține doar în localStorage; semnează cu WebCrypto Ed25519 (PKCS#8 din seed),
   același cod ca `edition.make_code` (verificat în test cu Chromium). Evidența codurilor date: localStorage.
+- GREȘEALĂ (1.0.0-beta.6 → reparată în beta.11): butonul de activare Pro avea `id="ed-go"`, ca butonul „Scrie” din
+  `#edit`; `$("#ed-go")` lua primul element → „Scrie” nu mai făcea nimic (BMS, invertor, SOC). Acum `#pro-go`;
+  testul `test_page_ids_are_unique` verifică id-urile din index.html.
 - 1.0.0-beta.7: „Versiunea” în `#ed-card`, mutat sub meniul Despre, scris 14 px; scoase `#version` și
   `#about-version` (cu „citire la fiecare 2 s”). `site/coduri/` are manifest + iconițe (se pune pe ecranul principal;
   pe iPhone aplicația de pe ecran are alt localStorage decât Safari → cheia se lipește din nou acolo).
