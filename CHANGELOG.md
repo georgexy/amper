@@ -2,6 +2,27 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.12 — 2026-10-29
+- Setări → Dispozitive conectate → „+” (Adaugă dispozitiv): la fel ca ghidul — „Configurare automată” (cablu și
+  Bluetooth, rezultatele pe Invertor / BMS) sau „Configurare manuală” (ce adaugi → modelul → conexiunea), cu „‹ Înapoi”.
+- BMS-urile PACE apar în aplicație ca „PACE / Daren” (nu mai scrie PowerCube).
+- Invertoare noi (doar citire, încă neverificate pe un aparat real):
+  - **Deye** hibrid monofazat (și Sunsynk, Sol-Ark), pe RS485 (Modbus);
+  - **Easun ISolar / SMH** și celelalte Voltronic / Axpert (MPP Solar, PowMr vechi), pe RS232 (protocolul PI30);
+  - **Easun SMG / SMG-II** (PowMr nou, Anenji, SRNE), pe RS485 (Modbus); Amper alege singur harta de registre.
+  Se găsesc la detectarea automată și se pot alege din listă în ghid. Setările lor (ca la Growatt) vin după ce citirea
+  e confirmată pe un invertor real.
+- Ghid de configurare → Dispozitivele: două variante, una sub alta. „Configurare automată”: îți spune ce să legi
+  și ce să pornești, caută singur și arată separat invertorul găsit și BMS-urile găsite. „Configurare manuală”: întâi
+  invertorul (modelul din listă și tipul conexiunii), apoi acumulatorii (BMS); Amper caută doar ce ai ales, în câteva
+  secunde. „‹ Înapoi” te duce un pas înapoi (alt model, înapoi la invertor, altă variantă). La fiecare dispozitiv găsit
+  vezi valori citite din el („… — corect?”). În listă apar deja Deye și Easun (ISolar/SMH și SMG), „în curând”.
+  Butonul „+ Daly (se găsește singur)” a fost scos.
+- Reparat: la „Setează SOC”, butonul „Scrie în BMS” rămânea dezactivat când în câmp era SOC-ul sugerat (aplicația
+  credea că e aceeași valoare ca acum). Câmpul pornește tot de la sugestie, dar se compară cu SOC-ul real.
+- Spații între butoane și cardurile vecine: „Confirmă” (parola), „Instalează acum”, „Caută actualizări” și notele
+  versiunii nu se mai lipesc unele de altele.
+
 ## 1.0.0-beta.11 — 2026-10-29
 - Reparat: butonul „Scrie” din fereastra de modificare nu făcea nimic (setări BMS, setări invertor, „Setează SOC”)
   și scria „Scrie în invertor” și la BMS. Cauza: butonul „Activează Pro” (de la 1.0.0-beta.6) avea același nume

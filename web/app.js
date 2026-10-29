@@ -701,6 +701,7 @@ async function loadInverter() {
   if (!inv.data) $("#iv-list").innerHTML = `<div class="note">Citesc setările din invertor…</div>`;
   try {
     const r = await api("/api/inverter/settings");
+    $(".iv-clock").hidden = !!r.no_settings;               // invertor fără setări (Deye, Easun…): nici ceas
     if (r.error) throw new Error(r.error);
     inv.data = r;
     renderInverter();
@@ -742,7 +743,7 @@ function openEditor(x, target, write) {
   $("#ed-now").innerHTML = `Acum: <b>${esc(x.text)}</b>`;
   $("#ed-field").innerHTML = x.kind === "enum"
     ? `<select id="ed-val" class="ed-in">${x.options.map(([v, t]) => `<option value="${v}" ${v === x.raw ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>`
-    : `<div class="ed-num"><input id="ed-val" class="ed-in" type="number" inputmode="decimal" min="${x.min}" max="${x.max}" step="${x.step}" value="${x.value ?? ""}">
+    : `<div class="ed-num"><input id="ed-val" class="ed-in" type="number" inputmode="decimal" min="${x.min}" max="${x.max}" step="${x.step}" value="${x.initial ?? x.value ?? ""}">
        <span>${esc(x.unit)}</span></div><p class="note">Între ${num(x.min, decimals(x.step))} și ${num(x.max, decimals(x.step))} ${esc(x.unit)}.${x.role ? ` Acest prag e <b>${esc(x.role_text || x.role)}</b>.` : ""}${x.alert ? `<br><b class="bad">${esc(x.alert)}</b>` : ""}</p>`;
   $("#ed-warn").hidden = !(x.risky || x.note);
   $("#ed-warn").innerHTML = (x.risky ? "<b>Atenție: setare cu risc.</b> " : "") + esc(x.note || (x.risky ? "O valoare greșită poate opri alimentarea sau afecta bateria." : ""));
@@ -766,7 +767,8 @@ function editValue() {
 
 function updateDiff() {
   const x = inv.edit, e = editValue();
-  const same = !e.error && (x.kind === "enum" ? e.value === x.raw : Math.abs(e.value - x.value) < 1e-9);
+  // x.value = valoarea de acum (x.initial e doar ce apare la început în câmp, ex. SOC-ul sugerat)
+  const same = !e.error && (x.kind === "enum" ? e.value === x.raw : x.value != null && Math.abs(e.value - x.value) < 1e-9);
   $("#ed-diff").innerHTML = e.error ? `<span class="err">${esc(e.error)}</span>` : same ? "Aceeași valoare ca acum." :
     `${esc(x.text)} → <b>${esc(e.text)}</b>`;
   $("#ed-go").disabled = !!e.error || same || (x.risky && !$("#ed-ack").checked);
@@ -861,7 +863,7 @@ function renderCmds(msg = "") {
   }));
   const so = $("#cmd-soc");
   if (so) so.onclick = () => openEditor({ key: "set_soc", label: "Setează SOC", group: "", text: r.soc == null ? "–" : num(r.soc, 1) + " %",
-    value: s ? s.soc : r.soc, min: 0, max: 100, step: 0.1, unit: "%", risky: true,
+    value: r.soc, initial: s ? s.soc : r.soc, min: 0, max: 100, step: 0.1, unit: "%", risky: true,
     note: soc.warn + (sug ? ` Sugestie: ${sug}.` : "") }, "BMS", (v) => runCmd("set_soc", v, true));
   const rb = $("#cmd-restart");
   if (rb) rb.onclick = () => runCmd("restart");
@@ -947,8 +949,8 @@ function renderLooks() {
   }));
 }
 /* Setări → Dispozitive conectate: Invertoare și BMS-uri (grupate după tip, în ordinea adresei), cu legătura și starea */
-const DEV_TYPE = { daly: "Daly", jk: "JK", sim_daly: "Daly (simulat)", seplos: "Seplos V2 (RS485)", pace: "PowerCube / PACE (RS485)", sim_seplos: "Seplos (simulat)",
-  growatt_spf: "Growatt SPF", sim_growatt: "Growatt (simulat)" };
+const DEV_TYPE = { daly: "Daly", jk: "JK", sim_daly: "Daly (simulat)", seplos: "Seplos V2 (RS485)", pace: "PACE / Daren (RS485)", sim_seplos: "Seplos (simulat)",
+  growatt_spf: "Growatt SPF", deye: "Deye", voltronic: "Easun / Voltronic", srne: "Easun SMG / SRNE", sim_growatt: "Growatt (simulat)" };
 function devLink(info, d) {
   const live = d.reading?.raw?.link;                          // Daly: legătura găsită („Bluetooth AA:…”, „cablu …”)
   if (live) return live.replace(/\/dev\/serial\/by-id\//, "");
@@ -1015,64 +1017,125 @@ $("#daly-search").onclick = async () => {
 };
 
 /* ---------- Adaugă dispozitiv: ce e nou pe cablu (căutat singur) + căutare prin Bluetooth, apoi tipul BMS ---------- */
-const da = { cable: null, ble: null, types: [], timer: 0 };
-const DA_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", pace: "PowerCube", growatt_spf: "Invertor Growatt SPF" };
-function devAddOpen() {
-  da.ble = null;
-  $("#da-ble-list").innerHTML = ""; $("#da-form").hidden = true;
-  $("#da-ble-msg").textContent = "Un modul conectat acum la aplicația de pe telefon nu apare; închide-o înainte.";
-  devScan("cable");
+const da = { mode: null, man: {}, res: null, types: [], timer: 0 };
+const INV_TYPES = new Set(["growatt_spf", "deye", "voltronic", "srne", "sim_growatt"]);
+const DA_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", pace: "PACE", growatt_spf: "Invertor Growatt SPF",
+  deye: "Invertor Deye", voltronic: "Invertor Easun / Voltronic", srne: "Invertor Easun SMG / SRNE" };
+// „Adaugă dispozitiv”: ca în ghid — automat sau manual (tipul, modelul, conexiunea), câte un dispozitiv odată
+async function devAddOpen() {
+  da.mode = null; da.man = {}; da.res = null;
+  $("#da-form").hidden = true;
+  try { su.cat = su.cat || (await api("/api/setup/catalog")); } catch { su.cat = { catalog: [], links: {} }; }
+  devRender();
 }
-async function devScan(what) {
-  try {
-    const j = await api("/api/devices/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ what }) });
-    devScanShow(j);
-  } catch {}
+function devItem(f, i, src) {
+  const name = src === "ble" ? f.name : f.label;
+  const sub = src === "ble" ? `Bluetooth · semnal ${f.rssi ?? "–"} dBm${f.guess ? ` · pare ${esc(DA_NAME[f.guess] || f.guess)}` : ""}`
+    : `${esc(f.link || "cablu")}${f.short ? " · " + esc(f.short) : ""}`;
+  return `<button class="row row-link" data-pick="${src}:${i}"><span><b>${esc(name)}</b>
+    ${f.check && Object.keys(f.check).length ? `<small class="t">${esc(suCheck(f.check))} — corect?</small>` : ""}</span>
+    <span class="t">${sub} · atinge ca să-l adaugi ›</span></button>`;
 }
-function devScanShow(j) {
-  clearTimeout(da.timer);
-  const running = j.state === "running";
-  $("#da-ble").disabled = running;
-  $("#da-cable-again").hidden = running;
-  if (j.what === "cable") {
-    if (running) { $("#da-cable-msg").textContent = j.message || "Caut…"; $("#da-cable").innerHTML = ""; }
-    else if (j.state === "failed") $("#da-cable-msg").textContent = j.message;
-    else {
-      da.cable = j.found || [];
-      $("#da-cable-msg").textContent = da.cable.length ? "" : (j.ports || []).length
-        ? "Niciun dispozitiv nou pe porturile USB libere." : "Niciun adaptor USB nou legat la Pi.";
-      $("#da-cable").innerHTML = da.cable.map((f, i) => `<button class="row row-link" data-cable="${i}"><span><b>${esc(f.label)}</b></span>
-        <span class="t">cablu ${esc(f.short)}${f.baudrate ? ` · ${f.baudrate} baud` : ""} · atinge ca să-l adaugi ›</span></button>`).join("");
-      $$("[data-cable]").forEach((b) => (b.onclick = () => devForm({ ...da.cable[+b.dataset.cable] })));
-    }
+function devRender() {
+  const b = $("#da-body"), r = da.res, running = r?.state === "running", cat = su.cat.catalog;
+  let h = "";
+  if (!da.mode) {
+    h = `<p class="note">Cum vrei să găsim dispozitivul nou?</p><div class="su-mode">
+      <button data-dm="auto"><b>Configurare automată</b><small>Amper caută pe porturile USB libere și prin Bluetooth și îți arată ce a găsit.</small></button>
+      <button data-dm="manual"><b>Configurare manuală</b><small>Alegi tu ce adaugi (invertor sau BMS), modelul și conexiunea; Amper caută doar asta.</small></button></div>`;
   } else {
-    $("#da-ble").textContent = running ? "Caut… (10 s)" : da.ble ? "Caută din nou prin Bluetooth" : "Caută prin Bluetooth";
-    if (j.state === "failed") $("#da-ble-msg").textContent = j.message;
-    if (j.state === "done") {
-      da.ble = j.found || []; da.types = j.types || [];
-      $("#da-ble-msg").textContent = da.ble.length ? "Alege modulul pe care vrei să-l adaugi." : "N-am găsit niciun modul Bluetooth nou în jur.";
-      $("#da-ble-list").innerHTML = da.ble.map((f, i) => `<button class="row row-link" data-ble="${i}"><span><b>${esc(f.name)}</b></span>
-        <span class="t">${esc(f.ble)} · semnal ${f.rssi ?? "–"} dBm${f.guess ? ` · pare ${esc(DA_NAME[f.guess] || f.guess)}` : ""} ›</span></button>`).join("");
-      $$("[data-ble]").forEach((b) => (b.onclick = () => devForm({ ...da.ble[+b.dataset.ble], link: "Bluetooth" })));
+    h = `<p class="note"><a href="#" class="su-up" data-dup="back">‹ Înapoi</a></p>`;
+    if (da.mode === "auto") {
+      h += `<p class="su-stage">Configurare automată</p>
+        <div class="card su-info"><b>Înainte de căutare</b><p>Leagă cablul USB al dispozitivului nou și pornește modulul lui Bluetooth.
+          Un modul conectat acum la aplicația de pe telefon nu apare; închide-o înainte.</p></div>
+        <button class="btn" id="da-scan" ${running ? "disabled" : ""}>${running ? "Caut…" : r ? "Caută din nou" : "Caută dispozitivele"}</button>`;
+    } else if (!da.man.kind) {
+      h += `<p class="su-stage">Configurare manuală</p><p class="note">Ce adaugi?</p><div class="su-mode">
+        <button data-dk="inverter"><b>Invertor</b><small>Growatt, Deye, Easun…</small></button>
+        <button data-dk="bms"><b>Baterie / BMS</b><small>Daly, JK, Seplos, PACE…</small></button></div>`;
+    } else {
+      const e = cat.find((x) => x.id === da.man.model && x.kind === da.man.kind);
+      h += `<p class="su-stage">Configurare manuală · ${da.man.kind === "inverter" ? "Invertor" : "Baterie / BMS"}</p>`;
+      if (!e) h += `<div class="list">${cat.filter((x) => x.kind === da.man.kind).map((x) => `<button class="row su-model" data-model="${x.id}" ${x.supported ? "" : "disabled"}>
+          <span><b>${esc(x.brand)}</b> · ${esc(x.model)}</span><span class="t">${x.supported ? "›" : "în curând"}</span></button>`).join("")}</div>`;
+      else {
+        const link = da.man.link || e.links[0];
+        h += `<div class="card su-pick"><b>${esc(e.brand)} · ${esc(e.model)}</b><span class="su-l">Tipul conexiunii</span>
+          <div class="su-links">${e.links.map((l) => `<button class="${l === link ? "on" : ""}" data-link="${l}">${esc(su.cat.links[l] || l)}</button>`).join("")}</div>
+          ${e.hint ? `<p class="note">${esc(e.hint)}</p>` : ""}
+          ${e.address && link === "cable" ? suField("da-addr", "Adresa (din comutatoarele DIP), dacă o știi",
+            `type="number" inputmode="numeric" min="0" max="15" placeholder="toate (0–15)" value="${da.man.address ?? ""}"`) : ""}
+          <button class="btn" id="da-scan" ${running ? "disabled" : ""}>${running ? "Caut…" : `Caută ${esc(e.brand)}`}</button></div>`;
+      }
+    }
+    h += `<p class="note" id="da-msg2">${esc(running ? r.message : r?.state === "failed" ? r.message : r?.ble_note || r?.error || "")}</p>`;
+    if (r?.state === "done") {
+      const cable = r.found || [], ble = r.ble || [];
+      const inv = cable.map((f, i) => [f, i]).filter(([f]) => suKind(f) === "inverter");
+      const bms = cable.map((f, i) => [f, i]).filter(([f]) => suKind(f) !== "inverter");
+      const any = cable.length || ble.length;
+      if (inv.length) h += `<h3 class="su-h">Invertor</h3><div class="list">${inv.map(([f, i]) => devItem(f, i, "cable")).join("")}</div>`;
+      if (bms.length || ble.length) h += `<h3 class="su-h">BMS / acumulatori</h3><div class="list">${bms.map(([f, i]) => devItem(f, i, "cable")).join("")}${ble.map((f, i) => devItem(f, i, "ble")).join("")}</div>`;
+      if (!any) h += `<div class="empty">N-am găsit nimic nou. Verifică cablul și că dispozitivul e pornit${da.mode === "auto"
+        ? `, sau încearcă <a href="#" class="su-up" data-dup="manual">configurarea manuală</a>` : `, sau încearcă <a href="#" class="su-up" data-dup="auto">configurarea automată</a>`}.</div>`;
     }
   }
-  if (running) da.timer = setTimeout(async () => { try { devScanShow(await api("/api/devices/scan")); } catch {} }, 1500);
-  else if (j.what === "cable") $("#da-cable-again").hidden = false;
+  b.innerHTML = h;
+  $$("[data-dm]", b).forEach((x) => (x.onclick = () => { da.mode = x.dataset.dm; da.man = {}; da.res = null; devRender(); }));
+  $$("[data-dk]", b).forEach((x) => (x.onclick = () => { da.man = { kind: x.dataset.dk }; da.res = null; devRender(); }));
+  $$(".su-model", b).forEach((x) => (x.onclick = () => { da.man.model = x.dataset.model; da.man.link = null; da.res = null; devRender(); }));
+  $$("[data-link]", b).forEach((x) => (x.onclick = () => { da.man.link = x.dataset.link; da.res = null; devRender(); }));
+  $$("[data-dup]", b).forEach((x) => (x.onclick = (ev) => {
+    ev.preventDefault();
+    const up = x.dataset.dup;
+    $("#da-form").hidden = true; da.res = running ? da.res : null;
+    if (up !== "back") { da.mode = up; da.man = {}; }
+    else if (da.mode === "manual" && da.man.model) { da.man.model = null; da.man.link = null; }
+    else if (da.mode === "manual" && da.man.kind) da.man = {};
+    else da.mode = null;
+    devRender();
+  }));
+  $$("[data-pick]", b).forEach((x) => (x.onclick = () => {
+    const [src, i] = x.dataset.pick.split(":");
+    if (src === "ble") devForm({ ...r.ble[+i], link: "Bluetooth" });
+    else { const f = { ...r.found[+i] }; devForm(f.ble ? { ...f, link: "Bluetooth", known: true } : f); }
+  }));
+  if ($("#da-scan")) $("#da-scan").onclick = devScan;
 }
-$("#da-ble").onclick = () => devScan("ble");
-$("#da-cable-again").onclick = () => devScan("cable");
+async function devScan() {
+  let body = { mode: "auto" };
+  if (da.mode === "manual") {
+    const e = su.cat.catalog.find((x) => x.id === da.man.model);
+    da.man.address = $("#da-addr") ? $("#da-addr").value : null;
+    body = { model: e.id, link: da.man.link || e.links[0], address: da.man.address };
+  }
+  $("#da-form").hidden = true;
+  try {
+    const j = await api("/api/devices/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (j.error) { da.res = { state: "failed", message: j.error }; return devRender(); }
+    devPoll(j);
+  } catch {}
+}
+function devPoll(j) {
+  clearTimeout(da.timer);
+  da.res = j;
+  if (j.ble && j.types) da.types = j.types;
+  devRender();
+  if (j.state === "running") da.timer = setTimeout(async () => { try { devPoll(await api("/api/devices/scan")); } catch {} }, 1500);
+}
 
 // formularul: la Bluetooth, întâi tipul BMS-ului; apoi numele și capacitatea
 function devForm(c) {
   const f = $("#da-form"), ble = c.link === "Bluetooth";
   if (ble && !c.type) c.type = c.guess || "daly";
-  const types = ble ? da.types : [];
-  const pack = () => c.type !== "growatt_spf";
+  const types = ble && !c.known ? da.types : [];
+  const pack = () => !INV_TYPES.has(c.type);
   const draw = () => {
     const t = types.find((x) => x.type === c.type);
-    const ok = !ble || t?.supported;
+    const ok = !ble || !types.length || t?.supported;
     f.innerHTML = `<h3>${esc(ble ? c.name : c.label)}</h3>
-      ${ble ? `<p class="note">Ce BMS este?</p><div class="da-types">${types.map((x) => `<label class="row-check ${x.supported ? "" : "dis"}">
+      ${types.length ? `<p class="note">Ce BMS este?</p><div class="da-types">${types.map((x) => `<label class="row-check ${x.supported ? "" : "dis"}">
         <input type="radio" name="da-type" value="${esc(x.type)}" ${x.type === c.type ? "checked" : ""}>
         <span><b>${esc(x.label)}</b>${x.supported ? "" : "<small>Nu e suportat încă — spune-i autorului ce model ai.</small>"}</span></label>`).join("")}</div>` : ""}
       ${ok ? `<label class="su-l" for="da-name">Nume</label><input class="ed-in" id="da-name" maxlength="40" placeholder="de ex. ${esc(DA_NAME[c.type] || "")} 4">
@@ -2128,7 +2191,7 @@ const SU_STEPS = [
   { k: "name", t: "Numele instalației" }, { k: "password", t: "Parola aplicației" }, { k: "remote", t: "Acces de oriunde" },
   { k: "devices", t: "Dispozitivele" }, { k: "capacity", t: "Capacitățile" }, { k: "notif", t: "Notificări" },
 ];
-const DEV_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", pace: "PowerCube", growatt_spf: "Invertor Growatt SPF" };
+const DEV_NAME = DA_NAME;
 const su = { i: 0, d: null, chosen: null, keep: false, again: false, pollT: 0 };
 
 // Pi-ul nu răspunde (Amper oprit sau blocat, Pi fără curent/internet): un mesaj în loc de ecran negru.
@@ -2157,6 +2220,8 @@ async function openSetup(again, step, reset = false) {
   su.again = again; su.chosen = null; su.keep = false; su.reset = reset;
   su.i = su.start = Math.max(0, SU_STEPS.findIndex((x) => x.k === step));     // „+ Adaugă dispozitiv” → direct la Dispozitive
   try { su.d = await api("/api/setup"); } catch { return; }
+  try { su.cat = su.cat || (await api("/api/setup/catalog")); } catch { su.cat = { catalog: [], links: {} }; }
+  su.found = []; su.pick = new Set(); su.mode = null; su.man = {};
   $("#app").hidden = true; $("#login").hidden = true; $("#setup").hidden = false;
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
   suRender();
@@ -2203,14 +2268,14 @@ function suRender() {
   } else if (st.k === "devices") {
     suRenderDevices();
   } else if (st.k === "capacity") {
-    const packs = (su.chosen || []).filter((c) => c.type !== "growatt_spf");
+    const packs = (su.chosen || []).filter((c) => !INV_TYPES.has(c.type));
     b.innerHTML = `<h2>Numele și capacitățile</h2>
       <p class="note">Capacitatea fiecărui modul (Ah) — din ea se calculează SOC-ul total și energia rămasă.
         O găsești pe eticheta bateriei.</p>
       ${(su.chosen || []).map((c, i) => `<div class="card su-dev">
         ${suField(`su-n${i}`, `${esc(c.label || DEV_NAME[c.type])}${c.link ? ` · ${esc(c.link)}` : ""}`,
           `maxlength="40" value="${esc(c.name || "")}" placeholder="${esc(suDefaultName(c, i))}"`)}
-        ${c.type === "growatt_spf" ? "" : suField(`su-c${i}`, "Capacitate (Ah)",
+        ${INV_TYPES.has(c.type) ? "" : suField(`su-c${i}`, "Capacitate (Ah)",
           `type="number" inputmode="decimal" min="1" max="2000" step="1" value="${c.capacity_ah || ""}"`)}</div>`).join("")}
       ${packs.length ? "" : `<p class="note">Niciun acumulator ales: nu e nimic de completat.</p>`}`;
   } else if (st.k === "notif") {
@@ -2234,56 +2299,139 @@ function suRender() {
   if (first && st.k !== "capacity") first.focus();
 }
 function suCheck(c) {
+  if (c.out_v != null || c.bat_v != null)                 // invertor: valori ușor de verificat pe afișajul lui
+    return [c.out_v != null ? `ieșire ${num(c.out_v, 0)} V` : "", c.bat_v != null ? `baterie ${num(c.bat_v, 1)} V` : "",
+      c.pv_w != null ? `panouri ${num(c.pv_w, 0)} W` : "", c.load_w != null ? `consum ${num(c.load_w, 0)} W` : ""].filter(Boolean).join(" · ");
   return [c.voltage != null ? `${num(c.voltage, 1)} V` : "", c.soc != null ? `SOC ${num(c.soc, 0)}%` : "",
     c.capacity_ah ? `${num(c.capacity_ah, 0)} Ah` : "fără capacitate", c.cells ? `${c.cells} celule` : "",
     c.cycles != null ? `${c.cycles} cicluri` : ""].filter(Boolean).join(" · ");
 }
 function suDefaultName(c, i) {
   const same = (su.chosen || []).filter((x) => x.type === c.type);
-  return same.length > 1 || c.type !== "growatt_spf" ? `${DEV_NAME[c.type]} ${same.indexOf(c) + 1}` : DEV_NAME[c.type];
+  return same.length > 1 || !INV_TYPES.has(c.type) ? `${DEV_NAME[c.type]} ${same.indexOf(c) + 1}` : DEV_NAME[c.type];
+}
+const suKey = (f) => f.ble ? `ble:${f.ble}` : `${f.port}|${f.type}|${f.address ?? ""}`;
+function suMerge(found) {                     // rezultatele mai multor căutări se adună (ex. invertorul, apoi bateriile)
+  for (const f of found || []) {
+    const k = suKey(f);
+    if (su.found.some((x) => suKey(x) === k)) continue;
+    su.found.push(f);
+    if (f.ok !== false) su.pick.add(k);
+  }
+}
+// tipul unui dispozitiv găsit (după catalog): invertor sau BMS
+const suKind = (f) => su.cat.catalog.find((e) => e.driver === f.type)?.kind || (INV_TYPES.has(f.type) ? "inverter" : "bms");
+function suFoundHtml(kind, title) {
+  const list = su.found.map((f, i) => [f, i]).filter(([f]) => suKind(f) === kind);
+  if (!list.length) return title ? `<h3 class="su-h">${title}</h3><div class="empty">Nimic găsit.</div>` : "";
+  return `${title ? `<h3 class="su-h">${title}</h3>` : ""}<div class="list">${list.map(([f, i]) => `<label class="row-check">
+    <input type="checkbox" class="su-f" data-i="${i}" ${su.pick.has(suKey(f)) ? "checked" : ""}>
+    <span><b>${esc(f.label)}</b><small>${esc(f.link)}${f.short ? " · " + esc(f.short) : ""}${f.rssi ? ` · semnal ${f.rssi} dBm` : ""}</small>
+    ${f.check && Object.keys(f.check).length ? `<small>${esc(suCheck(f.check))} — corect?</small>` : ""}
+    ${f.ok === false ? `<small class="warnc">Nu pare BMS (egalizator activ?) — nebifat.</small>` : ""}</span></label>
+    ${f.binding ? `<button class="btn sm danger su-rej" data-rej="${i}">Respinge ${esc(f.name || "")}</button>` : ""}`).join("")}</div>`;
+}
+function suManualHtml(sc, running) {
+  const kind = su.man.stage, cat = su.cat.catalog;
+  const what = kind === "inverter" ? "invertorul" : "acumulatorii (BMS-urile)";
+  const e = cat.find((x) => x.id === su.man.model && x.kind === kind);
+  let h = `<p class="su-stage">${kind === "inverter" ? "Pasul 1 din 2 · Invertorul" : "Pasul 2 din 2 · Acumulatorii (BMS)"}</p>`;
+  if (!e) {
+    h += `<p class="note">Ce ${kind === "inverter" ? "invertor" : "BMS"} ai?</p>
+      <div class="list">${cat.filter((x) => x.kind === kind).map((x) => `<button class="row su-model" data-model="${x.id}" ${x.supported ? "" : "disabled"}>
+        <span><b>${esc(x.brand)}</b> · ${esc(x.model)}</span><span class="t">${x.supported ? "›" : "în curând"}</span></button>`).join("")}</div>`;
+  } else {
+    const link = su.man.link || e.links[0];
+    h += `<div class="card su-pick"><b>${esc(e.brand)} · ${esc(e.model)}</b>
+        <span class="su-l">Tipul conexiunii</span>
+        <div class="su-links">${e.links.map((l) => `<button class="${l === link ? "on" : ""}" data-link="${l}">${esc(su.cat.links[l] || l)}</button>`).join("")}</div>
+        ${e.hint ? `<p class="note">${esc(e.hint)}</p>` : ""}
+        ${e.address && link === "cable" ? suField("su-addr", "Adresa (din comutatoarele DIP), dacă o știi",
+          `type="number" inputmode="numeric" min="0" max="15" placeholder="toate (0–15)" value="${su.man.address ?? ""}"`) : ""}
+        <button class="btn" id="su-scan" ${running ? "disabled" : ""}>${running ? "Caut…" : `Caută ${esc(e.brand)}`}</button>
+      </div>
+      <p class="note"><a href="#" class="su-up" data-up="model">‹ Alt model</a></p>`;
+  }
+  h += `<p class="note" id="su-scan-msg">${esc(running ? sc.message : sc.state === "failed" ? sc.message : sc.ble_note || "")}</p>`;
+  h += suFoundHtml(kind, su.found.some((f) => suKind(f) === kind) ? (kind === "inverter" ? "Invertor găsit" : "BMS găsite") : "");
+  if (kind === "bms" && su.found.some((f) => suKind(f) === "bms"))
+    h += `<p class="note">Mai ai alte acumulatoare (alt model)? Alege-l din listă și caută din nou; se adaugă la cele de mai sus.</p>`;
+  h += `<p class="note">${kind === "inverter" ? "Apasă „Mai departe” pentru acumulatori (și dacă n-ai invertor de legat)."
+    : "Apasă „Mai departe” când ai găsit toate ce vrei să păstrezi."}</p>`;
+  return h;
 }
 function suRenderDevices() {
   const d = su.d, sc = d.scan || {}, b = $("#su-body");
   const real = d.devices.filter((x) => !x.type.startsWith("sim_"));
-  const found = sc.found || [];
-  if (!su.chosen) su.chosen = null;
-  b.innerHTML = `<h2>Dispozitivele</h2>
-    <p class="note">Leagă acum la Pi cablurile USB (invertor, RS485, Daly) și pornește modulele Daly cu Bluetooth.
-      Apoi caută. Căutarea durează 1–2 minute.</p>
-    ${real.length ? `<div class="list">${real.map((x) => `<div class="row"><span><b>${esc(x.name)}</b></span>
-      <span class="t">${esc(x.port || x.ble || "")}${x.capacity_ah ? ` · ${x.capacity_ah} Ah` : ""}</span></div>`).join("")}</div>
-      <label class="row-check"><input type="checkbox" id="su-keep" ${su.keep ? "checked" : ""}>
-        <span><b>Păstrează dispozitivele de acum</b><small>Nu schimb nimic la dispozitive.</small></span></label>` : ""}
-    <button class="btn" id="su-scan" ${sc.state === "running" ? "disabled" : ""}>${sc.state === "running" ? "Caut…" : found.length ? "Caută din nou" : "Caută dispozitivele"}</button>
-    <p class="note" id="su-scan-msg">${esc(sc.state === "running" ? sc.message : sc.state === "failed" ? sc.message : sc.ble_note || "")}</p>
-    ${sc.state === "done" ? `<div class="list">${found.length ? found.map((f, i) => `<label class="row-check">
-        <input type="checkbox" class="su-f" data-i="${i}" ${f.ok === false ? "" : "checked"}>
-        <span><b>${esc(f.label)}</b><small>${esc(f.link)}${f.short ? " · " + esc(f.short) : ""}${f.rssi ? ` · semnal ${f.rssi} dBm` : ""}</small>
-        ${f.check ? `<small>${esc(suCheck(f.check))}</small>` : ""}
-        ${f.ok === false ? `<small class="warnc">Nu pare BMS (egalizator activ?) — nebifat.</small>` : ""}</span></label>
-        ${f.binding ? `<button class="btn sm danger su-rej" data-rej="${i}">Respinge ${esc(f.name || "")}</button>` : ""}`).join("")
-      : `<div class="empty">N-am găsit nimic. Verifică cablurile și că BMS-urile sunt treze (pornește un consumator), apoi caută din nou.</div>`}</div>` : ""}
-    <p class="note">Ai module Daly care nu sunt încă legate? Adaugă-le acum: se vor găsi singure când apar
-      (pe cablu sau Bluetooth).</p>
-    <div class="su-add"><button class="btn sm" id="su-add-daly">+ Daly (se găsește singur)</button>
-      <span class="note" id="su-add-n">${su.extraDaly ? `${su.extraDaly} adăugate` : ""}</span></div>`;
-  $("#su-scan").onclick = async () => {
+  const running = sc.state === "running";
+  if (sc.state === "done" && sc !== su.merged) { suMerge(sc.found); su.merged = sc; }
+  let h = `<h2>Dispozitivele</h2>`;
+  if (!su.mode) {
+    h += `${real.length ? `<div class="list">${real.map((x) => `<div class="row"><span><b>${esc(x.name)}</b></span>
+        <span class="t">${esc(x.port || x.ble || "")}${x.capacity_ah ? ` · ${x.capacity_ah} Ah` : ""}</span></div>`).join("")}</div>
+        <label class="row-check"><input type="checkbox" id="su-keep" ${su.keep ? "checked" : ""}>
+          <span><b>Păstrează dispozitivele de acum</b><small>Nu schimb nimic la dispozitive.</small></span></label>` : ""}
+      <p class="note">Cum vrei să găsim invertorul și acumulatorii?</p>
+      <div class="su-mode">
+        <button data-m="auto"><b>Configurare automată</b><small>Amper încearcă singur toate tipurile cunoscute și îți arată ce a găsit (1–2 minute).</small></button>
+        <button data-m="manual"><b>Configurare manuală</b><small>Alegi tu din listă invertorul, apoi BMS-urile, și tipul conexiunii; Amper caută doar ce ai ales.</small></button>
+      </div>`;
+  } else if (su.mode === "auto") {
+    h += `<p class="su-stage">Configurare automată</p>
+      <div class="card su-info"><b>Înainte de căutare</b>
+        <p>1. Leagă la Pi cablurile USB: invertorul, adaptorul RS485 al bateriilor, cablurile BMS-urilor.</p>
+        <p>2. Pornește modulele Bluetooth ale BMS-urilor (un BMS adormit se trezește dacă pornești un consumator).</p></div>
+      <button class="btn" id="su-scan" ${running ? "disabled" : ""}>${running ? "Caut…" : su.found.length ? "Caută din nou" : "Caută dispozitivele"}</button>
+      <p class="note" id="su-scan-msg">${esc(running ? sc.message : sc.state === "failed" ? sc.message : sc.ble_note || "")}</p>
+      ${sc.state === "done" || su.found.length ? suFoundHtml("inverter", "Invertor") + suFoundHtml("bms", "BMS / acumulatori") +
+        (su.found.length ? "" : `<p class="note">N-am găsit nimic? Verifică cablurile sau încearcă <a href="#" class="su-up" data-up="manual">configurarea manuală</a>.</p>`) : ""}`;
+  } else {
+    h += suManualHtml(sc, running);
+  }
+  b.innerHTML = h;
+  if (su.mode) { $("#su-back").hidden = false; $("#su-back").textContent = "‹ Înapoi"; }
+  $$(".su-mode button", b).forEach((x) => (x.onclick = () => {
+    // modul ales de la capăt: rezultatele căutărilor de dinainte nu se amestecă
+    su.mode = x.dataset.m; su.man = { stage: "inverter" }; su.found = []; su.pick = new Set(); su.d.scan = {};
+    suRenderDevices();
+  }));
+  $$(".su-model", b).forEach((x) => (x.onclick = () => { su.man.model = x.dataset.model; su.man.link = null; su.man.address = null; suRenderDevices(); }));
+  $$("[data-link]", b).forEach((x) => (x.onclick = () => { su.man.link = x.dataset.link; suRenderDevices(); }));
+  $$(".su-up", b).forEach((x) => (x.onclick = (ev) => {
+    ev.preventDefault();
+    if (x.dataset.up === "model") { su.man.model = null; su.man.link = null; }
+    else { su.mode = x.dataset.up; su.man = { stage: "inverter" }; }
+    suRenderDevices();
+  }));
+  $$(".su-f", b).forEach((x) => (x.onchange = () => {
+    const k = suKey(su.found[+x.dataset.i]);
+    x.checked ? su.pick.add(k) : su.pick.delete(k);
+  }));
+  if ($("#su-scan")) $("#su-scan").onclick = async () => {
     su.keep = false;
-    su.d.scan = await api("/api/setup/scan", { method: "POST" });
+    let body = {};
+    if (su.mode === "manual") {
+      const e = su.cat.catalog.find((x) => x.id === su.man.model);
+      su.man.address = $("#su-addr") ? $("#su-addr").value : null;
+      body = { model: e.id, link: su.man.link || e.links[0], address: su.man.address };
+    }
+    try {
+      su.d.scan = await api("/api/setup/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    } catch (err) { $("#su-err").textContent = err.message; return; }
+    if (su.d.scan.error) { $("#su-err").textContent = su.d.scan.error; su.d.scan = {}; return; }
     suRenderDevices(); suPollScan();
   };
-  $$(".su-rej").forEach((b) => (b.onclick = async () => {
-    const f = found[+b.dataset.rej];
+  $$(".su-rej", b).forEach((x) => (x.onclick = async () => {
+    const f = su.found[+x.dataset.rej];
     if (!confirm(`Respingi ${f.name}? Nu va mai fi legat automat (se poate permite din nou din Setări).`)) return;
     try {
       const { r, j } = await securePost("/api/daly/reject", { keys: f.keys, binding: f.binding, label: f.label });
       if (!r.ok) throw new Error(j.error || "Nu a mers.");
-      found.splice(+b.dataset.rej, 1); suRenderDevices();
-    } catch (e) { if (e.message !== "Anulat.") $("#su-err").textContent = e.message; }
+      su.pick.delete(suKey(f)); su.found.splice(+x.dataset.rej, 1); suRenderDevices();
+    } catch (err) { if (err.message !== "Anulat.") $("#su-err").textContent = err.message; }
   }));
-  $("#su-add-daly").onclick = () => { su.extraDaly = (su.extraDaly || 0) + 1; $("#su-add-n").textContent = `${su.extraDaly} adăugate`; };
-  if ($("#su-keep")) $("#su-keep").onchange = (e) => (su.keep = e.target.checked);
-  if (sc.state === "running") suPollScan();
+  if ($("#su-keep")) $("#su-keep").onchange = (ev) => (su.keep = ev.target.checked);
+  if (running) suPollScan();
 }
 function suPollScan() {
   clearTimeout(su.pollT);
@@ -2318,10 +2466,12 @@ async function suNext() {
       if (su.reset) { location.reload(); return; }
     }
   } else if (st.k === "devices") {
-    if (su.keep) { su.chosen = null; su.i += 2; return suRender(); }       // sari peste capacități
-    const found = su.d.scan?.found || [];
-    const sel = $$(".su-f").filter((x) => x.checked).map((x) => ({ ...found[+x.dataset.i] }));
-    for (let k = 0; k < (su.extraDaly || 0); k++) sel.push({ type: "daly", link: "se găsește singur", label: "Daly" });
+    if (su.keep && !su.mode) { su.chosen = null; su.i += 2; return suRender(); }       // sari peste capacități
+    if (!su.mode) throw new Error("Alege configurarea automată sau manuală.");
+    if (su.mode === "manual" && su.man.stage === "inverter") {           // invertorul e gata: urmează BMS-urile
+      su.man = { stage: "bms" }; su.d.scan = {}; return suRenderDevices();
+    }
+    const sel = su.found.filter((f) => su.pick.has(suKey(f))).map((f) => ({ ...f }));
     if (!sel.length) {
       if (su.d.devices.some((x) => !x.type.startsWith("sim_")))
         throw new Error("Alege dispozitivele găsite sau bifează „Păstrează dispozitivele de acum”.");
@@ -2329,14 +2479,14 @@ async function suNext() {
       su.chosen = []; su.i += 2; return suRender();
     }
     // ordinea: Daly, Seplos, invertor
-    const order = { daly: 0, jk: 1, seplos: 2, pace: 3, growatt_spf: 4 };
+    const order = { daly: 0, jk: 1, seplos: 2, pace: 3, growatt_spf: 4, deye: 4, voltronic: 4, srne: 4 };
     su.chosen = sel.sort((a, b) => order[a.type] - order[b.type]);
   } else if (st.k === "capacity") {
     su.chosen.forEach((c, i) => {
       c.name = $(`#su-n${i}`).value.trim() || suDefaultName(c, i);
-      if (c.type !== "growatt_spf") c.capacity_ah = parseFloat(($(`#su-c${i}`).value || "").replace(",", "."));
+      if (!INV_TYPES.has(c.type)) c.capacity_ah = parseFloat(($(`#su-c${i}`).value || "").replace(",", "."));
     });
-    const bad = su.chosen.find((c) => c.type !== "growatt_spf" && !(c.capacity_ah >= 1 && c.capacity_ah <= 2000));
+    const bad = su.chosen.find((c) => !INV_TYPES.has(c.type) && !(c.capacity_ah >= 1 && c.capacity_ah <= 2000));
     if (bad) throw new Error(`Completează capacitatea pentru ${bad.name} (între 1 și 2000 Ah).`);
     await post("/api/setup/devices", { devices: su.chosen });
   } else if (st.k === "notif") {
@@ -2364,6 +2514,13 @@ $("#su-next").onclick = async () => {
   b.disabled = false;
 };
 $("#su-back").onclick = () => {
+  if (SU_STEPS[su.i].k === "devices" && su.mode) {                    // în pasul Dispozitivele: un sub-pas înapoi
+    if (su.mode === "manual" && su.man.model) { su.man.model = null; su.man.link = null; }
+    else if (su.mode === "manual" && su.man.stage === "bms") su.man = { stage: "inverter" };
+    else su.mode = null;
+    su.d.scan = su.d.scan?.state === "running" ? su.d.scan : {};
+    return suRenderDevices();
+  }
   if (su.i === su.start) { $("#setup").hidden = true; $("#app").hidden = false; return; }   // reluat din Setări: renunță
   su.i -= SU_STEPS[su.i].k === "notif" && !su.chosen ? 2 : 1;
   suRender();

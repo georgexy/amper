@@ -326,3 +326,77 @@ def test_page_ids_are_unique():
     html = (Path(__file__).parent.parent / "web" / "index.html").read_text(encoding="utf-8")
     dup = [k for k, n in Counter(re.findall(r'\bid="([^"]+)"', html)).items() if n > 1]
     assert dup == []
+
+
+def test_catalog_and_model_scan(tmp_path, monkeypatch):
+    """„Aleg eu din listă”: catalogul (cu modelele încă nesuportate marcate) și căutarea doar pentru modelul ales."""
+    from amper import __main__ as cli
+    from amper import catalog, setup_scan
+    tried = []
+    monkeypatch.setattr(cli, "list_ports", lambda: ["/dev/ttyUSB0"])
+    monkeypatch.setattr(cli, "probe", lambda p, only=None, addresses=None: tried.append((p, only, addresses))
+                        or ['seplos {"baudrate": 19200, "address": 2}'])
+    monkeypatch.setattr(setup_scan, "live_check", lambda item: {"voltage": 53.1, "soc": 71})
+    res = setup_scan.scan({"devices": []}, model="seplos", link="cable", address=2)
+    assert tried == [("/dev/ttyUSB0", {"seplos"}, [2])]
+    assert res["found"][0]["label"] == "Seplos (adresa 2)" and res["found"][0]["check"]["soc"] == 71
+    import pytest
+    with pytest.raises(ValueError):
+        setup_scan.scan({"devices": []}, model="jbd", link="ble")          # încă nesuportat
+    ids = {e["id"]: e for e in catalog.CATALOG}
+    assert ids["growatt_spf"]["supported"] and ids["deye"]["supported"] and not ids["jbd"]["supported"]
+    assert {e["kind"] for e in catalog.CATALOG} == {"inverter", "bms"}
+
+    async def steps(c, eng, n):
+        return await (await c.get("/api/setup/catalog")).json()
+    cat = run({}, steps, tmp_path)
+    assert any(e["brand"] == "Easun" for e in cat["catalog"]) and cat["links"]["ble"] == "Bluetooth"
+
+
+def test_probe_only_tries_the_chosen_type(monkeypatch):
+    from amper import __main__ as cli
+    from amper.drivers import daly, growatt_spf
+    calls = []
+
+    class Fake:
+        def __init__(self, cfg):
+            calls.append(cfg["type"])
+
+        def _query(self, *a):
+            raise OSError("nimic")
+
+        def _read_block(self, *a):
+            raise OSError("nimic")
+
+        def close(self):
+            pass
+    monkeypatch.setattr(daly, "DalyDriver", Fake)
+    monkeypatch.setattr(growatt_spf, "GrowattSPFDriver", Fake)
+    assert cli.probe("/dev/x", only={"growatt_spf"}) == []
+    assert calls == ["growatt_spf"]
+
+
+def test_add_device_scan_modes(tmp_path, monkeypatch):
+    """„Adaugă dispozitiv”: modelul ales din listă trece la `setup_scan.scan`, automat = cablu + Bluetooth."""
+    import asyncio as _a
+    from amper import setup_scan
+    calls = []
+    monkeypatch.setattr(setup_scan, "scan", lambda cfg, progress, secs, model, link, address:
+                        calls.append((model, link, address)) or {"found": [{"type": "deye", "label": "Invertor Deye"}], "ports": []})
+    monkeypatch.setattr(setup_scan, "scan_cable", lambda cfg, progress: {"found": [], "ports": []})
+    monkeypatch.setattr(setup_scan, "scan_ble", lambda cfg: {"found": [{"name": "DL-1", "ble": "AA"}], "types": []})
+
+    async def steps(c, eng, n):
+        out = []
+        for body in ({"model": "deye", "link": "cable", "address": ""}, {"mode": "auto"}):
+            await c.post("/api/devices/scan", json=body)
+            for _ in range(50):
+                j = await (await c.get("/api/devices/scan")).json()
+                if j["state"] != "running":
+                    break
+                await _a.sleep(0.05)
+            out.append(j)
+        return out
+    model, auto = run({}, steps, tmp_path)
+    assert calls == [("deye", "cable", None)] and model["found"][0]["type"] == "deye"
+    assert auto["ble"][0]["name"] == "DL-1" and auto["found"] == []

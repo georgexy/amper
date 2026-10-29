@@ -105,6 +105,14 @@ la 100% la bancă plină. Etapa 1: doar Modbus, puține scrieri (uzura memoriei 
 Etapa 2: emulare BMS (Pylontech?) pe portul BMS al invertorului — adaptor nou + manualul SPF 5000 ES.
 Reguli: nu se ating protecțiile BMS, limitele invertorului rămân plasa de siguranță, watchdog, activare doar de utilizator.
 
+## Idee ținută minte (2026-10-29, „deocamdată nu integra”): dispozitive necunoscute
+- „Raport de dispozitiv necunoscut”: la căutare, ce răspunde dar nu se potrivește → adaptorul USB, vitezele, cererile
+  și răspunsurile brute (doar comenzi de CITIRE; Modbus: registrele uzuale; BLE: nume, servicii, notificări).
+- Asistent „Compară cu ecranul aparatului”: utilizatorul scrie 3–4 valori de pe afișaj, Amper caută în răspunsurile brute
+  registrul + scara (ex. 52,8 V = registrul 183 × 0,01) → harta se completează din 2–3 rapoarte.
+- Trimitere: (a) fișier trimis de utilizator (e-mail/WhatsApp, fără server) — recomandat; (b) server propriu, cu acord
+  și date personale șterse (serie, MAC). Utilizatorul nu vrea conturi externe. Nicio scriere spre un aparat necunoscut.
+
 ## Alerte proprii + cifra de pe Alerte (2026-10-26)
 - Tabela `user_alerts`; `alerts.METRICS` (SOC bancă, SOC minim modul, tensiune, celule min/max, temperatură module,
   PV, consum, încărcare, rețea, temperatură invertor); `evaluate_user` cu histerezis (marjă per metrică), durată
@@ -383,6 +391,34 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   actualiza.” `app.js`: `?v=update` și mesajul SW deschid Setări → Actualizări.
 - Ecran: beta sus, `#up-check` „Caută actualizări”, `.up-new-head` (titlu + „Descarcă”), bara/instalarea înaintea notelor.
 
+## Conectare: automat sau din listă (1.0.0-beta.12, cerut 2026-10-29)
+- Ghid → Dispozitivele (forma cerută de utilizator 2026-10-29): întâi două butoane UNUL SUB ALTUL „Configurare
+  automată” / „Configurare manuală” (`su.mode` null → auto | manual; alegerea golește `su.found`/`su.pick`). Automat:
+  card „Înainte de căutare” + „Caută”, rezultatele în DOUĂ liste (Invertor / BMS, `suKind` după catalog). Manual:
+  `su.man.stage` inverter → bms (Mai departe trece la BMS), în fiecare: model din listă → tipul conexiunii (+ adresa
+  DIP) → „Caută”; BMS-urile se pot căuta de mai multe ori (se adună). „‹ Înapoi” = un sub-pas înapoi. Butonul
+  „+ Daly (se găsește singur)” SCOS (cerut).
+- `amper/catalog.py` (`CATALOG`: id, kind inverter|bms, brand, model, driver, links, supported, address, hint) →
+  `GET /api/setup/catalog`. `POST /api/setup/scan {model, link, address}` → `setup_scan.scan(..., model, link,
+  address)`: `__main__.probe(port, only={driver}, addresses)` sau `scan_ble_model` (nume DL-/JK-). Fiecare găsit pe
+  cablu are `check` din `live_check` (o citire: BMS → V/SOC/celule; invertor → out_v/bat_v/pv_w/load_w).
+- Invertoare noi (1.0.0-beta.12, DOAR CITIRE, NEVERIFICATE pe aparat; setările după confirmare):
+  - `drivers/modbus.py` (`ModbusDriver.read_regs/read_map`, funcția 03, `s16`) — comun Deye/SRNE.
+  - `drivers/deye.py`: holding 0–7 (tip 2–6 + seria ASCII 3–7 → `looks_like_deye` la căutare), 59 stare, 70–112
+    (energii zilnice ×0,1 kWh, 90/91 temperaturi (v−1000)×0,1, 109–112 PV), 150–193 (150 rețea V, 154 ieșire V,
+    169 putere rețea s16, 178 consum, 183 baterie ×0,01 V, 184 SOC, 186/187 PV W, 190 putere baterie s16 + = descărcare
+    → `battery_power_sign` −1, 193 frecvență). De confirmat semnele 169/190 și 178.
+  - `drivers/voltronic.py`: PI30 la 2400, CRC XMODEM cu 0x28/0x0D/0x0A +1 (verificat cu cadrele publicate QPIGS
+    B7A9, QMOD 49C1, QPIWS B4DA, QPI BEAC); QPIGS (câmpurile 0–20), QMOD, QPIWS (biți → `WARNINGS`). USB HID nesuportat.
+  - `drivers/srne.py`: două hărți, `detect()` (sau `map` în config): „smg” 201–230 (SMG-II/PowMr/Anenji), „srne”
+    0x0100–0x0109 + 0x0210–0x0221 (SRNE HF/HES). `battery_power_sign` +1 implicit — DE VERIFICAT.
+  - `__main__.probe`: după Growatt → Deye → SMG/SRNE → Voltronic. Tipuri în `KNOWN_TYPES`, `REAL`, `setup_scan`
+    (`INVERTERS`, `BASE`), catalog `supported=True`; `app.js` `INV_TYPES`. Fără `read_settings` → ecranul invertorului
+    spune „deocamdată doar citește” (`no_settings`) și ascunde ceasul.
+  - „Adaugă dispozitiv” (Setări, 1.0.0-beta.12): ca ghidul, câte un dispozitiv — `da.mode` auto | manual, `da.man`
+    {kind, model, link, address}, `devRender/devScan/devPoll`; `POST /api/devices/scan {mode: auto}` (cablu + `ble`) sau
+    `{model, link, address}` (`setup_scan.scan`); vechiul `{what}` rămâne. Alegerea → `devForm` → `/api/devices/add`.
+
 ## Deconectare BMS, module excluse, egalizatoare (1.0.0-beta.1, în pregătire)
 - Pe Pi-ul utilizatorului, căutarea a legat un EGALIZATOR ACTIV (BLE „DL-B77B020306D3”) ca daly2: răspunde la 0x90 cu
   tensiuni reale, SOC 0, 0 cicluri, MOSFET 0. Utilizatorul a scos modulele BLE de pe egalizatoare și va deconecta daly2.
@@ -430,6 +466,7 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - `__main__.probe`: după Growatt, PACE 0x25 la 9600 pe adresele 0–15 (`PROBE_WAIT` 0,8 s), apoi bucla Seplos (0x20,
   19200/9600) separă Seplos de Pylon cu `pace.is_seplos`. Ghid/„Adaugă dispozitiv”: `setup_scan` (NAMES „PowerCube”,
   `protocol` păstrat), `app.js` (DEV_TYPE „PowerCube / PACE (RS485)”).
+- În aplicație NU apare „PowerCube” (cerut 2026-10-29): numele afișat e „PACE / Daren” (`NAMES`, catalog, `DEV_TYPE`).
 - DE VERIFICAT la PowerCube: dacă răspunde la 0x25 sau 0x20 (programul lui e „BMS_Monitor”, nu PbmsTools), adresa
   (master 0 pentru toate modulele?), semnul curentului, ordinea temperaturilor, biții de stare. Doar citire.
 

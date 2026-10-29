@@ -15,7 +15,7 @@ nicăieri, în afară de logarea cu Google pentru accesul de oriunde (opțional)
 |---|---|
 | **Raspberry Pi** | Pi 4 sau Pi 5 (merge și Pi 3B+). Cu alimentatorul lui oficial: unul slab dă erori ciudate. |
 | **Card microSD** | 32 GB sau mai mare, de preferat „High Endurance” (scrie zilnic pe el). |
-| **Bateriile** | **Daly**: prin Bluetooth (modulul BMS-ului, numele „DL-…”), fără cabluri; sau câte un cablu USB-UART Daly pe modul. <br> **JK** (Jikong): prin Bluetooth (modelele cu hardware 10 și mai noi), sau pe cablu prin modulul RS485/UART al JK și un adaptor USB-RS485. <br> **Seplos V2**: un adaptor **USB-RS485** (cu cip CH340, ~30 lei), pe portul RS485 al bateriei. <br> **Ecobat PowerCube** și alte baterii cu BMS PACE / „Pylon”: același adaptor USB-RS485, în mufa RJ45 notată RS485 (nu CAN); încă netestat pe o baterie reală. |
+| **Bateriile** | **Daly**: prin Bluetooth (modulul BMS-ului, numele „DL-…”), fără cabluri; sau câte un cablu USB-UART Daly pe modul. <br> **JK** (Jikong): prin Bluetooth (modelele cu hardware 10 și mai noi), sau pe cablu prin modulul RS485/UART al JK și un adaptor USB-RS485. <br> **Seplos V2**: un adaptor **USB-RS485** (cu cip CH340, ~30 lei), pe portul RS485 al bateriei. <br> Baterii cu BMS **PACE / Daren** (și protocolul „Pylon”): același adaptor USB-RS485, în mufa RJ45 notată RS485 (nu CAN); încă netestat pe o baterie reală. |
 | **Invertorul** | **Growatt SPF** (ex. SPF 5000 ES): un cablu USB obișnuit (A–B) în portul USB al invertorului, sau un adaptor USB-RS232 (FTDI) pe portul RS232. |
 | **Telefon** | Orice telefon cu browser (iPhone, Android). |
 | **Internet** | WiFi acasă/la locație. Pi-ul poate sta și pe cablu de rețea. |
@@ -100,7 +100,7 @@ te anunță pe telefon. Dacă tot nu merge:
 - Daly prin Bluetooth: BMS-ul poate „adormi” fără curent; pornește un consumator și apasă „Caută” din nou. Cât timp
   aplicația Daly de pe telefon e conectată la modul, Pi-ul nu se poate conecta la el (și invers).
 - Seplos: adaptorul pe portul **RS485** (nu CAN) al bateriei; adresele din DIP switch diferite pe fiecare pachet.
-- PowerCube: la fel, mufa **RS485** (nu CAN); fiecare modul cu altă adresă din DIP switch (0 = modulul principal).
+- BMS PACE / Daren: la fel, mufa **RS485** (nu CAN); fiecare modul cu altă adresă din DIP switch (0 = modulul principal).
 - Growatt: încearcă alt cablu USB sau alt port USB al Pi-ului.
 
 **Ai uitat parola aplicației:**
