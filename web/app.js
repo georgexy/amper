@@ -105,7 +105,6 @@ async function boot() {
   const v = new URLSearchParams(location.search).get("v");
   if (v === "alerts") { show("alerts"); history.replaceState(null, "", location.pathname); }
   if (v === "update") { show("settings"); showPanel("update"); history.replaceState(null, "", location.pathname); }
-  $("#version").textContent = `Amper ${state.info.version || ""} · citire la fiecare ${state.info.poll_interval} s.`;
   $("#set-about-sub").textContent = `Amper ${isPro() ? "Pro" : "Lite"} ${state.info.version || ""} · actualizări, Pi-ul`;
   setInterval(tickConn, 1000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -287,6 +286,20 @@ const ICON = {
 const icon = (k) => `<svg viewBox="0 0 24 24">${ICON[k]}</svg>`;
 const kv = (v, u, d = 0) => (v == null ? "–" : `${num(v, d)}<span class="u">${u}</span>`);
 function put(root, k, html) { root.querySelectorAll(`[data-k="${k}"]`).forEach((e) => { if (e._h !== html) e.innerHTML = e._h = html; }); }
+/* bara de jos: inelul din mijloc = SOC-ul băncii; fulger la încărcare, căsuță la descărcare, „!” roșu la avarie */
+const NAV_IC = {
+  charging: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  discharging: '<path d="M4 11.5 12 4.5l8 7V20H4z"/>',
+  fault: '<path d="M12 4v10M12 19v.5"/>',
+};
+function navState(h) {
+  const btn = $(".nav-now"), soc = h.b.soc;
+  const st = h.health.cls === "fault" ? "fault" : soc == null ? "idle" : h.mode;
+  if (btn.dataset.st !== st) { btn.dataset.st = st; $("#nav-ic").innerHTML = NAV_IC[st] || ""; }
+  $("#nav-soc").textContent = soc == null ? "–" : num(soc, 0);
+  const C = 2 * Math.PI * 34, f = Math.max(0, Math.min(100, soc ?? 0)) / 100;
+  $("#nav-arc").setAttribute("stroke-dasharray", `${f * C} ${C}`);
+}
 function modeClass(el, h, extra = "") { el.className = `${extra} mode-${h.mode} ${h.health.cls === "fault" ? "fault" : ""}`.trim(); }
 
 /* ---------- butonul „i” de la panouri (toate temele): tensiunea și curentul PV de acum ---------- */
@@ -534,7 +547,9 @@ function renderNow() {
     $$("[data-open=packs]", home).forEach((el) => (el.onclick = () => show("packs")));
     $$("[data-open=inverter]", home).forEach((el) => (el.onclick = () => show("inverter")));
   }
-  L.update(home, homeData());
+  const hd = homeData();
+  L.update(home, hd);
+  navState(hd);
   if (!$("#pvpop").hidden) $("#pvpop").innerHTML = pvInfoHtml();            // valorile se schimbă la fiecare citire
   if (state.view === "packs") renderPacks();
   if (state.view === "inverter") renderInverterLive();
@@ -1018,6 +1033,7 @@ function renderEdition() {
   const pro = isPro();
   $("#ed-name").textContent = pro ? "Amper Pro" : "Amper Lite";
   $("#ed-pid").textContent = state.info?.pi_id || "–";
+  $("#ed-ver").textContent = state.info?.version || "–";
   $("#ed-act").hidden = pro;
 }
 $("#ed-go").onclick = async () => {
@@ -1040,7 +1056,7 @@ function showPanel(name) {
   $("#set-menu").hidden = !!name;
   for (const k of ["teme", "notif", "daly", "devoff", "devadd", "excl", "info", "update", "security", "remote", "auto", "about", "conn", "share", "wifi"])
     $("#set-" + k).hidden = k !== name;
-  if (name === "about") { $("#about-version").textContent = $("#version").textContent; renderEdition(); }
+  if (name === "about") renderEdition();
   if (name === "share") loadShare();
   if (name === "wifi") loadWifiNow();
   if (name === "auto") loadUserAlerts();

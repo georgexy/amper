@@ -75,3 +75,35 @@ def test_limits_protect(monkeypatch):
     with pytest.raises(ValueError):
         dp.write_field(bms, "tc_lo_a", 20)
     assert bms.sent == []
+
+
+class NoisyDaly(FakeDaly):
+    """Ca pe hardware (2026-10-28): la fiecare citire a lui 0x5F, octeții 4..7 sunt alții, fără nicio scriere."""
+
+    def __init__(self, applies=True):
+        super().__init__(applies)
+        self.n = 0
+
+    def _query(self, cmd, frames=1):
+        b = self.blocks[cmd]
+        if cmd == 0x5F:
+            self.n += 1
+            b = b[:4] + bytes([self.n, 0x0C, 0x70 + self.n, 0x32])
+        return [b]
+
+
+def test_balance_write_ok_although_other_bytes_change(monkeypatch, caplog):
+    monkeypatch.setattr(dp.time, "sleep", lambda s: None)
+    bms = NoisyDaly()
+    res = dp.write_field(bms, "bal_start", 3.40)
+    assert res["changed"]
+    assert bms.blocks[0x5F][:2].hex() == "0d48"                           # 3400 mV aplicat
+    assert dp.write_field(bms, "bal_diff", 20)["changed"]
+    assert bms.blocks[0x5F][2:4].hex() == "0014"
+    assert "alți octeți" in caplog.text                                   # doar în jurnal, nu eroare
+
+
+def test_balance_not_applied_still_reported(monkeypatch):
+    monkeypatch.setattr(dp.time, "sleep", lambda s: None)
+    with pytest.raises(DriverError, match="nu a aplicat"):
+        dp.write_field(NoisyDaly(applies=False), "bal_start", 3.40)

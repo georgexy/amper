@@ -181,6 +181,9 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   de citire − 0x40 cu blocul întreg de 8 octeți, apoi citire înapoi și comparare — regula protocolului, NEVERIFICATĂ
   — utilizatorul a confirmat pe 2026-10-26 că scrierea FUNCȚIONEAZĂ pe BMS-ul real. Rolul
   avertisment/protecție al fiecărui prag se calculează din valorile perechii (ordinea diferă între blocuri).
+- 2026-10-28 (1.0.0-beta.7): la 0x5F octeții 4..7 se schimbă singuri între citiri (Daly 1: `…00014b32` →
+  `…700c7232`); `write_field` compară acum doar octeții câmpului (restul → doar avertisment în jurnal). Scrierea
+  bal_start 3,40 V / bal_diff 20 mV s-a aplicat pe 3 Daly (firmware 31_2306, 31_2207, 11_2506).
 
 ## Setările invertorului (Growatt)
 - Protocolul de referință: „OffGrid Modbus RS485&RS232 RTU Protocol V0.17” (în Google Drive-ul utilizatorului,
@@ -404,4 +407,16 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `POST /api/pro/activate {code, app_password}`. `app.js`: `isPro()`, `renderEdition()`, `#ed-card`, `#iv-pro/#iv-lite`.
 - Coduri: `.github/workflows/pro-code.yml` (Actions → „Cod Pro” → ID; codul în rezumatul rulării — public, dar
   merge doar pe acel Pi) sau `AMPER_SIGNING_KEY=… python tools/release.py pro <ID>`.
+- Aplicația de coduri (cerută 2026-10-28): `site/coduri/index.html` → https://georgexy.github.io/amper/coduri/
+  (noindex, fără link de pe site). Cheia privată se lipește o dată, se verifică cu `PUBLIC_KEYS` (copiate din
+  `update_key.py` — țin-le sincron!) și se ține doar în localStorage; semnează cu WebCrypto Ed25519 (PKCS#8 din seed),
+  același cod ca `edition.make_code` (verificat în test cu Chromium). Evidența codurilor date: localStorage.
+- 1.0.0-beta.7: „Versiunea” în `#ed-card`, mutat sub meniul Despre, scris 14 px; scoase `#version` și
+  `#about-version` (cu „citire la fiecare 2 s”). `site/coduri/` are manifest + iconițe (se pune pe ecranul principal;
+  pe iPhone aplicația de pe ecran are alt localStorage decât Safari → cheia se lipește din nou acolo).
+- 1.0.0-beta.7: bara de jos = model „J” ales de utilizator (2026-10-28): `nav.tabs` Istoric | `.nav-now` | Alerte;
+  `.nav-now` = inel SVG (r 34, `#nav-arc` dasharray = SOC bancă) + `#nav-soc`; `navState(homeData())` la fiecare
+  randare: `data-st` charging (verde, fulger mare) / discharging (albastru, căsuță) / idle (gri) / fault
+  (`health.cls === "fault"`, roșu, „!”). Pe alte ecrane cercul e la 78% opacitate; tabul activ = pastilă colorată.
+  `body` padding jos 104 px (cercul iese ~24 px peste bară).
 

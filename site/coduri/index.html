@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Amper — coduri Pro</title>
+<meta name="theme-color" content="#0E1A22">
+<link rel="icon" href="../img/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Coduri Pro">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+@font-face { font-family: "Barlow"; font-weight: 400; src: url(../fonts/barlow-latin-400-normal.woff2) format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+@font-face { font-family: "Barlow"; font-weight: 400; src: url(../fonts/barlow-latin-ext-400-normal.woff2) format("woff2"); unicode-range: U+0100-024F, U+1E00-1EFF; }
+@font-face { font-family: "Barlow"; font-weight: 600; src: url(../fonts/barlow-latin-600-normal.woff2) format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+@font-face { font-family: "Barlow"; font-weight: 600; src: url(../fonts/barlow-latin-ext-600-normal.woff2) format("woff2"); unicode-range: U+0100-024F, U+1E00-1EFF; }
+@font-face { font-family: "Barlow Condensed"; font-weight: 700; src: url(../fonts/barlow-condensed-latin-700-normal.woff2) format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+@font-face { font-family: "Barlow Condensed"; font-weight: 700; src: url(../fonts/barlow-condensed-latin-ext-700-normal.woff2) format("woff2"); unicode-range: U+0100-024F, U+1E00-1EFF; }
+:root { --bg: #0E1A22; --panel: #172632; --panel-2: #1D3040; --line: #2A4255; --text: #E7EFF3; --muted: #8FA6B4;
+  --cell: #63B7E6; --charge: #52C98F; --alarm: #F2564F; --warn: #F5A040; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 17px/1.5 "Barlow", system-ui, sans-serif; }
+main { max-width: 560px; margin: 0 auto; padding: calc(18px + env(safe-area-inset-top)) 16px calc(60px + env(safe-area-inset-bottom)); }
+h1, h2 { font-family: "Barlow Condensed", "Barlow", sans-serif; font-weight: 700; margin: 0; }
+h1 { font-size: 34px; display: flex; align-items: center; gap: 10px; }
+h1 img { width: 30px; height: 30px; }
+h2 { font-size: 22px; margin: 26px 0 8px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 16px; margin-top: 12px; }
+.note { color: var(--muted); font-size: 15px; margin: 8px 0 0; }
+label { display: block; color: var(--muted); font-size: 14px; margin: 12px 0 4px; }
+input, textarea { font: inherit; width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--panel-2); color: var(--text); }
+textarea { font-family: ui-monospace, Menlo, monospace; font-size: 14px; resize: vertical; }
+#pid { font-size: 24px; letter-spacing: .08em; text-transform: uppercase; font-family: ui-monospace, Menlo, monospace; }
+button { font: inherit; font-weight: 600; border: 0; border-radius: 12px; padding: 13px 16px; cursor: pointer;
+  background: var(--panel-2); color: var(--text); }
+button.main { width: 100%; background: var(--charge); color: #0B1A12; margin-top: 14px; font-size: 18px; }
+button:disabled { opacity: .45; cursor: default; }
+.row { display: flex; gap: 8px; margin-top: 10px; }
+.row button { flex: 1; }
+.ok { color: var(--charge); } .err { color: var(--alarm); }
+.code { font-family: ui-monospace, Menlo, monospace; font-size: 14px; word-break: break-all; background: var(--panel-2);
+  border-radius: 10px; padding: 12px; margin-top: 10px; user-select: all; }
+.hist { list-style: none; padding: 0; margin: 0; }
+.hist li { border-top: 1px solid var(--line); padding: 10px 0; display: flex; gap: 10px; align-items: center; }
+.hist li:first-child { border-top: 0; }
+.hist .m { flex: 1; min-width: 0; }
+.hist b { font-family: ui-monospace, Menlo, monospace; letter-spacing: .05em; }
+.hist small { display: block; color: var(--muted); }
+.hist button { padding: 8px 12px; font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1><img src="../img/icon.svg" alt="">Coduri Amper Pro</h1>
+  <p class="note">Generează codul de activare Pro pentru un Pi. Codul merge doar pe Pi-ul cu acel ID. Totul se
+    calculează aici, în telefon: cheia nu e trimisă nicăieri.</p>
+
+  <section class="card" id="key-card">
+    <h2 style="margin-top:0">Cheia de semnare</h2>
+    <div id="key-set" hidden>
+      <p class="ok" id="key-state">Cheia e salvată pe acest telefon și e cea corectă.</p>
+      <div class="row"><button id="key-forget">Șterge cheia de pe telefon</button></div>
+    </div>
+    <div id="key-new">
+      <p class="note">Lipește cheia privată de semnare (aceeași cu secretul GitHub <code>AMPER_SIGNING_KEY</code>,
+        un rând care se termină de obicei cu „=”). Se verifică pe loc cu cheia publică din Amper.</p>
+      <textarea id="key" rows="2" autocomplete="off" autocapitalize="off" spellcheck="false"
+        placeholder="cheia privată (base64)"></textarea>
+      <label><input type="checkbox" id="remember" checked style="width:auto"> Ține minte cheia pe acest telefon</label>
+      <button class="main" id="key-save">Folosește cheia</button>
+      <p class="note" id="key-msg"></p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0">Cod nou</h2>
+    <label for="pid">ID Pi (din Amper → Setări → Despre)</label>
+    <input id="pid" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="7K3F-Q9PA">
+    <label for="who">Pentru cine (doar pentru evidența ta, opțional)</label>
+    <input id="who" maxlength="60" placeholder="ex. Ion, Casa de la munte">
+    <button class="main" id="make" disabled>Generează codul</button>
+    <p class="note" id="msg"></p>
+    <div id="out" hidden>
+      <div class="code" id="code"></div>
+      <div class="row"><button id="copy">Copiază codul</button><button id="share">Trimite…</button></div>
+    </div>
+  </section>
+
+  <h2>Coduri date</h2>
+  <div class="card"><ul class="hist" id="hist"></ul><p class="note" id="hist-empty">Încă niciun cod.</p></div>
+  <p class="note">Evidența stă doar pe acest telefon.</p>
+  <p class="note" id="a2hs">Pune-o pe ecranul principal: în Safari, butonul Partajare → „Adaugă pe ecranul principal”.
+    Se deschide apoi ca o aplicație, „Coduri Pro”.</p>
+</main>
+
+<script>
+"use strict";
+// Aceleași reguli ca amper/edition.py: ID = 8 caractere din ALPHABET, mesajul semnat „amper-pro:v1:XXXX-XXXX”,
+// codul = semnătura Ed25519, base64url fără „=”. Cheia publică = amper/update_key.py.
+const PUBLIC_KEYS = ["yt6lXvC7qWeVWVign02N5znzBxdU01/E40Bfirlcw1k="];
+const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const $ = (s) => document.querySelector(s);
+const enc = new TextEncoder();
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+const b64 = (s) => Uint8Array.from(atob(s.replace(/\s+/g, "")), (c) => c.charCodeAt(0));
+const b64url = (u8) => btoa(String.fromCharCode(...u8)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const normId = (s) => { const t = String(s).toUpperCase().replace(/[^A-Z0-9]/g, ""); return t.length === 8 ? `${t.slice(0, 4)}-${t.slice(4)}` : t; };
+const validId = (id) => /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(id) && [...id.replace("-", "")].every((c) => ALPHABET.includes(c));
+let key = null;
+
+async function importKey(seedB64) {
+  const seed = b64(seedB64);
+  if (seed.length !== 32) throw new Error("Cheia trebuie să aibă 32 de octeți (base64, cam 44 de caractere).");
+  // PKCS#8 pentru Ed25519 = prefixul fix + cei 32 de octeți ai cheii
+  const der = new Uint8Array([0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20, ...seed]);
+  const k = await crypto.subtle.importKey("pkcs8", der, { name: "Ed25519" }, false, ["sign"]);
+  // verificare: o semnătură de probă trebuie să treacă de una dintre cheile publice ale Amper
+  const probe = enc.encode("amper-pro:v1:TEST-TEST");
+  const sig = new Uint8Array(await crypto.subtle.sign("Ed25519", k, probe));
+  for (const p of PUBLIC_KEYS) {
+    const pub = await crypto.subtle.importKey("raw", b64(p), { name: "Ed25519" }, false, ["verify"]);
+    if (await crypto.subtle.verify("Ed25519", pub, sig, probe)) return k;
+  }
+  throw new Error("Cheia nu e cea a Amper (nu se potrivește cu cheia publică din program).");
+}
+
+function showKey() {
+  $("#key-set").hidden = !key;
+  $("#key-new").hidden = !!key;
+  $("#make").disabled = !key;
+}
+
+async function useKey(seed, remember) {
+  try {
+    key = await importKey(seed);
+    if (remember) store.set("amper-sign-key", seed.trim()); else store.del("amper-sign-key");
+    $("#key").value = "";
+    $("#key-msg").textContent = "";
+  } catch (e) {
+    key = null;
+    const unsupported = e && (e.name === "NotSupportedError" || /Ed25519|algorithm/i.test(e.message || ""));
+    $("#key-msg").innerHTML = `<span class="err">${unsupported
+      ? "Browserul acesta nu știe semnături Ed25519. Folosește Safari (iOS 17+) sau Chrome actualizat."
+      : (e.message || "Cheie greșită.")}</span>`;
+  }
+  showKey();
+}
+
+$("#key-save").onclick = () => useKey($("#key").value, $("#remember").checked);
+$("#key-forget").onclick = () => {
+  if (!confirm("Ștergi cheia de pe acest telefon? Data viitoare va trebui lipită din nou.")) return;
+  store.del("amper-sign-key"); key = null; showKey();
+};
+
+$("#make").onclick = async () => {
+  const id = normId($("#pid").value);
+  $("#out").hidden = true;
+  if (!validId(id)) { $("#msg").innerHTML = `<span class="err">ID-ul „${id || "–"}” nu e valid: 8 caractere, ex. 7K3F-Q9PA.</span>`; return; }
+  const sig = new Uint8Array(await crypto.subtle.sign("Ed25519", key, enc.encode(`amper-pro:v1:${id}`)));
+  const code = b64url(sig);
+  $("#pid").value = id;
+  $("#code").textContent = code;
+  $("#out").hidden = false;
+  $("#msg").innerHTML = `Cod pentru <b>${id}</b>. Clientul îl lipește în Amper → Setări → Despre → „Activează Pro”.`;
+  const hist = loadHist().filter((h) => h.id !== id);
+  hist.unshift({ id, who: $("#who").value.trim(), code, at: Date.now() });
+  store.set("amper-pro-codes", JSON.stringify(hist.slice(0, 200)));
+  renderHist();
+};
+
+async function copy(text, btn) {
+  try { await navigator.clipboard.writeText(text); } catch {
+    const r = document.createRange(); r.selectNodeContents($("#code")); getSelection().removeAllRanges(); getSelection().addRange(r);
+    document.execCommand("copy");
+  }
+  const t = btn.textContent; btn.textContent = "Copiat ✓"; setTimeout(() => (btn.textContent = t), 1500);
+}
+$("#copy").onclick = () => copy($("#code").textContent, $("#copy"));
+$("#share").onclick = async () => {
+  const text = `Codul tău Amper Pro (pentru Pi-ul ${$("#pid").value}):\n${$("#code").textContent}\n\nÎl lipești în Amper → Setări → Despre → „Activează Pro”.`;
+  if (navigator.share) { try { await navigator.share({ text }); } catch {} } else copy(text, $("#share"));
+};
+if (!navigator.share) $("#share").hidden = true;
+
+function loadHist() { try { return JSON.parse(store.get("amper-pro-codes") || "[]"); } catch { return []; } }
+function renderHist() {
+  const h = loadHist();
+  $("#hist-empty").hidden = h.length > 0;
+  $("#hist").innerHTML = "";
+  for (const x of h) {
+    const li = document.createElement("li");
+    li.innerHTML = `<div class="m"><b></b><small></small></div><button>Copiază</button>`;
+    li.querySelector("b").textContent = x.id;
+    li.querySelector("small").textContent = [x.who, new Date(x.at).toLocaleDateString("ro-RO")].filter(Boolean).join(" · ");
+    const btn = li.querySelector("button");
+    btn.onclick = () => copy(x.code, btn);
+    $("#hist").append(li);
+  }
+}
+
+renderHist();
+if (matchMedia("(display-mode: standalone)").matches || navigator.standalone) $("#a2hs").hidden = true;
+const saved = store.get("amper-sign-key");
+if (saved) useKey(saved, true); else showKey();
+</script>
+</body>
+</html>
