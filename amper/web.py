@@ -596,19 +596,39 @@ def make_app(engine) -> web.Application:
 
     async def devices_scan_start(request):
         body = await request.json()
+        # „Adaugă dispozitiv”: mode=auto (cablu + Bluetooth), model ales din listă (catalog), sau vechiul what=cable|ble
+        mode = "auto" if body.get("mode") == "auto" else "model" if body.get("model") else None
         what = "ble" if body.get("what") == "ble" else "cable"
+        try:
+            address = int(body["address"]) if body.get("address") not in (None, "") else None
+        except (TypeError, ValueError):
+            return _json({"error": "Adresa trebuie să fie un număr (0–15)."}, 400)
         if dev_job.get("state") == "running":
             return _json(dev_job)
         dev_job.clear()
-        dev_job.update(state="running", what=what, started=time.time(),
-                       message="Caut prin Bluetooth (10 s)…" if what == "ble" else "Caut pe porturile USB…")
+        dev_job.update(state="running", what=mode or what, started=time.time(),
+                       message="Caut prin Bluetooth (10 s)…" if (mode, what) == (None, "ble") else "Caut…")
 
         def progress(msg):
             dev_job["message"] = msg
 
         async def run():
             try:
-                fn = (lambda: setup_scan.scan_ble(cfg)) if what == "ble" else (lambda: setup_scan.scan_cable(cfg, progress))
+                if mode == "auto":
+                    def fn():
+                        res = setup_scan.scan_cable(cfg, progress)
+                        progress("Caut prin Bluetooth (10 s)…")
+                        try:
+                            ble_res = setup_scan.scan_ble(cfg)
+                            res.update(ble=ble_res["found"], types=ble_res["types"])
+                        except Exception as e:
+                            res.update(ble=[], ble_note=f"Bluetooth indisponibil ({e.__class__.__name__})")
+                        return res
+                elif mode == "model":
+                    def fn():
+                        return setup_scan.scan(cfg, progress, 10, body["model"], body.get("link"), address)
+                else:
+                    fn = (lambda: setup_scan.scan_ble(cfg)) if what == "ble" else (lambda: setup_scan.scan_cable(cfg, progress))
                 dev_job.update(state="done", message="", **await asyncio.to_thread(fn))
             except Exception as e:
                 log.warning("căutare %s: %s", what, e)

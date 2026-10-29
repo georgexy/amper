@@ -415,7 +415,9 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   - `__main__.probe`: după Growatt → Deye → SMG/SRNE → Voltronic. Tipuri în `KNOWN_TYPES`, `REAL`, `setup_scan`
     (`INVERTERS`, `BASE`), catalog `supported=True`; `app.js` `INV_TYPES`. Fără `read_settings` → ecranul invertorului
     spune „deocamdată doar citește” (`no_settings`) și ascunde ceasul.
-  - „Adaugă dispozitiv” (Setări) încă are doar cablu/Bluetooth automat.
+  - „Adaugă dispozitiv” (Setări, 1.0.0-beta.12): ca ghidul, câte un dispozitiv — `da.mode` auto | manual, `da.man`
+    {kind, model, link, address}, `devRender/devScan/devPoll`; `POST /api/devices/scan {mode: auto}` (cablu + `ble`) sau
+    `{model, link, address}` (`setup_scan.scan`); vechiul `{what}` rămâne. Alegerea → `devForm` → `/api/devices/add`.
 
 ## Deconectare BMS, module excluse, egalizatoare (1.0.0-beta.1, în pregătire)
 - Pe Pi-ul utilizatorului, căutarea a legat un EGALIZATOR ACTIV (BLE „DL-B77B020306D3”) ca daly2: răspunde la 0x90 cu

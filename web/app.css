@@ -656,6 +656,7 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .su-model:disabled { opacity: .5; cursor: default; }
 .list .row.su-model { display: flex; }
 .su-up { color: var(--acc); }
+#da-body .row-link span small { display: block; margin-top: 2px; }
 .su-pick { padding: 12px 14px; display: grid; gap: 8px; }
 .su-links { display: flex; gap: 6px; }
 .su-links button { flex: 1; border: 1px solid var(--line); background: var(--panel-2); color: inherit; border-radius: 99px;

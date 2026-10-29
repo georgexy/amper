@@ -2,7 +2,9 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.12 — în pregătire
+## 1.0.0-beta.12 — 2026-10-29
+- Setări → Dispozitive conectate → „+” (Adaugă dispozitiv): la fel ca ghidul — „Configurare automată” (cablu și
+  Bluetooth, rezultatele pe Invertor / BMS) sau „Configurare manuală” (ce adaugi → modelul → conexiunea), cu „‹ Înapoi”.
 - BMS-urile PACE apar în aplicație ca „PACE / Daren” (nu mai scrie PowerCube).
 - Invertoare noi (doar citire, încă neverificate pe un aparat real):
   - **Deye** hibrid monofazat (și Sunsynk, Sol-Ark), pe RS485 (Modbus);

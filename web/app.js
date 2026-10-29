@@ -1017,66 +1017,125 @@ $("#daly-search").onclick = async () => {
 };
 
 /* ---------- Adaugă dispozitiv: ce e nou pe cablu (căutat singur) + căutare prin Bluetooth, apoi tipul BMS ---------- */
-const da = { cable: null, ble: null, types: [], timer: 0 };
+const da = { mode: null, man: {}, res: null, types: [], timer: 0 };
 const INV_TYPES = new Set(["growatt_spf", "deye", "voltronic", "srne", "sim_growatt"]);
 const DA_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", pace: "PACE", growatt_spf: "Invertor Growatt SPF",
   deye: "Invertor Deye", voltronic: "Invertor Easun / Voltronic", srne: "Invertor Easun SMG / SRNE" };
-function devAddOpen() {
-  da.ble = null;
-  $("#da-ble-list").innerHTML = ""; $("#da-form").hidden = true;
-  $("#da-ble-msg").textContent = "Un modul conectat acum la aplicația de pe telefon nu apare; închide-o înainte.";
-  devScan("cable");
+// „Adaugă dispozitiv”: ca în ghid — automat sau manual (tipul, modelul, conexiunea), câte un dispozitiv odată
+async function devAddOpen() {
+  da.mode = null; da.man = {}; da.res = null;
+  $("#da-form").hidden = true;
+  try { su.cat = su.cat || (await api("/api/setup/catalog")); } catch { su.cat = { catalog: [], links: {} }; }
+  devRender();
 }
-async function devScan(what) {
-  try {
-    const j = await api("/api/devices/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ what }) });
-    devScanShow(j);
-  } catch {}
+function devItem(f, i, src) {
+  const name = src === "ble" ? f.name : f.label;
+  const sub = src === "ble" ? `Bluetooth · semnal ${f.rssi ?? "–"} dBm${f.guess ? ` · pare ${esc(DA_NAME[f.guess] || f.guess)}` : ""}`
+    : `${esc(f.link || "cablu")}${f.short ? " · " + esc(f.short) : ""}`;
+  return `<button class="row row-link" data-pick="${src}:${i}"><span><b>${esc(name)}</b>
+    ${f.check && Object.keys(f.check).length ? `<small class="t">${esc(suCheck(f.check))} — corect?</small>` : ""}</span>
+    <span class="t">${sub} · atinge ca să-l adaugi ›</span></button>`;
 }
-function devScanShow(j) {
-  clearTimeout(da.timer);
-  const running = j.state === "running";
-  $("#da-ble").disabled = running;
-  $("#da-cable-again").hidden = running;
-  if (j.what === "cable") {
-    if (running) { $("#da-cable-msg").textContent = j.message || "Caut…"; $("#da-cable").innerHTML = ""; }
-    else if (j.state === "failed") $("#da-cable-msg").textContent = j.message;
-    else {
-      da.cable = j.found || [];
-      $("#da-cable-msg").textContent = da.cable.length ? "" : (j.ports || []).length
-        ? "Niciun dispozitiv nou pe porturile USB libere." : "Niciun adaptor USB nou legat la Pi.";
-      $("#da-cable").innerHTML = da.cable.map((f, i) => `<button class="row row-link" data-cable="${i}"><span><b>${esc(f.label)}</b></span>
-        <span class="t">cablu ${esc(f.short)}${f.baudrate ? ` · ${f.baudrate} baud` : ""} · atinge ca să-l adaugi ›</span></button>`).join("");
-      $$("[data-cable]").forEach((b) => (b.onclick = () => devForm({ ...da.cable[+b.dataset.cable] })));
-    }
+function devRender() {
+  const b = $("#da-body"), r = da.res, running = r?.state === "running", cat = su.cat.catalog;
+  let h = "";
+  if (!da.mode) {
+    h = `<p class="note">Cum vrei să găsim dispozitivul nou?</p><div class="su-mode">
+      <button data-dm="auto"><b>Configurare automată</b><small>Amper caută pe porturile USB libere și prin Bluetooth și îți arată ce a găsit.</small></button>
+      <button data-dm="manual"><b>Configurare manuală</b><small>Alegi tu ce adaugi (invertor sau BMS), modelul și conexiunea; Amper caută doar asta.</small></button></div>`;
   } else {
-    $("#da-ble").textContent = running ? "Caut… (10 s)" : da.ble ? "Caută din nou prin Bluetooth" : "Caută prin Bluetooth";
-    if (j.state === "failed") $("#da-ble-msg").textContent = j.message;
-    if (j.state === "done") {
-      da.ble = j.found || []; da.types = j.types || [];
-      $("#da-ble-msg").textContent = da.ble.length ? "Alege modulul pe care vrei să-l adaugi." : "N-am găsit niciun modul Bluetooth nou în jur.";
-      $("#da-ble-list").innerHTML = da.ble.map((f, i) => `<button class="row row-link" data-ble="${i}"><span><b>${esc(f.name)}</b></span>
-        <span class="t">${esc(f.ble)} · semnal ${f.rssi ?? "–"} dBm${f.guess ? ` · pare ${esc(DA_NAME[f.guess] || f.guess)}` : ""} ›</span></button>`).join("");
-      $$("[data-ble]").forEach((b) => (b.onclick = () => devForm({ ...da.ble[+b.dataset.ble], link: "Bluetooth" })));
+    h = `<p class="note"><a href="#" class="su-up" data-dup="back">‹ Înapoi</a></p>`;
+    if (da.mode === "auto") {
+      h += `<p class="su-stage">Configurare automată</p>
+        <div class="card su-info"><b>Înainte de căutare</b><p>Leagă cablul USB al dispozitivului nou și pornește modulul lui Bluetooth.
+          Un modul conectat acum la aplicația de pe telefon nu apare; închide-o înainte.</p></div>
+        <button class="btn" id="da-scan" ${running ? "disabled" : ""}>${running ? "Caut…" : r ? "Caută din nou" : "Caută dispozitivele"}</button>`;
+    } else if (!da.man.kind) {
+      h += `<p class="su-stage">Configurare manuală</p><p class="note">Ce adaugi?</p><div class="su-mode">
+        <button data-dk="inverter"><b>Invertor</b><small>Growatt, Deye, Easun…</small></button>
+        <button data-dk="bms"><b>Baterie / BMS</b><small>Daly, JK, Seplos, PACE…</small></button></div>`;
+    } else {
+      const e = cat.find((x) => x.id === da.man.model && x.kind === da.man.kind);
+      h += `<p class="su-stage">Configurare manuală · ${da.man.kind === "inverter" ? "Invertor" : "Baterie / BMS"}</p>`;
+      if (!e) h += `<div class="list">${cat.filter((x) => x.kind === da.man.kind).map((x) => `<button class="row su-model" data-model="${x.id}" ${x.supported ? "" : "disabled"}>
+          <span><b>${esc(x.brand)}</b> · ${esc(x.model)}</span><span class="t">${x.supported ? "›" : "în curând"}</span></button>`).join("")}</div>`;
+      else {
+        const link = da.man.link || e.links[0];
+        h += `<div class="card su-pick"><b>${esc(e.brand)} · ${esc(e.model)}</b><span class="su-l">Tipul conexiunii</span>
+          <div class="su-links">${e.links.map((l) => `<button class="${l === link ? "on" : ""}" data-link="${l}">${esc(su.cat.links[l] || l)}</button>`).join("")}</div>
+          ${e.hint ? `<p class="note">${esc(e.hint)}</p>` : ""}
+          ${e.address && link === "cable" ? suField("da-addr", "Adresa (din comutatoarele DIP), dacă o știi",
+            `type="number" inputmode="numeric" min="0" max="15" placeholder="toate (0–15)" value="${da.man.address ?? ""}"`) : ""}
+          <button class="btn" id="da-scan" ${running ? "disabled" : ""}>${running ? "Caut…" : `Caută ${esc(e.brand)}`}</button></div>`;
+      }
+    }
+    h += `<p class="note" id="da-msg2">${esc(running ? r.message : r?.state === "failed" ? r.message : r?.ble_note || r?.error || "")}</p>`;
+    if (r?.state === "done") {
+      const cable = r.found || [], ble = r.ble || [];
+      const inv = cable.map((f, i) => [f, i]).filter(([f]) => suKind(f) === "inverter");
+      const bms = cable.map((f, i) => [f, i]).filter(([f]) => suKind(f) !== "inverter");
+      const any = cable.length || ble.length;
+      if (inv.length) h += `<h3 class="su-h">Invertor</h3><div class="list">${inv.map(([f, i]) => devItem(f, i, "cable")).join("")}</div>`;
+      if (bms.length || ble.length) h += `<h3 class="su-h">BMS / acumulatori</h3><div class="list">${bms.map(([f, i]) => devItem(f, i, "cable")).join("")}${ble.map((f, i) => devItem(f, i, "ble")).join("")}</div>`;
+      if (!any) h += `<div class="empty">N-am găsit nimic nou. Verifică cablul și că dispozitivul e pornit${da.mode === "auto"
+        ? `, sau încearcă <a href="#" class="su-up" data-dup="manual">configurarea manuală</a>` : `, sau încearcă <a href="#" class="su-up" data-dup="auto">configurarea automată</a>`}.</div>`;
     }
   }
-  if (running) da.timer = setTimeout(async () => { try { devScanShow(await api("/api/devices/scan")); } catch {} }, 1500);
-  else if (j.what === "cable") $("#da-cable-again").hidden = false;
+  b.innerHTML = h;
+  $$("[data-dm]", b).forEach((x) => (x.onclick = () => { da.mode = x.dataset.dm; da.man = {}; da.res = null; devRender(); }));
+  $$("[data-dk]", b).forEach((x) => (x.onclick = () => { da.man = { kind: x.dataset.dk }; da.res = null; devRender(); }));
+  $$(".su-model", b).forEach((x) => (x.onclick = () => { da.man.model = x.dataset.model; da.man.link = null; da.res = null; devRender(); }));
+  $$("[data-link]", b).forEach((x) => (x.onclick = () => { da.man.link = x.dataset.link; da.res = null; devRender(); }));
+  $$("[data-dup]", b).forEach((x) => (x.onclick = (ev) => {
+    ev.preventDefault();
+    const up = x.dataset.dup;
+    $("#da-form").hidden = true; da.res = running ? da.res : null;
+    if (up !== "back") { da.mode = up; da.man = {}; }
+    else if (da.mode === "manual" && da.man.model) { da.man.model = null; da.man.link = null; }
+    else if (da.mode === "manual" && da.man.kind) da.man = {};
+    else da.mode = null;
+    devRender();
+  }));
+  $$("[data-pick]", b).forEach((x) => (x.onclick = () => {
+    const [src, i] = x.dataset.pick.split(":");
+    if (src === "ble") devForm({ ...r.ble[+i], link: "Bluetooth" });
+    else { const f = { ...r.found[+i] }; devForm(f.ble ? { ...f, link: "Bluetooth", known: true } : f); }
+  }));
+  if ($("#da-scan")) $("#da-scan").onclick = devScan;
 }
-$("#da-ble").onclick = () => devScan("ble");
-$("#da-cable-again").onclick = () => devScan("cable");
+async function devScan() {
+  let body = { mode: "auto" };
+  if (da.mode === "manual") {
+    const e = su.cat.catalog.find((x) => x.id === da.man.model);
+    da.man.address = $("#da-addr") ? $("#da-addr").value : null;
+    body = { model: e.id, link: da.man.link || e.links[0], address: da.man.address };
+  }
+  $("#da-form").hidden = true;
+  try {
+    const j = await api("/api/devices/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (j.error) { da.res = { state: "failed", message: j.error }; return devRender(); }
+    devPoll(j);
+  } catch {}
+}
+function devPoll(j) {
+  clearTimeout(da.timer);
+  da.res = j;
+  if (j.ble && j.types) da.types = j.types;
+  devRender();
+  if (j.state === "running") da.timer = setTimeout(async () => { try { devPoll(await api("/api/devices/scan")); } catch {} }, 1500);
+}
 
 // formularul: la Bluetooth, întâi tipul BMS-ului; apoi numele și capacitatea
 function devForm(c) {
   const f = $("#da-form"), ble = c.link === "Bluetooth";
   if (ble && !c.type) c.type = c.guess || "daly";
-  const types = ble ? da.types : [];
+  const types = ble && !c.known ? da.types : [];
   const pack = () => !INV_TYPES.has(c.type);
   const draw = () => {
     const t = types.find((x) => x.type === c.type);
-    const ok = !ble || t?.supported;
+    const ok = !ble || !types.length || t?.supported;
     f.innerHTML = `<h3>${esc(ble ? c.name : c.label)}</h3>
-      ${ble ? `<p class="note">Ce BMS este?</p><div class="da-types">${types.map((x) => `<label class="row-check ${x.supported ? "" : "dis"}">
+      ${types.length ? `<p class="note">Ce BMS este?</p><div class="da-types">${types.map((x) => `<label class="row-check ${x.supported ? "" : "dis"}">
         <input type="radio" name="da-type" value="${esc(x.type)}" ${x.type === c.type ? "checked" : ""}>
         <span><b>${esc(x.label)}</b>${x.supported ? "" : "<small>Nu e suportat încă — spune-i autorului ce model ai.</small>"}</span></label>`).join("")}</div>` : ""}
       ${ok ? `<label class="su-l" for="da-name">Nume</label><input class="ed-in" id="da-name" maxlength="40" placeholder="de ex. ${esc(DA_NAME[c.type] || "")} 4">

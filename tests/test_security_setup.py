@@ -374,3 +374,29 @@ def test_probe_only_tries_the_chosen_type(monkeypatch):
     monkeypatch.setattr(growatt_spf, "GrowattSPFDriver", Fake)
     assert cli.probe("/dev/x", only={"growatt_spf"}) == []
     assert calls == ["growatt_spf"]
+
+
+def test_add_device_scan_modes(tmp_path, monkeypatch):
+    """„Adaugă dispozitiv”: modelul ales din listă trece la `setup_scan.scan`, automat = cablu + Bluetooth."""
+    import asyncio as _a
+    from amper import setup_scan
+    calls = []
+    monkeypatch.setattr(setup_scan, "scan", lambda cfg, progress, secs, model, link, address:
+                        calls.append((model, link, address)) or {"found": [{"type": "deye", "label": "Invertor Deye"}], "ports": []})
+    monkeypatch.setattr(setup_scan, "scan_cable", lambda cfg, progress: {"found": [], "ports": []})
+    monkeypatch.setattr(setup_scan, "scan_ble", lambda cfg: {"found": [{"name": "DL-1", "ble": "AA"}], "types": []})
+
+    async def steps(c, eng, n):
+        out = []
+        for body in ({"model": "deye", "link": "cable", "address": ""}, {"mode": "auto"}):
+            await c.post("/api/devices/scan", json=body)
+            for _ in range(50):
+                j = await (await c.get("/api/devices/scan")).json()
+                if j["state"] != "running":
+                    break
+                await _a.sleep(0.05)
+            out.append(j)
+        return out
+    model, auto = run({}, steps, tmp_path)
+    assert calls == [("deye", "cable", None)] and model["found"][0]["type"] == "deye"
+    assert auto["ble"][0]["name"] == "DL-1" and auto["found"] == []
