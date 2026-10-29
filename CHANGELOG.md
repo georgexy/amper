@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.8 — în pregătire
+## 1.0.0-beta.8 — 2026-10-29
 - Actualizări: istoricul și „Revino la versiunea anterioară” s-au mutat într-un ecran separat, „Istoric versiuni”.
 - Mesajele de la Actualizări spun „server” în loc de GitHub.
 - Tema Flux: ecranul principal încape pe telefon fără glisare (și pe ecrane mici, ca iPhone SE). Căsuțele de jos
@@ -18,6 +18,11 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Daly prin Bluetooth: când se pierd tensiuni de celule (ex. 10 din 16), citirea se reîncearcă o dată, apoi se
   păstrează ultimele complete (cel mult 2 minute, cu „de acum N s”). Nu se mai calculează minim/maxim/diferență din
   celule lipsă; tensiunea, curentul și SOC-ul rămân valide. La fel pe cablu.
+- Alerte: când adaptorul USB al unor dispozitive e scos din Pi (portul nu mai există), apare o singură alertă
+  „Adaptorul … e deconectat”, nu câte una pentru fiecare dispozitiv. Cu „Deconectează” pe fiecare dispozitiv,
+  alerta dispare după ultimul.
+- Protecții BMS: alerta și fișa modulului spun dacă BMS-ul chiar a oprit încărcarea/descărcarea (MOSFET oprit)
+  sau doar semnalează protecția, cu MOSFET-urile încă pornite.
 
 ## 1.0.0-beta.7 — 2026-10-29
 - Reparat: la setările de echilibrare ale BMS-ului Daly, aplicația spunea „BMS-ul arată altceva decât s-a trimis”

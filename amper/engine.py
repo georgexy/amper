@@ -29,13 +29,18 @@ class DeviceState:
         self.seen_at: float | None = None    # ultimul răspuns (ora sistemului), pentru deconectarea automată
         self.gen = 0          # crește la deconectare: o citire pornită înainte nu mai e luată în seamă
 
+    def port_missing(self) -> bool:
+        """Portul serial din config nu mai există (adaptorul USB scos din Pi)."""
+        port = str(self.cfg.get("port") or "")
+        return port.startswith("/dev/") and not os.path.exists(port)
+
     def to_dict(self, now: float, stale_after: float) -> dict:
         r = self.reading.to_dict() if self.reading else None
         if r:
             r.get("raw", {}).pop("regs", None)
         return dict(id=self.cfg["id"], name=self.cfg.get("name", self.cfg["id"]), type=self.cfg["type"],
                     kind=self.driver.kind, reading=r, last_ok=self.last_ok, error=self.error,
-                    connected=self.connected,
+                    connected=self.connected, port=self.cfg.get("port"), port_missing=self.port_missing(),
                     stale=self.last_ok is None or now - self.last_ok > stale_after,
                     capacity_ah=self.cfg.get("capacity_ah") or (r or {}).get("capacity_ah"))
 

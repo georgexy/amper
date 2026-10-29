@@ -25,6 +25,8 @@ class Condition:
     message: str
     hold: float = 0          # secunde de persistență înainte de alertă
     notify_clear: bool = True   # trimite și „Rezolvat” când condiția trece
+    members: tuple = ()      # dispozitivele cuprinse (alerta „adaptor deconectat”, pe port)
+    replaces: tuple = ()     # chei de alerte pe care le înlocuiește: se închid în tăcere
 
 
 @dataclass
@@ -37,6 +39,17 @@ class ActiveAlert:
     extra: dict = field(default_factory=dict)
 
 
+def mos_note(r: dict) -> str:
+    """Dacă protecția raportată chiar a tăiat ceva: starea MOSFET-urilor (văzut 2026-10-29: Daly 2 a raportat
+    „SOC mic (nivel 2)”, dar MOSFET-ul de descărcare a rămas pornit; Daly 1 l-a oprit)."""
+    off = [w for k, w in (("charge_mos", "încărcarea"), ("discharge_mos", "descărcarea")) if r.get(k) is False]
+    if off:
+        return f" (BMS-ul a oprit {' și '.join(off)})"
+    if r.get("charge_mos") and r.get("discharge_mos"):
+        return " (MOSFET-urile sunt pornite: doar semnal de la BMS, nu a tăiat nimic)"
+    return ""
+
+
 def evaluate(snapshot: dict, cfg: dict, now: float) -> list[Condition]:
     """Calculează condițiile active din starea curentă (snapshot-ul motorului)."""
     a = cfg
@@ -47,15 +60,33 @@ def evaluate(snapshot: dict, cfg: dict, now: float) -> list[Condition]:
     names = {d: v["name"] for d, v in devices.items()}
 
     # --- comunicație pierdută ---
+    # Adaptorul USB scos (portul nu mai există): o singură alertă pe port, nu câte una pe fiecare dispozitiv
+    # (văzut 2026-10-28: 3 Seplos pe același adaptor scos → 3 alerte critice).
+    lost: dict[str, float] = {}
     for d, v in devices.items():
         if not v.get("connected", True):      # nelegat încă (n-a răspuns niciodată)
             continue
         last = v.get("last_ok")
         age = now - last if last else now - snapshot["started"]
         if age > a["comm_lost_seconds"]:
-            out.append(Condition(f"comm:{d}", "comm_lost", d, "critical",
-                                 f"{names[d]}: nu mai comunică de {int(age // 60)} min"
-                                 + (f" ({v['error']})" if v.get("error") else "")))
+            lost[d] = age
+    by_port: dict[str, list[str]] = {}
+    for d in lost:
+        if devices[d].get("port_missing"):
+            by_port.setdefault(devices[d]["port"], []).append(d)
+    for port, ids in by_port.items():
+        ids.sort()
+        out.append(Condition(f"comm:port:{port}", "comm_lost", None, "critical",
+                             f"Adaptorul {port.rsplit('/', 1)[-1]} e deconectat de la Pi — "
+                             f"{', '.join(names[d] for d in ids)} nu comunică de {int(max(lost[d] for d in ids) // 60)} min",
+                             members=tuple(ids), replaces=tuple(f"comm:{d}" for d in ids)))
+    for d, age in lost.items():
+        if devices[d].get("port_missing"):
+            continue
+        v = devices[d]
+        out.append(Condition(f"comm:{d}", "comm_lost", d, "critical",
+                             f"{names[d]}: nu mai comunică de {int(age // 60)} min"
+                             + (f" ({v['error']})" if v.get("error") else "")))
 
     bank = snapshot.get("bank", {})
     bank_charging = (bank.get("current") or 0) > a["bank_charging_amps"]
@@ -113,7 +144,7 @@ def evaluate(snapshot: dict, cfg: dict, now: float) -> list[Condition]:
         # --- raportate de BMS: protecții/defecte (critice) și alarme (avertismente) ---
         if r.get("protections"):
             out.append(Condition(f"bmsprot:{d}", "bms_protection", d, "critical",
-                                 f"{n}: PROTECȚIE BMS — " + "; ".join(r["protections"][:4]), hold=10))
+                                 f"{n}: PROTECȚIE BMS — " + "; ".join(r["protections"][:4]) + mos_note(r), hold=10))
         if r.get("alarms"):
             out.append(Condition(f"bms:{d}", "bms_alarm", d, "warning",
                                  f"{n}: avertisment BMS — " + "; ".join(r["alarms"][:4]), hold=30))
@@ -215,6 +246,12 @@ class AlertManager:
         fired = {k for k, a in self.active.items() if a.fired}
         conds.update({c.key: c for c in evaluate_user(self.user_rules(), snapshot, fired)})
 
+        for c in list(conds.values()):
+            for k in c.replaces:                # alertele înlocuite (ex. per dispozitiv → pe adaptor): fără „Rezolvat”
+                old = self.active.pop(k, None)
+                if old and old.fired and old.db_id:
+                    self.db.close_alert(old.db_id, int(now))
+
         for key, c in conds.items():
             act = self.active.get(key)
             if act is None:
@@ -278,7 +315,10 @@ class AlertManager:
         """Dispozitiv deconectat din aplicație: alertele lui se închid în tăcere (fără „✅ Rezolvat”)."""
         now = now or time.time()
         n = 0
-        for key in [k for k, a in self.active.items() if a.cond.device == device]:
+        for key, a in list(self.active.items()):    # alerta pe adaptor: rămâne cât mai are alte dispozitive
+            if device in a.cond.members and len(a.cond.members) > 1:
+                a.cond.members = tuple(m for m in a.cond.members if m != device)
+        for key in [k for k, a in self.active.items() if a.cond.device == device or a.cond.members == (device,)]:
             act = self.active.pop(key)
             if act.fired and act.db_id:
                 self.db.close_alert(act.db_id, int(now))

@@ -1447,7 +1447,11 @@ function renderSheet() {
       : "BMS-ul nu a trimis tensiunile pe celule.";
     $("#sh-cells").innerHTML = "";
   }
-  $("#sh-alarms").innerHTML = (r.protections || []).map((a) => `<li class="prot">Protecție: ${esc(a)}</li>`).join("") +
+  // protecția raportată a tăiat chiar ceva, sau e doar semnalul BMS-ului (MOSFET-urile încă pornite)?
+  const cut = [r.charge_mos === false && "încărcarea", r.discharge_mos === false && "descărcarea"].filter(Boolean);
+  const mosNote = !r.protections?.length ? "" : cut.length ? `<li class="prot">BMS-ul a oprit ${cut.join(" și ")} (MOSFET OPRIT).</li>`
+    : r.charge_mos && r.discharge_mos ? "<li>MOSFET-urile sunt pornite: protecția e doar semnalată de BMS, nu a tăiat nimic.</li>" : "";
+  $("#sh-alarms").innerHTML = (r.protections || []).map((a) => `<li class="prot">Protecție: ${esc(a)}</li>`).join("") + mosNote +
     (r.alarms || []).map((a) => `<li>${esc(a)}</li>`).join("");
   $("#sh-upd").textContent = d.last_ok ? `Actualizat ${ago(d.last_ok)}` : "";
 }

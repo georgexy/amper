@@ -187,6 +187,10 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   3,55/3,60/2,95/2,85 V, 0x5A = 57,0/57,5/47,0/45,6 V.
 - Celule lipsă la 0x95 (Daly 3 BLE, 2026-10-29: 15/12/10 din 16): `DalyProtocol._read_cells` reîncearcă o dată, apoi
   ultimele complete ≤ `CELLS_KEEP_S` (120 s) cu `raw.cells_age`/`cells_missing`, altfel `cells = []`.
+- Adaptor scos (1.0.0-beta.8): `DeviceState.port_missing()` (port /dev/… inexistent) → `alerts.evaluate` dă o singură
+  condiție `comm:port:<port>` (rule comm_lost, device None, `members`, `replaces` = cheile comm:<id>, închise în
+  tăcere). `drop_device` scoate dispozitivul din `members`; alerta se închide în tăcere la ultimul.
+- `alerts.mos_note`: la `bms_protection` se spune dacă MOSFET-ul e chiar oprit sau e doar semnal (Daly 2, 2026-10-29).
 - 2026-10-28 (1.0.0-beta.7): la 0x5F octeții 4..7 se schimbă singuri între citiri (Daly 1: `…00014b32` →
   `…700c7232`); `write_field` compară acum doar octeții câmpului (restul → doar avertisment în jurnal). Scrierea
   bal_start 3,40 V / bal_diff 20 mV s-a aplicat pe 3 Daly (firmware 31_2306, 31_2207, 11_2506).
@@ -431,7 +435,7 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - 1.0.0-beta.8 (în pregătire): în aplicație NU apare cuvântul GitHub (mesajele `UpdateError` din `update.py` spun
   „server”/„serverul de actualizări”). Actualizări: buton „Istoric versiuni” → panoul `set-uphist` (`#up-prev` +
   `#up-hist`, înapoi → update).
-- 1.0.0-beta.8 (în pregătire): Flux compact (cerut 2026-10-29). Prima variantă (bateria cu text alături + 4 căsuțe pe
+- 1.0.0-beta.8: Flux compact (cerut 2026-10-29). Prima variantă (bateria cu text alături + 4 căsuțe pe
   un rând) și alte 4 machete au fost respinse: utilizatorul a cerut FĂRĂ căsuțe, fiecare valoare la nodul ei —
   `.f-node .t` (`tpv` sub Panouri, `tld` sub Consum casă, `tgr` sub Rețea); autonomia = `eta` sub baterie. Bateria
   rămâne centrată (96×112). Liniile pv/load pornesc de la y 156 (sub textul nou). Încape pe 390×664 și, cu
