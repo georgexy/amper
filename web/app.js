@@ -415,29 +415,25 @@ function drawDay(svg) {
 /* ---------- tema Flux de energie ---------- */
 // coordonate în viewBox 360 × 330; bateria e sub diagramă
 const FLUX = {
-  pv: "M72 128 C72 182 128 205 152 213", load: "M208 213 C232 205 288 182 288 128",
+  pv: "M72 156 C72 194 128 205 152 213", load: "M208 213 C232 205 288 194 288 156",
   bat: "M180 247 L180 330", grid: "M58 290 C100 290 148 262 160 240",
 };
 const flux = {
-  html: () => `
-    <div class="f-inv" data-k="inv" data-open="inverter" role="button" tabindex="0"></div>
+  html: () => `<div class="f-wrap">
     <div class="f-diag">
       <svg class="lines" viewBox="0 0 360 330">${Object.entries(FLUX).map(([k, d]) =>
         `<path class="ln" data-ln="${k}" d="${d}"/><path class="dots" data-dots="${k}" d="${d}"/>`).join("")}</svg>
-      <div class="f-node" style="left:20%;top:19%;--c:var(--sun)"><div class="disc">${icon("sun")}</div><div class="w" data-k="pv">–</div><div class="l">Panouri ${PV_I}</div></div>
-      <div class="f-node" style="left:80%;top:19%;--c:var(--load)"><div class="disc">${icon("home")}</div><div class="w" data-k="load">–</div><div class="l">Consum casă</div></div>
+      <div class="f-node" style="left:20%;top:19%;--c:var(--sun)"><div class="disc">${icon("sun")}</div><div class="w" data-k="pv">–</div><div class="l">Panouri ${PV_I}</div><div class="t" data-k="tpv"></div></div>
+      <div class="f-node" style="left:80%;top:19%;--c:var(--load)"><div class="disc">${icon("home")}</div><div class="w" data-k="load">–</div><div class="l">Consum casă</div><div class="t" data-k="tld"></div></div>
       <div class="f-node sm" data-open="inverter" role="button" tabindex="0" aria-label="Invertor" style="left:50%;top:69%;--c:var(--cell)"><div class="disc" style="width:64px;height:64px">${icon("inv")}</div></div>
-      <div class="f-node sm" data-k-cls="grid" style="left:11%;top:88%;--c:var(--muted)"><div class="disc">${icon("grid")}</div><div class="l" data-k="grid">Rețea</div></div>
-      <div class="f-blabel" data-k="bat" style="left:53%;top:87%"></div>
+      <div class="f-node sm" data-k-cls="grid" style="left:11%;top:88%;--c:var(--muted)"><div class="disc">${icon("grid")}</div><div class="l" data-k="grid">Rețea</div><div class="t" data-k="tgr"></div></div>
+      <div class="f-inv" data-k="inv" data-open="inverter" role="button" tabindex="0" style="left:62%;top:71%"></div>
     </div>
     <button class="f-batt" data-open="packs" aria-label="Bateria — vezi pachetele">
-      <div class="f-cap"></div><div class="f-cell"><div class="f-fill"></div><b><span data-k="soc">–</span>%</b></div>
-      <div class="k" data-k="kwh"></div><div class="s" data-k="eta"></div><span class="health" data-k="health"></span>
-    </button>
-    <div class="f-cards"><div class="card"><span>Produs azi</span><b data-k="tpv">–</b></div>
-      <div class="card"><span>Din rețea azi</span><b data-k="tgr">–</b></div>
-      <div class="card"><span>Consumat azi</span><b data-k="tld">–</b></div>
-      <div class="card"><span>Autonomie</span><b data-k="aut">–</b></div></div>`,
+      <div class="f-bl"><span data-k="flow"></span><b data-k="bw"></b><span data-k="etal"></span><b data-k="eta"></b></div>
+      <div class="f-bico"><div class="f-link"></div><div class="f-cap"></div><div class="f-cell"><div class="f-fill"></div><b><span data-k="soc">–</span>%</b></div></div>
+      <div class="f-br"><span>Total:</span><b data-k="cap"></b><span>Actual:</span><b data-k="kwh"></b></div>
+    </button></div>`,
   update(root, h) {
     const { b, ir, bp } = h;
     const ac = ir?.ac_in_power || 0;
@@ -454,26 +450,34 @@ const flux = {
       dots.classList.toggle("rev", !!rev);
       dots.style.setProperty("--dur", `${Math.max(0.7, 3 - (w || 0) / 1500).toFixed(1)}s`);
     }
+    // legătura invertor → baterie continuă sub diagramă, până la baterie
+    const link = root.querySelector(".f-link"), [bw, bc, brev] = flows.bat;
+    link.style.setProperty("--lc", bc); link.classList.toggle("on", bw > 20); link.classList.toggle("rev", !!brev);
     root.querySelector(".f-diag").className = `f-diag mode-${h.mode}`;
     put(root, "pv", watts(ir?.pv_power));
     put(root, "load", watts(ir?.load_power));
-    put(root, "bat", bp == null || Math.abs(bp) <= 20 ? "" : watts(Math.abs(bp)));
     const gridOn = ir?.ac_in_voltage > 50;
     root.querySelector('[data-k-cls="grid"]').classList.toggle("dim", !gridOn);
-    put(root, "grid", `Rețea<br>${ir?.ac_in_voltage == null ? "–" : num(ir.ac_in_voltage, 0) + " V"}`);
-    put(root, "inv", ir ? `Invertor: <b>${esc(ir.status || "–")}</b><br>${num(ir.inverter_temp, 0)} °C · ${num(ir.output_voltage, 0)} V · ${num(ir.output_freq, 1)} Hz`
+    put(root, "grid", ir?.ac_in_voltage == null ? "Rețea" : `Rețea<br>${num(ir.ac_in_voltage, 0)} V`);
+    put(root, "inv", ir ? `Invertor · ${num(ir.inverter_temp, 0)} °C<b>${esc(ir.status || "–")}</b>`
       : h.inv ? `${esc(h.inv.name)}: fără date` : "");
     modeClass(root.querySelector(".f-batt"), h, "f-batt");
     root.querySelector(".f-fill").style.height = `calc(${Math.max(0, Math.min(100, b.soc ?? 0))}% - 12px)`;
     put(root, "soc", b.soc == null ? "–" : num(b.soc, 0));
-    put(root, "kwh", b.kwh == null ? h.modeText : `${num(b.kwh, 1)} kWh · ${h.modeText[0].toLowerCase() + h.modeText.slice(1)}`);
-    put(root, "eta", [h.eta, b.voltage ? num(b.voltage, 1) + " V" : ""].filter(Boolean).join(" · "));
-    put(root, "health", h.health.text);
-    root.querySelector('[data-k="health"]').className = "health " + h.health.cls;
-    put(root, "tpv", kv(h.today.pv_kwh, "kWh", 1));
-    put(root, "tld", kv(h.today.load_kwh, "kWh", 1));
-    put(root, "tgr", h.today.pv_kwh == null ? "–" : kv(h.today.ac_in_kwh || 0, "kWh", 1));
-    put(root, "aut", h.autonomy == null ? "–" : `~${duration(h.autonomy)}`);
+    // stânga bateriei, ca dreapta: eticheta ștearsă, valoarea albă dedesubt
+    const moving = h.mode !== "idle" && bp != null, chg = h.mode === "charging";
+    put(root, "flow", moving ? (chg ? "Se încarcă:" : "Se descarcă:") : "Stare:");
+    put(root, "bw", moving ? watts(Math.abs(bp)) : esc(h.modeText));
+    const full = moving && b.hours ? duration(b.hours).replace(/(\d) (h|min|zile|zi)\b/g, "$1\u00a0$2") : "";
+    put(root, "etal", full ? (chg ? "Încărcare completă:" : "Descărcare completă:") : "");
+    put(root, "eta", full);
+    put(root, "cap", kv(h.capKwh, "kWh", 1));
+    put(root, "kwh", kv(b.kwh, "kWh", 1));
+    // erorile nu apar sub baterie: se văd în ecranul Bateriile
+    const today = (label, v) => v == null ? "" : `${label} <b>${num(v, 1)} kWh</b>`;
+    put(root, "tpv", today("produs azi", h.today.pv_kwh));
+    put(root, "tld", today("consumat azi", h.today.load_kwh));
+    put(root, "tgr", today("din rețea azi", h.today.pv_kwh == null ? null : h.today.ac_in_kwh || 0));
   },
 };
 
@@ -560,6 +564,8 @@ function renderNow() {
 
 /* ------------------------------------------------------------------ ecranul BATERIILE */
 // Bluetooth: numele modulului (ca în aplicația Daly de pe telefon) și adresa — ca să știi care baterie e care
+// celulele din ultima citire completă (Daly: au lipsit cadre la citirea de acum)
+const cellsOld = (r) => (r.raw?.cells_age != null ? ` · <span class="old" title="Au lipsit celule (${esc(r.raw.cells_missing)}); arăt ultima citire completă">de acum ${r.raw.cells_age} s</span>` : "");
 function bleId(r) {
   const n = r.raw?.ble_name, mac = r.raw?.ble_mac;
   if (!n && !mac) return "";
@@ -601,7 +607,7 @@ function renderPacks() {
       <div class="soc">${r.soc == null ? "–" : num(r.soc, 0)}<sup>%</sup></div></div>
       ${cells.length ? `<div class="pk-cells">${cells.map((v) => `<i class="${hi - lo > 0.005 ? (v === hi ? "hi" : v === lo ? "lo" : "") : ""}"
         style="height:${Math.max(8, ((v - floor) / span) * 100)}%"></i>`).join("")}</div>` : ""}
-      <div class="ft"><span>${cells.length ? `${cells.length} celule · min <b>${num(lo, 3)}</b> · max <b>${num(hi, 3)}</b>` : ""}</span>
+      <div class="ft"><span>${cells.length ? `${cells.length} celule · min <b>${num(lo, 3)}</b> · max <b>${num(hi, 3)}</b>${cellsOld(r)}` : ""}</span>
       <span class="mos">${mos(r.charge_mos, "încărcare")}${mos(r.discharge_mos, "descărcare")}</span></div>`;
   }
 }
@@ -667,12 +673,12 @@ function openEdit(key) {
 function openEditor(x, target, write) {
   Object.assign(editor, { item: x, target, write });
   inv.edit = x;
-  $("#ed-title").textContent = x.group ? `${x.group}: ${x.label}` : x.label;
+  $("#ed-title").textContent = (x.group ? `${x.group}: ${x.label}` : x.label) + (x.role_text ? ` — ${x.role_text}` : "");
   $("#ed-now").innerHTML = `Acum: <b>${esc(x.text)}</b>`;
   $("#ed-field").innerHTML = x.kind === "enum"
     ? `<select id="ed-val" class="ed-in">${x.options.map(([v, t]) => `<option value="${v}" ${v === x.raw ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>`
     : `<div class="ed-num"><input id="ed-val" class="ed-in" type="number" inputmode="decimal" min="${x.min}" max="${x.max}" step="${x.step}" value="${x.value ?? ""}">
-       <span>${esc(x.unit)}</span></div><p class="note">Între ${num(x.min, decimals(x.step))} și ${num(x.max, decimals(x.step))} ${esc(x.unit)}.${x.role ? ` Acum e pragul de <b>${esc(x.role)}</b>.` : ""}</p>`;
+       <span>${esc(x.unit)}</span></div><p class="note">Între ${num(x.min, decimals(x.step))} și ${num(x.max, decimals(x.step))} ${esc(x.unit)}.${x.role ? ` Acest prag e <b>${esc(x.role_text || x.role)}</b>.` : ""}${x.alert ? `<br><b class="bad">${esc(x.alert)}</b>` : ""}</p>`;
   $("#ed-warn").hidden = !(x.risky || x.note);
   $("#ed-warn").innerHTML = (x.risky ? "<b>Atenție: setare cu risc.</b> " : "") + esc(x.note || (x.risky ? "O valoare greșită poate opri alimentarea sau afecta bateria." : ""));
   $("#ed-go").textContent = `Scrie în ${target}`;
@@ -762,12 +768,16 @@ async function loadBms() {
 }
 function renderBms() {
   const r = bms.data, groups = [...new Set(r.settings.map((x) => x.group))];
+  const alerts = r.settings.filter((x) => x.alert);
   $("#bms-list").innerHTML = (r.can_write ? "" : `<div class="banner warning"><b>Modificarea e dezactivată</b>
       <small>Setați o parolă pentru aplicație ca să poată fi schimbate setările.</small></div>`) +
+    (alerts.length ? `<div class="banner warning"><b>Praguri de verificat</b>${alerts.map((x) =>
+      `<small><b>${esc(x.group)}, ${esc(x.label.toLowerCase())}:</b> ${esc(x.alert)}</small>`).join("")}</div>` : "") +
     groups.map((g) => `<h2>${esc(g)}</h2><div class="list iv-set">${r.settings.filter((x) => x.group === g).map((x) => `
       <button class="row iv-row" data-key="${esc(x.key)}" ${r.can_write ? "" : "disabled"}>
         <span class="k">${esc(x.label)}${x.risky ? ' <i class="risk" title="Setare cu risc">!</i>' : ""}${x.role
-          ? ` <span class="role ${x.role === "protecție" ? "p" : ""}">${esc(x.role)}</span>` : ""}</span>
+          ? ` <span class="role ${x.role === "protecție" ? "p" : ""}" title="${esc(x.role_text || x.role)}">${esc(x.role_text || x.role)}</span>` : ""}${x.alert
+          ? '<small class="bad">protecția e mai puțin severă decât avertismentul</small>' : ""}</span>
         <span class="v">${esc(x.text)}</span>${r.can_write ? '<span class="ed">Modifică ›</span>' : ""}</button>`).join("")}</div>`).join("");
   $$(".iv-row", $("#bms-list")).forEach((el) => (el.onclick = () => {
     const x = bms.data.settings.find((s) => s.key === el.dataset.key);
@@ -1054,7 +1064,7 @@ $("#ed-go").onclick = async () => {
 
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "notif", "daly", "devoff", "devadd", "excl", "info", "update", "security", "remote", "auto", "about", "conn", "share", "wifi"])
+  for (const k of ["teme", "notif", "daly", "devoff", "devadd", "excl", "info", "update", "uphist", "security", "remote", "auto", "about", "conn", "share", "wifi"])
     $("#set-" + k).hidden = k !== name;
   if (name === "about") renderEdition();
   if (name === "share") loadShare();
@@ -1064,7 +1074,7 @@ function showPanel(name) {
   if (name === "security") loadSecurity();
   clearInterval(state.infoTimer);
   clearTimeout(upd.timer);
-  if (name === "update") loadUpdate();
+  if (name === "update" || name === "uphist") loadUpdate();
   if (name === "info") { loadInfo(); state.infoTimer = setInterval(() => !$("#set-info").hidden && loadInfo(), 5000); }
   if (name === "notif") renderNotif();
   if (name === "daly" || name === "devoff") renderDaly();
@@ -1281,6 +1291,7 @@ function renderUpdate() {
   $("#up-prev").hidden = !r.previous || running;
   if (r.previous) $("#up-prev-txt").textContent = `Revine la Amper ${r.previous.version || "anterior"}. Istoricul și setările rămân; se face totuși o copie înainte.`;
   const h = r.history || [];
+  $("#up-hist-sub").textContent = r.previous?.version ? `Actualizările făcute · poți reveni la ${r.previous.version}` : "Actualizările făcute";
   $("#up-hist").innerHTML = h.length ? h.map((x) => `<div class="row ${x.result === "ok" ? "" : "warning"}">
       <span><b>${x.kind === "rollback" ? "Revenire" : "Actualizare"} ${esc(x.from || "?")} → ${esc(x.version || "?")}</b> · ${UP_RESULT[x.result] || esc(x.result)}</span>
       <span class="t">${dateTime(x.at)}${x.result === "ok" ? "" : " · " + esc(x.message)}</span></div>`).join("")
@@ -1423,17 +1434,24 @@ function renderSheet() {
   if (cells.length) {
     const lo = Math.min(...cells), hi = Math.max(...cells);
     const floor = Math.min(lo, 3.0) - 0.05, top = Math.max(hi, 3.45) + 0.02;
-    $("#sh-cellnote").textContent = `min ${num(lo, 3)} V, max ${num(hi, 3)} V`;
+    $("#sh-cellnote").textContent = `min ${num(lo, 3)} V, max ${num(hi, 3)} V` + (r.raw?.cells_age != null
+      ? ` · ultima citire completă, de acum ${r.raw.cells_age} s (au lipsit celule: ${r.raw.cells_missing})` : "");
     $("#sh-cells").innerHTML = cells.map((v, i) => {
       const h = ((v - floor) / (top - floor)) * 100;
       const c = cells.length > 1 && hi - lo > 0.005 ? (v === hi ? "hi" : v === lo ? "lo" : "") : "";
       return `<div class="cellbar ${c}"><div class="tube"><i style="height:${h}%"></i></div><b>${num(v, 3).slice(0, 5)}</b>${i + 1}</div>`;
     }).join("");
   } else {
-    $("#sh-cellnote").textContent = "BMS-ul nu a trimis tensiunile pe celule.";
+    $("#sh-cellnote").textContent = r.raw?.cells_missing
+      ? `Citire incompletă a celulelor (${r.raw.cells_missing}); se reîncearcă la următoarea citire.`
+      : "BMS-ul nu a trimis tensiunile pe celule.";
     $("#sh-cells").innerHTML = "";
   }
-  $("#sh-alarms").innerHTML = (r.protections || []).map((a) => `<li class="prot">Protecție: ${esc(a)}</li>`).join("") +
+  // protecția raportată a tăiat chiar ceva, sau e doar semnalul BMS-ului (MOSFET-urile încă pornite)?
+  const cut = [r.charge_mos === false && "încărcarea", r.discharge_mos === false && "descărcarea"].filter(Boolean);
+  const mosNote = !r.protections?.length ? "" : cut.length ? `<li class="prot">BMS-ul a oprit ${cut.join(" și ")} (MOSFET OPRIT).</li>`
+    : r.charge_mos && r.discharge_mos ? "<li>MOSFET-urile sunt pornite: protecția e doar semnalată de BMS, nu a tăiat nimic.</li>" : "";
+  $("#sh-alarms").innerHTML = (r.protections || []).map((a) => `<li class="prot">Protecție: ${esc(a)}</li>`).join("") + mosNote +
     (r.alarms || []).map((a) => `<li>${esc(a)}</li>`).join("");
   $("#sh-upd").textContent = d.last_ok ? `Actualizat ${ago(d.last_ok)}` : "";
 }

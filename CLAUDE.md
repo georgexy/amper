@@ -179,8 +179,18 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - Setări BMS în aplicație (Bateriile → ⚙ pe fiecare Daly): `amper/daly_params.py` (`FIELDS`, limite LiFePO4 16S),
   `GET/POST /api/daly/<id>/settings` (scriere: parolă+cookie, jurnal `settings_log`, notificare). Scrierea = comanda
   de citire − 0x40 cu blocul întreg de 8 octeți, apoi citire înapoi și comparare — regula protocolului, NEVERIFICATĂ
-  — utilizatorul a confirmat pe 2026-10-26 că scrierea FUNCȚIONEAZĂ pe BMS-ul real. Rolul
-  avertisment/protecție al fiecărui prag se calculează din valorile perechii (ordinea diferă între blocuri).
+  — utilizatorul a confirmat pe 2026-10-26 că scrierea FUNCȚIONEAZĂ pe BMS-ul real. Rolul pragurilor = POZIȚIA
+  (1.0.0-beta.8, dovedit 2026-10-29: cell_lo_b 2,95 V → Daly 3 „celulă mică (nivel 2)” și a tăiat la 2,93–2,95 V):
+  [sus nivel 1, sus nivel 2, jos nivel 1, jos nivel 2], nivel 2 = protecție (taie). `CONFIRMED` = {0x59, 0x5A};
+  0x5B/0x5C „neconfirmat pe hardware”. `describe` dă `level`, `role_text`, `alert` (protecție mai puțin severă).
+  Valorile din fabrică Daly 1/3 (3,65/3,60, 2,30/2,80) sunt „inversate”. Setările actuale (toate 3): 0x59 =
+  3,55/3,60/2,95/2,85 V, 0x5A = 57,0/57,5/47,0/45,6 V.
+- Celule lipsă la 0x95 (Daly 3 BLE, 2026-10-29: 15/12/10 din 16): `DalyProtocol._read_cells` reîncearcă o dată, apoi
+  ultimele complete ≤ `CELLS_KEEP_S` (120 s) cu `raw.cells_age`/`cells_missing`, altfel `cells = []`.
+- Adaptor scos (1.0.0-beta.8): `DeviceState.port_missing()` (port /dev/… inexistent) → `alerts.evaluate` dă o singură
+  condiție `comm:port:<port>` (rule comm_lost, device None, `members`, `replaces` = cheile comm:<id>, închise în
+  tăcere). `drop_device` scoate dispozitivul din `members`; alerta se închide în tăcere la ultimul.
+- `alerts.mos_note`: la `bms_protection` se spune dacă MOSFET-ul e chiar oprit sau e doar semnal (Daly 2, 2026-10-29).
 - 2026-10-28 (1.0.0-beta.7): la 0x5F octeții 4..7 se schimbă singuri între citiri (Daly 1: `…00014b32` →
   `…700c7232`); `write_field` compară acum doar octeții câmpului (restul → doar avertisment în jurnal). Scrierea
   bal_start 3,40 V / bal_diff 20 mV s-a aplicat pe 3 Daly (firmware 31_2306, 31_2207, 11_2506).
@@ -422,4 +432,19 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - Site (2026-10-29): utilizatorul NU vrea nicio legătură spre GitHub pe site (scoase: ghidul README, licența, Întrebări,
   Codul sursă, suma de control, fallback-ul butonului). Butonul de descărcare e inactiv („vine în curând”) până când
   API-ul GitHub găsește `.img.xz` în ultima versiune stabilă; atunci duce direct la fișier (descărcare, nu pagină).
-
+- 1.0.0-beta.8 (în pregătire): în aplicație NU apare cuvântul GitHub (mesajele `UpdateError` din `update.py` spun
+  „server”/„serverul de actualizări”). Actualizări: buton „Istoric versiuni” → panoul `set-uphist` (`#up-prev` +
+  `#up-hist`, înapoi → update).
+- 1.0.0-beta.8: Flux compact (cerut 2026-10-29). Prima variantă (bateria cu text alături + 4 căsuțe pe
+  un rând) și alte 4 machete au fost respinse: utilizatorul a cerut FĂRĂ căsuțe, fiecare valoare la nodul ei —
+  `.f-node .t` (`tpv` sub Panouri, `tld` sub Consum casă, `tgr` sub Rețea); autonomia = `eta` sub baterie. Bateria
+  rămâne centrată (96×112). Liniile pv/load pornesc de la y 156 (sub textul nou). Încape pe 390×664 și, cu
+  `@media (max-height: 620px)`, pe 320×568 (iPhone SE). Măsurat cu Playwright (scrollHeight = innerHeight).
+  Sub baterie NU se afișează `health` (erorile; cerut 2026-10-29: se văd în Bateriile); `.k` 14 px, `.s` 12 px.
+  `.f-inv` (starea invertorului) e în `.f-diag`, lângă invertor (left 62%, top 71%; pe SE 78%). `.f-wrap` = coloană
+  flex `space-evenly` cu min-height 100dvh − 54 (antet) − 112 (bara de jos); `.f-diag` lățime
+  min(100%, 400px, (100dvh − 340px) × 1,09) → diagrama crește cu ecranul.
+  Bateria (cerut 2026-10-29): `.f-batt` = grilă `.f-bl` („Se descarcă:”/„Se încarcă:”/„Stare:” + `bw`;
+  „Descărcare/Încărcare completă:” + durata; etichete șterse, valori albe, ca dreapta; fără tensiune) | `.f-bico` | `.f-br`
+  („Total:” `capKwh`, „Actual:” `b.kwh`); `flex: 1` o împinge jos, iar `.f-link` (bară cu puncte animate, `--lc`)
+  continuă linia invertor → baterie. `.f-blabel` (puterea pe linie) scos: puterea e în stânga.

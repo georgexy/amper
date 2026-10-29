@@ -209,3 +209,45 @@ def test_clock_jump_does_not_disconnect_a_live_device():
     eng._clock_offset -= 7 * 86400                                            # ceasul sare 7 zile înainte
     eng.check_clock()
     assert eng.expire_devices() == [] and st.connected
+
+
+def lose(eng, t, ids, steps=30):
+    """`steps` × 10 s fără citiri de la `ids`; celelalte răspund."""
+    for _ in range(steps):
+        t += 10
+        for s in eng.devices.values():
+            if s.cfg["id"] not in ids:
+                s.last_ok = t
+        eng.alerts.process(eng.snapshot(now=t), now=t)
+    return t
+
+
+def test_unplugged_adapter_gives_one_alert_per_port():
+    eng = make_engine()
+    t = run_sim(eng, noon(), 60)
+    for d in ("daly1", "daly2"):
+        eng.devices[d].cfg["port"] = "/dev/null"                       # portul există: alerte pe dispozitiv
+    t = lose(eng, t, {"daly1", "daly2", "daly3"})
+    assert {a["key"] for a in eng.alerts.active_list()} >= {"comm:daly1", "comm:daly2", "comm:daly3"}
+    for d in ("daly1", "daly2"):
+        eng.devices[d].cfg["port"] = "/dev/amper-test-lipsa"            # adaptorul scos
+    sent = len(eng.notifier.sent)
+    t = lose(eng, t, {"daly1", "daly2", "daly3"})
+    comm = {a["key"]: a for a in eng.alerts.active_list() if a["rule"] == "comm_lost"}
+    assert set(comm) == {"comm:port:/dev/amper-test-lipsa", "comm:daly3"}    # una pe adaptor + daly3 (fără port)
+    assert "Adaptorul amper-test-lipsa e deconectat" in comm["comm:port:/dev/amper-test-lipsa"]["message"]
+    assert "Daly 1, Daly 2" in comm["comm:port:/dev/amper-test-lipsa"]["message"]
+    new = [n["message"] for n in eng.notifier.sent[sent:]]
+    assert not any("Rezolvat" in m for m in new) and sum("Adaptorul" in m for m in new) == 1
+    # „Deconectează” pe fiecare: alerta pe adaptor rămâne cât mai are dispozitive, apoi se închide în tăcere
+    eng.alerts.drop_device("daly1", t)
+    assert "comm:port:/dev/amper-test-lipsa" in {a["key"] for a in eng.alerts.active_list()}
+    eng.alerts.drop_device("daly2", t)
+    assert "comm:port:/dev/amper-test-lipsa" not in {a["key"] for a in eng.alerts.active_list()}
+
+
+def test_protection_says_if_mosfet_really_cut():
+    from amper.alerts import mos_note
+    assert "oprit descărcarea" in mos_note({"charge_mos": True, "discharge_mos": False})
+    assert "doar semnal" in mos_note({"charge_mos": True, "discharge_mos": True})
+    assert mos_note({}) == ""

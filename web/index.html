@@ -74,8 +74,8 @@
         <button class="back" id="bms-back" aria-label="Înapoi la baterii">‹</button>
         <h2 id="bms-title">Setări BMS</h2>
       </div>
-      <p class="note">Valorile sunt citite acum din BMS. La fiecare pereche de praguri, BMS-ul avertizează la cel mai
-        puțin sever și oprește (protecție) la cel mai sever. Fiecare modificare se citește înapoi din BMS ca să fie verificată.</p>
+      <p class="note">Valorile sunt citite acum din BMS. La fiecare pereche de praguri, primul e avertismentul (nivel 1),
+        al doilea e protecția (nivel 2): la el BMS-ul taie încărcarea sau descărcarea. Fiecare modificare se citește înapoi din BMS ca să fie verificată.</p>
       <div id="bms-list"></div>
       <h2>Modificări făcute</h2>
       <div class="list" id="bms-log"></div>
@@ -209,12 +209,21 @@
           <div class="list up-steps" id="up-steps"></div>
           <p class="note" id="up-job-msg"></p>
         </div>
+        <div class="set-menu up-more">
+          <button class="card set-btn" data-panel="uphist"><span class="ic" style="--ic:var(--load)">
+            <svg viewBox="0 0 24 24" class="ai"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>
+            <span><b>Istoric versiuni</b><span id="up-hist-sub">Actualizările făcute, revenirea</span></span><i>›</i></button>
+        </div>
+      </section>
+
+      <section class="set-panel" id="set-uphist" hidden>
+        <div class="pk-top"><button class="back set-back" data-back="update" aria-label="Înapoi la Actualizări">‹</button><h2>Istoric versiuni</h2></div>
         <div id="up-prev" hidden>
           <h2>Versiunea anterioară</h2>
           <p class="note" id="up-prev-txt"></p>
           <button class="btn danger" id="up-back">Revino la versiunea anterioară</button>
         </div>
-        <h2>Istoric</h2>
+        <h2>Actualizări făcute</h2>
         <div class="list" id="up-hist"></div>
       </section>
 

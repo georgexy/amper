@@ -7,9 +7,13 @@ Daly UART/485, NEVERIFICATĂ încă pe aceste BMS-uri. De aceea:
   - după scriere, blocul se citește înapoi și trebuie să fie identic cu cel trimis, altfel se raportează eroare;
   - valorile sunt limitate la intervale sigure pentru LiFePO4 16S.
 
-Fiecare prag apare în pereche (ex. două tensiuni maxime pe celulă): BMS-ul avertizează la cel mai puțin sever și
-oprește (protecție) la cel mai sever. Ordinea din bloc diferă între comenzi, de aceea aplicația arată rolul calculat
-din valori, nu din poziție.
+Fiecare prag apare în pereche, iar rolul e dat de POZIȚIA în bloc, nu de valoare: ordinea e
+[sus nivel 1, sus nivel 2, jos nivel 1, jos nivel 2]; nivel 1 = avertisment, nivel 2 = protecție (taie MOSFET-ul).
+Dovedit pe hardware 2026-10-29 la 0x59: cu cell_lo_b = 2,95 V, Daly 3 a raportat „Tensiune celulă mică (nivel 2)” și
+a tăiat descărcarea la 2,93–2,95 V. Înainte rolul se calcula după valori („cel mai sever = protecție”), iar valorile
+din fabrică „inversate” (sus 3,65/3,60, jos 2,30/2,80) îl arătau pe dos. La 0x5A (pachet) ordinea e aceeași
+(același tip de bloc); la 0x5B (curent) și 0x5C (temperaturi) regula e NECONFIRMATĂ pe hardware (`CONFIRMED`).
+Dacă protecția e mai puțin severă decât avertismentul, `describe` o semnalează (`alert`), fără să blocheze scrierea.
 """
 from __future__ import annotations
 
@@ -31,47 +35,47 @@ FIELDS = [
       group="Baterie", label="Somn după (fără curent)",
       note="După acest timp fără curent BMS-ul adoarme și Bluetooth-ul nu mai răspunde. 65535 = maxim."),
     F(key="cell_hi_a", cmd=0x59, off=0, size=2, kind="u", scale=0.001, unit="V", min=3.40, max=3.75,
-      group="Tensiune celulă", label="Maximă — prag 1", pair="cell_hi", hi=True, risky=True),
+      group="Tensiune celulă", label="Maximă", pair="cell_hi", hi=True, risky=True),
     F(key="cell_hi_b", cmd=0x59, off=2, size=2, kind="u", scale=0.001, unit="V", min=3.40, max=3.75,
-      group="Tensiune celulă", label="Maximă — prag 2", pair="cell_hi", hi=True, risky=True),
+      group="Tensiune celulă", label="Maximă", pair="cell_hi", hi=True, risky=True),
     F(key="cell_lo_a", cmd=0x59, off=4, size=2, kind="u", scale=0.001, unit="V", min=2.00, max=3.10,
-      group="Tensiune celulă", label="Minimă — prag 1", pair="cell_lo", hi=False, risky=True),
+      group="Tensiune celulă", label="Minimă", pair="cell_lo", hi=False, risky=True),
     F(key="cell_lo_b", cmd=0x59, off=6, size=2, kind="u", scale=0.001, unit="V", min=2.00, max=3.10,
-      group="Tensiune celulă", label="Minimă — prag 2", pair="cell_lo", hi=False, risky=True),
+      group="Tensiune celulă", label="Minimă", pair="cell_lo", hi=False, risky=True),
     F(key="pack_hi_a", cmd=0x5A, off=0, size=2, kind="u", scale=0.1, unit="V", min=54.0, max=60.0,
-      group="Tensiune pachet", label="Maximă — prag 1", pair="pack_hi", hi=True, risky=True),
+      group="Tensiune pachet", label="Maximă", pair="pack_hi", hi=True, risky=True),
     F(key="pack_hi_b", cmd=0x5A, off=2, size=2, kind="u", scale=0.1, unit="V", min=54.0, max=60.0,
-      group="Tensiune pachet", label="Maximă — prag 2", pair="pack_hi", hi=True, risky=True),
+      group="Tensiune pachet", label="Maximă", pair="pack_hi", hi=True, risky=True),
     F(key="pack_lo_a", cmd=0x5A, off=4, size=2, kind="u", scale=0.1, unit="V", min=32.0, max=50.0,
-      group="Tensiune pachet", label="Minimă — prag 1", pair="pack_lo", hi=False, risky=True),
+      group="Tensiune pachet", label="Minimă", pair="pack_lo", hi=False, risky=True),
     F(key="pack_lo_b", cmd=0x5A, off=6, size=2, kind="u", scale=0.1, unit="V", min=32.0, max=50.0,
-      group="Tensiune pachet", label="Minimă — prag 2", pair="pack_lo", hi=False, risky=True),
+      group="Tensiune pachet", label="Minimă", pair="pack_lo", hi=False, risky=True),
     F(key="dis_a", cmd=0x5B, off=0, size=2, kind="cur_dis", scale=0.1, unit="A", min=5, max=400,
-      group="Curent", label="Descărcare — prag 1", pair="dis", hi=True, risky=True),
+      group="Curent", label="Descărcare", pair="dis", hi=True, risky=True),
     F(key="dis_b", cmd=0x5B, off=2, size=2, kind="cur_dis", scale=0.1, unit="A", min=5, max=400,
-      group="Curent", label="Descărcare — prag 2", pair="dis", hi=True, risky=True),
+      group="Curent", label="Descărcare", pair="dis", hi=True, risky=True),
     F(key="chg_a", cmd=0x5B, off=4, size=2, kind="cur_chg", scale=0.1, unit="A", min=5, max=400,
-      group="Curent", label="Încărcare — prag 1", pair="chg", hi=True, risky=True),
+      group="Curent", label="Încărcare", pair="chg", hi=True, risky=True),
     F(key="chg_b", cmd=0x5B, off=6, size=2, kind="cur_chg", scale=0.1, unit="A", min=5, max=400,
-      group="Curent", label="Încărcare — prag 2", pair="chg", hi=True, risky=True),
+      group="Curent", label="Încărcare", pair="chg", hi=True, risky=True),
     F(key="tc_hi_a", cmd=0x5C, off=0, size=1, kind="temp", scale=1, unit="°C", min=30, max=80,
-      group="Temperatură la încărcare", label="Maximă — prag 1", pair="tc_hi", hi=True),
+      group="Temperatură la încărcare", label="Maximă", pair="tc_hi", hi=True),
     F(key="tc_hi_b", cmd=0x5C, off=1, size=1, kind="temp", scale=1, unit="°C", min=30, max=80,
-      group="Temperatură la încărcare", label="Maximă — prag 2", pair="tc_hi", hi=True),
+      group="Temperatură la încărcare", label="Maximă", pair="tc_hi", hi=True),
     F(key="tc_lo_a", cmd=0x5C, off=2, size=1, kind="temp", scale=1, unit="°C", min=-40, max=15,
-      group="Temperatură la încărcare", label="Minimă — prag 1", pair="tc_lo", hi=False, risky=True,
+      group="Temperatură la încărcare", label="Minimă", pair="tc_lo", hi=False, risky=True,
       note="LiFePO4 nu are voie să fie încărcat sub 0 °C."),
     F(key="tc_lo_b", cmd=0x5C, off=3, size=1, kind="temp", scale=1, unit="°C", min=-40, max=15,
-      group="Temperatură la încărcare", label="Minimă — prag 2", pair="tc_lo", hi=False, risky=True,
+      group="Temperatură la încărcare", label="Minimă", pair="tc_lo", hi=False, risky=True,
       note="LiFePO4 nu are voie să fie încărcat sub 0 °C."),
     F(key="td_hi_a", cmd=0x5C, off=4, size=1, kind="temp", scale=1, unit="°C", min=30, max=85,
-      group="Temperatură la descărcare", label="Maximă — prag 1", pair="td_hi", hi=True),
+      group="Temperatură la descărcare", label="Maximă", pair="td_hi", hi=True),
     F(key="td_hi_b", cmd=0x5C, off=5, size=1, kind="temp", scale=1, unit="°C", min=30, max=85,
-      group="Temperatură la descărcare", label="Maximă — prag 2", pair="td_hi", hi=True),
+      group="Temperatură la descărcare", label="Maximă", pair="td_hi", hi=True),
     F(key="td_lo_a", cmd=0x5C, off=6, size=1, kind="temp", scale=1, unit="°C", min=-40, max=10,
-      group="Temperatură la descărcare", label="Minimă — prag 1", pair="td_lo", hi=False),
+      group="Temperatură la descărcare", label="Minimă", pair="td_lo", hi=False),
     F(key="td_lo_b", cmd=0x5C, off=7, size=1, kind="temp", scale=1, unit="°C", min=-40, max=10,
-      group="Temperatură la descărcare", label="Minimă — prag 2", pair="td_lo", hi=False),
+      group="Temperatură la descărcare", label="Minimă", pair="td_lo", hi=False),
     F(key="bal_start", cmd=0x5F, off=0, size=2, kind="u", scale=0.001, unit="V", min=3.00, max=3.60,
       group="Echilibrare", label="Pornește peste",
       note="La LiFePO4, între 3,2 și 3,35 V curba e plată: echilibrarea acolo poate dezechilibra."),
@@ -79,6 +83,14 @@ FIELDS = [
       group="Echilibrare", label="La o diferență de cel puțin"),
 ]
 BY_KEY = {f["key"]: f for f in FIELDS}
+# rolul după poziție e dovedit pe hardware doar la tensiuni (0x59 celulă, 0x5A pachet)
+CONFIRMED = {0x59, 0x5A}
+ROLE_TEXT = {1: "Avertisment (nivel 1)", 2: "Protecție (nivel 2, taie)"}
+
+
+def level(f: dict) -> int | None:
+    """Nivelul pragului după poziție: primul din pereche (…_a) = 1, al doilea (…_b) = 2."""
+    return (1 if f["key"].endswith("_a") else 2) if f.get("pair") else None
 READ_CMDS = sorted({f["cmd"] for f in FIELDS})
 WRITE_OFFSET = 0x40
 
@@ -117,25 +129,30 @@ def fmt(f: dict, v: float) -> str:
 
 
 def describe(blocks: dict[int, bytes]) -> list[dict]:
-    """Câmpurile cu valorile citite; pentru perechi, rolul (avertisment/protecție) calculat din valori."""
+    """Câmpurile cu valorile citite; pentru perechi, rolul după poziție (nivel 1 = avertisment, nivel 2 = protecție)
+    și `alert` pe protecție dacă e mai puțin severă decât avertismentul (BMS-ul ar tăia înainte să avertizeze)."""
     vals = {}
     for f in FIELDS:
         b = blocks.get(f["cmd"])
         vals[f["key"]] = raw_to_value(f, raw_get(b, f)) if b else None
     out = []
     for f in FIELDS:
-        v = vals[f["key"]]
-        role = ""
-        if f.get("pair") and v is not None:
-            other = next(o for o in FIELDS if o.get("pair") == f["pair"] and o["key"] != f["key"])
-            ov = vals[other["key"]]
-            if ov is not None and ov != v:
-                severe = v > ov if f["hi"] else v < ov
-                role = "protecție" if severe else "avertisment"
-        out.append(dict(key=f["key"], group=f["group"], label=f["label"], value=v,
-                        text=fmt(f, v) if v is not None else "–", role=role, unit=f["unit"], min=f["min"],
-                        max=f["max"], step=f["scale"] if f["kind"] not in ("temp",) else 1,
-                        risky=bool(f.get("risky")), note=f.get("note", "")))
+        v, lv = vals[f["key"]], level(f)
+        sure = f["cmd"] in CONFIRMED
+        item = dict(key=f["key"], group=f["group"], label=f["label"], value=v,
+                    text=fmt(f, v) if v is not None else "–", unit=f["unit"], min=f["min"], max=f["max"],
+                    step=f["scale"] if f["kind"] not in ("temp",) else 1, risky=bool(f.get("risky")),
+                    note=f.get("note", ""), role="", level=lv, role_text="", confirmed=sure, alert="")
+        if lv:
+            item["role"] = "protecție" if lv == 2 else "avertisment"
+            item["role_text"] = ROLE_TEXT[lv] + ("" if sure else " — neconfirmat pe hardware")
+            warn = BY_KEY[f["pair"] + "_a"]
+            wv = vals[warn["key"]]
+            if lv == 2 and v is not None and wv is not None and (v < wv if f["hi"] else v > wv):
+                item["alert"] = (f"Protecția ({fmt(f, v)}) e mai puțin severă decât avertismentul ({fmt(warn, wv)}): "
+                                 "BMS-ul taie înainte să avertizeze." + ("" if sure else " Ordinea pragurilor la "
+                                 "acest grup e neconfirmată pe hardware."))
+        out.append(item)
     return out
 
 
@@ -165,7 +182,8 @@ def write_field(drv, key: str, value) -> dict:
     raw = value_to_raw(f, value)
     old_block = drv._query(f["cmd"])[0]
     old = raw_to_value(f, raw_get(old_block, f))
-    res = dict(label=f"{f['group']}, {f['label']}", old=fmt(f, old), new=fmt(f, raw_to_value(f, raw)),
+    lv = level(f)
+    res = dict(label=f"{f['group']}, {f['label']}" + (f" — {ROLE_TEXT[lv].lower()}" if lv else ""), old=fmt(f, old), new=fmt(f, raw_to_value(f, raw)),
                changed=raw != raw_get(old_block, f))
     if not res["changed"]:
         return res

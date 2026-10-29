@@ -18,12 +18,10 @@ def test_decode_real_values():
     d = {x["key"]: x for x in dp.describe(blocks())}
     assert d["capacity"]["value"] == 105.0 and d["sleep"]["value"] == 3600
     assert (d["cell_hi_a"]["value"], d["cell_hi_b"]["value"]) == (3.65, 3.6)
-    assert d["cell_hi_a"]["role"] == "protecție" and d["cell_hi_b"]["role"] == "avertisment"
-    assert (d["cell_lo_a"]["value"], d["cell_lo_b"]["value"]) == (2.3, 2.8) and d["cell_lo_a"]["role"] == "protecție"
+    assert (d["cell_lo_a"]["value"], d["cell_lo_b"]["value"]) == (2.3, 2.8)
     assert (d["pack_hi_a"]["value"], d["pack_lo_b"]["value"]) == (58.4, 48.0)
     assert (d["dis_a"]["value"], d["dis_b"]["value"], d["chg_a"]["value"], d["chg_b"]["value"]) == (180, 100, 180, 100)
     assert (d["tc_hi_a"]["value"], d["tc_hi_b"]["value"], d["tc_lo_a"]["value"], d["tc_lo_b"]["value"]) == (55, 65, -35, -40)
-    assert d["tc_hi_b"]["role"] == "protecție" and d["tc_lo_b"]["role"] == "protecție"
     assert (d["bal_start"]["value"], d["bal_diff"]["value"]) == (3.2, 50)
 
 
@@ -107,3 +105,36 @@ def test_balance_not_applied_still_reported(monkeypatch):
     monkeypatch.setattr(dp.time, "sleep", lambda s: None)
     with pytest.raises(DriverError, match="nu a aplicat"):
         dp.write_field(NoisyDaly(applies=False), "bal_start", 3.40)
+
+
+def roles(block_hex):
+    d = {x["key"]: x for x in dp.describe({0x59: bytes.fromhex(block_hex)}) if x["key"].startswith("cell_")}
+    return {k: (x["value"], x["role"], bool(x["alert"])) for k, x in d.items()}
+
+
+def test_roles_by_position_not_value():
+    # Daly 2 din fabrică: sus 3,65 / 3,75, jos 2,30 / 2,20 — protecția (nivel 2) e mai severă: totul în regulă
+    assert roles("0e420ea608fc0898") == {
+        "cell_hi_a": (3.65, "avertisment", False), "cell_hi_b": (3.75, "protecție", False),
+        "cell_lo_a": (2.3, "avertisment", False), "cell_lo_b": (2.2, "protecție", False)}
+    # Daly 1/3 din fabrică: sus 3,65 / 3,60, jos 2,30 / 2,80 — rolurile rămân după poziție (nivel 2 = protecție,
+    # dovedit pe hardware), iar protecția mai puțin severă decât avertismentul e semnalată
+    assert roles("0e420e1008fc0af0") == {
+        "cell_hi_a": (3.65, "avertisment", False), "cell_hi_b": (3.6, "protecție", True),
+        "cell_lo_a": (2.3, "avertisment", False), "cell_lo_b": (2.8, "protecție", True)}
+    # setările actuale ale utilizatorului (2026-10-29): 3,55 / 3,60 / 2,95 / 2,85 V
+    assert roles("0dde0e100b860b22") == {
+        "cell_hi_a": (3.55, "avertisment", False), "cell_hi_b": (3.6, "protecție", False),
+        "cell_lo_a": (2.95, "avertisment", False), "cell_lo_b": (2.85, "protecție", False)}
+
+
+def test_role_texts_and_unconfirmed_groups():
+    d = {x["key"]: x for x in dp.describe({**blocks(), 0x5A: bytes.fromhex("023a023f01d601c8")})}
+    assert (d["pack_hi_a"]["value"], d["pack_hi_b"]["value"], d["pack_lo_a"]["value"], d["pack_lo_b"]["value"]) == \
+        (57.0, 57.5, 47.0, 45.6)
+    assert d["pack_lo_a"]["role_text"] == "Avertisment (nivel 1)"
+    assert d["pack_lo_b"]["role_text"] == "Protecție (nivel 2, taie)" and not d["pack_lo_b"]["alert"]
+    assert d["tc_hi_b"]["role"] == "protecție" and "neconfirmat" in d["tc_hi_b"]["role_text"]
+    assert not d["tc_hi_b"]["confirmed"] and d["cell_hi_b"]["confirmed"]
+    assert "neconfirmat" in d["dis_b"]["alert"]                         # 180 / 100 A: după poziție, inversat
+    assert d["bal_start"]["role"] == "" and d["bal_start"]["level"] is None
