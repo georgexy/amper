@@ -452,5 +452,5 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   1.0.0-beta.9: pe iPhone-ul real (PWA, zone sigure ~59/34 px) bateria intra sub bară și `.f-link` (flex: 1) se
   întindea ~300 px. Acum `.f-wrap` = `justify-content: center` cu min-height minus `env(safe-area-inset-*)`,
   `.f-batt` flex none, `.f-link` = clamp(14px, 100dvh − 660px, 70px). Verificat 390×664, 320×568, 393×759.
-  Puterea din stânga (`bw`): clasa `chg` verde / `dis` roșu (ales 2026-10-29, „doar în partea stângă”); eticheta de
-  pe linie (`.f-blabel`) rămâne în culoarea liniei.
+  Puterea din stânga (`bw`): clasa `chg` verde / `dis` roșu. Eticheta de pe linie (`.f-blabel`) SCOASĂ definitiv
+  (cerut 2026-10-29: „scrisul de pe linie îl eliminăm, rămâne doar cel din stânga”).

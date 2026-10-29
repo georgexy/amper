@@ -427,7 +427,6 @@ const flux = {
       <div class="f-node" style="left:80%;top:19%;--c:var(--load)"><div class="disc">${icon("home")}</div><div class="w" data-k="load">–</div><div class="l">Consum casă</div><div class="t" data-k="tld"></div></div>
       <div class="f-node sm" data-open="inverter" role="button" tabindex="0" aria-label="Invertor" style="left:50%;top:69%;--c:var(--cell)"><div class="disc" style="width:64px;height:64px">${icon("inv")}</div></div>
       <div class="f-node sm" data-k-cls="grid" style="left:11%;top:88%;--c:var(--muted)"><div class="disc">${icon("grid")}</div><div class="l" data-k="grid">Rețea</div><div class="t" data-k="tgr"></div></div>
-      <div class="f-blabel" data-k="bat" style="left:53%;top:87%"></div>
       <div class="f-inv" data-k="inv" data-open="inverter" role="button" tabindex="0" style="left:62%;top:71%"></div>
     </div>
     <button class="f-batt" data-open="packs" aria-label="Bateria — vezi pachetele">
@@ -456,7 +455,6 @@ const flux = {
     link.style.setProperty("--lc", bc); link.classList.toggle("on", bw > 20); link.classList.toggle("rev", !!brev);
     root.querySelector(".f-diag").className = `f-diag mode-${h.mode}`;
     put(root, "pv", watts(ir?.pv_power));
-    put(root, "bat", bp == null || Math.abs(bp) <= 20 ? "" : watts(Math.abs(bp)));   // puterea pe linia spre baterie
     put(root, "load", watts(ir?.load_power));
     const gridOn = ir?.ac_in_voltage > 50;
     root.querySelector('[data-k-cls="grid"]').classList.toggle("dim", !gridOn);
@@ -470,7 +468,7 @@ const flux = {
     const moving = h.mode !== "idle" && bp != null, chg = h.mode === "charging";
     put(root, "flow", moving ? (chg ? "Se încarcă:" : "Se descarcă:") : "Stare:");
     put(root, "bw", moving ? watts(Math.abs(bp)) : esc(h.modeText));
-    // puterea din stânga: verde la încărcare, roșu la descărcare (pe linie rămâne culoarea liniei)
+    // puterea din stânga: verde la încărcare, roșu la descărcare (pe linie nu se mai scrie)
     root.querySelector('[data-k="bw"]').className = moving ? (chg ? "chg" : "dis") : "";
     const full = moving && b.hours ? duration(b.hours).replace(/(\d) (h|min|zile|zi)\b/g, "$1\u00a0$2") : "";
     put(root, "etal", full ? (chg ? "Încărcare completă:" : "Descărcare completă:") : "");
