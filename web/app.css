@@ -160,6 +160,7 @@ button { font: inherit; color: inherit; }
 .f-bl b, .f-br b { font: 700 19px/1.1 "Barlow Condensed", sans-serif; color: var(--text); margin-bottom: 4px; }
 .f-bl b:last-child, .f-br b:last-child { margin-bottom: 0; }
 .f-bl :empty { display: none; }
+.f-bl b.chg { color: var(--charge); } .f-bl b.dis { color: var(--alarm); }
 .f-cap { width: 34px; height: 8px; border-radius: 4px 4px 0 0; background: #4A6A80; margin: 0 auto; }
 .f-cell { width: 96px; height: 112px; margin: 0 auto; position: relative; border-radius: 20px; border: 3px solid #4A6A80;
   background: #0F1D26; overflow: hidden; box-shadow: 0 0 40px -10px var(--mc); }
