@@ -117,7 +117,7 @@ button { font: inherit; color: inherit; }
 
 /* ---------- tema Flux de energie ---------- */
 /* toată înălțimea ecranului (fără antet și bara de jos), împărțită egal între diagramă și baterie */
-.f-wrap { display: flex; flex-direction: column; justify-content: space-evenly; min-height: calc(100dvh - 54px - 112px); }
+.f-wrap { display: flex; flex-direction: column; min-height: calc(100dvh - 54px - 112px); }
 /* starea invertorului, lângă invertor */
 .f-inv { position: absolute; transform: translateY(-50%); max-width: 38%; font-size: 12px; line-height: 1.25; color: var(--muted); }
 .f-inv b { display: block; font: 600 14px/1.15 "Barlow Condensed", sans-serif; color: var(--acc); }
@@ -141,8 +141,24 @@ button { font: inherit; color: inherit; }
 .f-node .t b { font: 600 14px "Barlow Condensed", sans-serif; color: var(--text); }
 .f-node.sm .disc { width: 56px; height: 56px; } .f-node.sm .disc svg { width: 28px; height: 28px; }
 .f-node.dim .disc { border-style: dashed; box-shadow: none; opacity: .55; }
-.f-blabel { position: absolute; font: 700 18px "Barlow Condensed", sans-serif; color: var(--mc); transform: translateY(-50%); }
-.f-batt { display: block; margin: 0 auto; border: 0; background: none; color: inherit; text-align: center; padding: 0; }
+/* bateria jos, pe ultimul rând: încărcarea/descărcarea în stânga, capacitatea în dreapta */
+.f-batt { flex: 1; display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; width: 100%; margin: 0; border: 0;
+  background: none; color: inherit; padding: 0 0 6px; }
+.f-bico { display: flex; flex-direction: column; }
+.f-link { flex: 1; min-height: 10px; width: 3px; margin: 0 auto; background: var(--lc, #4A6A80); opacity: .9; position: relative; }
+.f-link.on::after { content: ""; position: absolute; inset: 0 -2px; animation: flink 1.4s linear infinite;
+  background: radial-gradient(circle, color-mix(in srgb, var(--lc) 45%, #fff) 2.6px, transparent 3px) 0 0 / 7px 22px repeat-y; }
+.f-link.rev::after { animation-direction: reverse; }
+@keyframes flink { to { background-position: 0 22px; } }
+@media (prefers-reduced-motion: reduce) { .f-link.on::after { animation: none; } }
+.f-bl, .f-br { align-self: end; height: 120px; display: flex; flex-direction: column; justify-content: center; min-width: 0;
+  font-size: 12px; line-height: 1.3; color: var(--muted); }
+.f-bl { text-align: right !important; } .f-br { text-align: left !important; }
+.f-bl b { font: 600 15px/1.15 "Barlow Condensed", sans-serif; color: var(--text); }
+.f-bl em { font: 700 19px/1.15 "Barlow Condensed", sans-serif; font-style: normal; color: var(--mc, var(--text)); margin-bottom: 2px; }
+.f-bl em:empty { display: none; }
+.f-br b { font: 700 19px/1.1 "Barlow Condensed", sans-serif; color: var(--text); margin-bottom: 4px; }
+.f-br b:last-child { margin-bottom: 0; }
 .f-cap { width: 34px; height: 8px; border-radius: 4px 4px 0 0; background: #4A6A80; margin: 0 auto; }
 .f-cell { width: 96px; height: 112px; margin: 0 auto; position: relative; border-radius: 20px; border: 3px solid #4A6A80;
   background: #0F1D26; overflow: hidden; box-shadow: 0 0 40px -10px var(--mc); }
@@ -151,8 +167,6 @@ button { font: inherit; color: inherit; }
   background: linear-gradient(180deg, color-mix(in srgb, var(--mc) 55%, #fff), var(--mc)); }
 .f-cell b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   font: 700 38px "Barlow Condensed", sans-serif; color: #fff; text-shadow: 0 1px 6px rgb(0 0 0 / .45); }
-.f-batt .k { font: 600 14px "Barlow Condensed", sans-serif; margin-top: 4px; }
-.f-batt .s { font-size: 12px; color: var(--muted); }
 /* ecrane scunde (iPhone SE): totul mai mic, ca pagina să încapă fără glisare */
 @media (max-height: 620px) {
   .f-node { width: 50%; } .f-node .l { white-space: nowrap; }
@@ -161,8 +175,8 @@ button { font: inherit; color: inherit; }
   .f-node.sm .disc { width: 42px; height: 42px; } .f-node.sm .disc svg { width: 21px; height: 21px; }
   .f-node[data-open="inverter"] .disc { width: 48px !important; height: 48px !important; }
   .f-inv { top: 78% !important; max-width: 40%; font-size: 11px; } .f-inv b { font-size: 13px; }
-  .f-blabel { top: 93% !important; }
   .f-cap { width: 26px; height: 6px; } .f-cell { width: 72px; height: 82px; border-radius: 15px; } .f-cell b { font-size: 28px; }
+  .f-bl, .f-br { height: 88px; font-size: 11px; } .f-bl b { font-size: 14px; } .f-bl em { font-size: 17px; } .f-br b { font-size: 17px; margin-bottom: 2px; }
 }
 
 /* ---------- tema Carduri ---------- */

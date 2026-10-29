@@ -9,7 +9,8 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
   au dispărut: „produs azi” e sub panouri, „consumat azi” sub consumul casei, „din rețea azi” sub rețea, iar
   autonomia rămâne sub baterie. Sub baterie nu mai apar erorile modulelor (se văd în ecranul Bateriile), iar
   textul cu energia rămasă e mai mic. Starea invertorului e lângă invertor, iar diagrama și bateria se
-  întind pe toată înălțimea ecranului.
+  întind pe toată înălțimea ecranului. Bateria stă jos: în stânga ei, dacă se încarcă sau se descarcă, cu ce putere
+  și cât mai durează; în dreapta, capacitatea totală și energia actuală.
 
 ## 1.0.0-beta.7 — 2026-10-29
 - Reparat: la setările de echilibrare ale BMS-ului Daly, aplicația spunea „BMS-ul arată altceva decât s-a trimis”

@@ -434,3 +434,6 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `.f-inv` (starea invertorului) e în `.f-diag`, lângă invertor (left 62%, top 71%; pe SE 78%). `.f-wrap` = coloană
   flex `space-evenly` cu min-height 100dvh − 54 (antet) − 112 (bara de jos); `.f-diag` lățime
   min(100%, 400px, (100dvh − 340px) × 1,09) → diagrama crește cu ecranul.
+  Bateria (cerut 2026-10-29): `.f-batt` = grilă `.f-bl` (stare, `bw` putere, `eta`, tensiune) | `.f-bico` | `.f-br`
+  („Total:” `capKwh`, „Actual:” `b.kwh`); `flex: 1` o împinge jos, iar `.f-link` (bară cu puncte animate, `--lc`)
+  continuă linia invertor → baterie. `.f-blabel` (puterea pe linie) scos: puterea e în stânga.

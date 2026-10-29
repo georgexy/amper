@@ -427,12 +427,12 @@ const flux = {
       <div class="f-node" style="left:80%;top:19%;--c:var(--load)"><div class="disc">${icon("home")}</div><div class="w" data-k="load">–</div><div class="l">Consum casă</div><div class="t" data-k="tld"></div></div>
       <div class="f-node sm" data-open="inverter" role="button" tabindex="0" aria-label="Invertor" style="left:50%;top:69%;--c:var(--cell)"><div class="disc" style="width:64px;height:64px">${icon("inv")}</div></div>
       <div class="f-node sm" data-k-cls="grid" style="left:11%;top:88%;--c:var(--muted)"><div class="disc">${icon("grid")}</div><div class="l" data-k="grid">Rețea</div><div class="t" data-k="tgr"></div></div>
-      <div class="f-blabel" data-k="bat" style="left:53%;top:87%"></div>
       <div class="f-inv" data-k="inv" data-open="inverter" role="button" tabindex="0" style="left:62%;top:71%"></div>
     </div>
     <button class="f-batt" data-open="packs" aria-label="Bateria — vezi pachetele">
-      <div class="f-cap"></div><div class="f-cell"><div class="f-fill"></div><b><span data-k="soc">–</span>%</b></div>
-      <div class="k" data-k="kwh"></div><div class="s" data-k="eta"></div>
+      <div class="f-bl"><b data-k="flow"></b><em data-k="bw"></em><span data-k="eta"></span><span data-k="volt"></span></div>
+      <div class="f-bico"><div class="f-link"></div><div class="f-cap"></div><div class="f-cell"><div class="f-fill"></div><b><span data-k="soc">–</span>%</b></div></div>
+      <div class="f-br"><span>Total:</span><b data-k="cap"></b><span>Actual:</span><b data-k="kwh"></b></div>
     </button></div>`,
   update(root, h) {
     const { b, ir, bp } = h;
@@ -450,10 +450,12 @@ const flux = {
       dots.classList.toggle("rev", !!rev);
       dots.style.setProperty("--dur", `${Math.max(0.7, 3 - (w || 0) / 1500).toFixed(1)}s`);
     }
+    // legătura invertor → baterie continuă sub diagramă, până la baterie
+    const link = root.querySelector(".f-link"), [bw, bc, brev] = flows.bat;
+    link.style.setProperty("--lc", bc); link.classList.toggle("on", bw > 20); link.classList.toggle("rev", !!brev);
     root.querySelector(".f-diag").className = `f-diag mode-${h.mode}`;
     put(root, "pv", watts(ir?.pv_power));
     put(root, "load", watts(ir?.load_power));
-    put(root, "bat", bp == null || Math.abs(bp) <= 20 ? "" : watts(Math.abs(bp)));
     const gridOn = ir?.ac_in_voltage > 50;
     root.querySelector('[data-k-cls="grid"]').classList.toggle("dim", !gridOn);
     put(root, "grid", ir?.ac_in_voltage == null ? "Rețea" : `Rețea<br>${num(ir.ac_in_voltage, 0)} V`);
@@ -462,8 +464,14 @@ const flux = {
     modeClass(root.querySelector(".f-batt"), h, "f-batt");
     root.querySelector(".f-fill").style.height = `calc(${Math.max(0, Math.min(100, b.soc ?? 0))}% - 12px)`;
     put(root, "soc", b.soc == null ? "–" : num(b.soc, 0));
-    put(root, "kwh", b.kwh == null ? h.modeText : `${num(b.kwh, 1)} kWh · ${h.modeText[0].toLowerCase() + h.modeText.slice(1)}`);
-    put(root, "eta", [h.eta, b.voltage ? num(b.voltage, 1) + " V" : ""].filter(Boolean).join(" · "));
+    // stânga bateriei: starea, puterea, cât mai durează (fără rupere între număr și unitate)
+    const moving = h.mode !== "idle" && bp != null;
+    put(root, "flow", moving ? (h.mode === "charging" ? "Se încarcă" : "Se descarcă") : h.modeText);
+    put(root, "bw", moving ? watts(Math.abs(bp)) : "");
+    put(root, "eta", h.eta.replace(/(\d) (h|min|zile|zi)\b/g, "$1\u00a0$2"));
+    put(root, "volt", b.voltage ? num(b.voltage, 1) + " V" : "");
+    put(root, "cap", kv(h.capKwh, "kWh", 1));
+    put(root, "kwh", kv(b.kwh, "kWh", 1));
     // erorile nu apar sub baterie: se văd în ecranul Bateriile
     const today = (label, v) => v == null ? "" : `${label} <b>${num(v, 1)} kWh</b>`;
     put(root, "tpv", today("produs azi", h.today.pv_kwh));
