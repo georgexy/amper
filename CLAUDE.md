@@ -105,6 +105,14 @@ la 100% la bancă plină. Etapa 1: doar Modbus, puține scrieri (uzura memoriei 
 Etapa 2: emulare BMS (Pylontech?) pe portul BMS al invertorului — adaptor nou + manualul SPF 5000 ES.
 Reguli: nu se ating protecțiile BMS, limitele invertorului rămân plasa de siguranță, watchdog, activare doar de utilizator.
 
+## Idee ținută minte (2026-10-29, „deocamdată nu integra”): dispozitive necunoscute
+- „Raport de dispozitiv necunoscut”: la căutare, ce răspunde dar nu se potrivește → adaptorul USB, vitezele, cererile
+  și răspunsurile brute (doar comenzi de CITIRE; Modbus: registrele uzuale; BLE: nume, servicii, notificări).
+- Asistent „Compară cu ecranul aparatului”: utilizatorul scrie 3–4 valori de pe afișaj, Amper caută în răspunsurile brute
+  registrul + scara (ex. 52,8 V = registrul 183 × 0,01) → harta se completează din 2–3 rapoarte.
+- Trimitere: (a) fișier trimis de utilizator (e-mail/WhatsApp, fără server) — recomandat; (b) server propriu, cu acord
+  și date personale șterse (serie, MAC). Utilizatorul nu vrea conturi externe. Nicio scriere spre un aparat necunoscut.
+
 ## Alerte proprii + cifra de pe Alerte (2026-10-26)
 - Tabela `user_alerts`; `alerts.METRICS` (SOC bancă, SOC minim modul, tensiune, celule min/max, temperatură module,
   PV, consum, încărcare, rețea, temperatură invertor); `evaluate_user` cu histerezis (marjă per metrică), durată
