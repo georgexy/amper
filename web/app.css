@@ -625,3 +625,4 @@ small.warnc { color: var(--warn); }
 .ed-row span { color: var(--muted); }
 .ed-row b { letter-spacing: .04em; font-weight: 600; }
 .ed-card .ed-in, .ed-card .ed-go { margin-top: 8px; }
+.up-more { margin-top: 18px; }

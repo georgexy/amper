@@ -1054,7 +1054,7 @@ $("#ed-go").onclick = async () => {
 
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "notif", "daly", "devoff", "devadd", "excl", "info", "update", "security", "remote", "auto", "about", "conn", "share", "wifi"])
+  for (const k of ["teme", "notif", "daly", "devoff", "devadd", "excl", "info", "update", "uphist", "security", "remote", "auto", "about", "conn", "share", "wifi"])
     $("#set-" + k).hidden = k !== name;
   if (name === "about") renderEdition();
   if (name === "share") loadShare();
@@ -1064,7 +1064,7 @@ function showPanel(name) {
   if (name === "security") loadSecurity();
   clearInterval(state.infoTimer);
   clearTimeout(upd.timer);
-  if (name === "update") loadUpdate();
+  if (name === "update" || name === "uphist") loadUpdate();
   if (name === "info") { loadInfo(); state.infoTimer = setInterval(() => !$("#set-info").hidden && loadInfo(), 5000); }
   if (name === "notif") renderNotif();
   if (name === "daly" || name === "devoff") renderDaly();
@@ -1281,6 +1281,7 @@ function renderUpdate() {
   $("#up-prev").hidden = !r.previous || running;
   if (r.previous) $("#up-prev-txt").textContent = `Revine la Amper ${r.previous.version || "anterior"}. Istoricul și setările rămân; se face totuși o copie înainte.`;
   const h = r.history || [];
+  $("#up-hist-sub").textContent = r.previous?.version ? `Actualizările făcute · poți reveni la ${r.previous.version}` : "Actualizările făcute";
   $("#up-hist").innerHTML = h.length ? h.map((x) => `<div class="row ${x.result === "ok" ? "" : "warning"}">
       <span><b>${x.kind === "rollback" ? "Revenire" : "Actualizare"} ${esc(x.from || "?")} → ${esc(x.version || "?")}</b> · ${UP_RESULT[x.result] || esc(x.result)}</span>
       <span class="t">${dateTime(x.at)}${x.result === "ok" ? "" : " · " + esc(x.message)}</span></div>`).join("")

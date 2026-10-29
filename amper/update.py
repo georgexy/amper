@@ -424,12 +424,12 @@ class Updater:
                     data = bytes(buf)
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                raise UpdateError("Nu există încă nicio versiune publicată pe GitHub.")
+                raise UpdateError("Nu există încă nicio versiune publicată pe server.")
             if e.code in (403, 429):
-                raise UpdateError("GitHub a limitat cererile pentru moment. Încearcă din nou peste o oră.")
-            raise UpdateError(f"GitHub a răspuns cu eroarea {e.code}. Încearcă mai târziu.")
+                raise UpdateError("Serverul de actualizări a limitat cererile pentru moment. Încearcă din nou peste o oră.")
+            raise UpdateError(f"Serverul de actualizări a răspuns cu eroarea {e.code}. Încearcă mai târziu.")
         except (urllib.error.URLError, TimeoutError, OSError):
-            raise UpdateError("Fără internet: nu pot ajunge la GitHub. Verifică legătura Pi-ului și încearcă din nou.")
+            raise UpdateError("Fără internet: nu pot ajunge la serverul de actualizări. Verifică legătura Pi-ului și încearcă din nou.")
         if len(data) > limit:
             raise UpdateError("Fișierul descărcat e prea mare.")
         return data
@@ -455,7 +455,7 @@ class Updater:
             if best is None or newer(v, best["version"]):
                 best = {"version": v, "assets": assets}
         if not best:
-            raise UpdateError("Nu există încă nicio versiune publicată pe GitHub.")
+            raise UpdateError("Nu există încă nicio versiune publicată pe server.")
         return best
 
     def _manifest(self, rel: dict) -> dict:
@@ -465,7 +465,7 @@ class Updater:
         if m["version"] != rel["version"]:
             raise UpdateError("Versiunea din manifest nu se potrivește cu cea publicată.")
         if m["tarball"] not in rel["assets"]:
-            raise UpdateError("Arhiva versiunii lipsește de pe GitHub.")
+            raise UpdateError("Arhiva versiunii lipsește de pe server.")
         return m
 
     def check(self, auto: bool = False) -> dict:
