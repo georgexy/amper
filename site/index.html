@@ -141,7 +141,7 @@ footer a { color: var(--muted); }
         Vezi în timp real fiecare modul și fiecare celulă, și afli pe telefon imediat ce ceva nu e în regulă,
         de exemplu când un BMS oprește încărcarea fără să semnaleze.</p>
       <div class="cta">
-        <a class="btn main dl" href="https://github.com/georgexy/amper/releases/latest">
+        <a class="btn main dl off" href="#instalare">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
           <span>Descarcă imaginea SD</span></a>
         <a class="btn" href="#instalare">Cum se instalează</a>
@@ -260,8 +260,7 @@ footer a { color: var(--muted); }
 <section id="instalare">
   <div class="wrap">
     <h2>Instalare în 4 pași</h2>
-    <p class="sub">Fără comenzi și fără calculator după primul pas. Ghidul complet e
-      <a href="https://github.com/georgexy/amper#readme">aici</a>.</p>
+    <p class="sub">Fără comenzi și fără calculator după primul pas.</p>
     <ol class="steps">
       <li><h3>Scrii cardul</h3><p>Descarci imaginea și o scrii pe card cu
         <a href="https://www.raspberrypi.com/software/">Raspberry Pi Imager</a> (Use custom). Fără personalizare.</p></li>
@@ -278,7 +277,7 @@ footer a { color: var(--muted); }
     <h2>Încearcă Amper</h2>
     <p class="sub" style="margin: 10px auto 28px">Imaginea are tot ce trebuie: sistemul, Amper și actualizările.</p>
     <div class="cta">
-      <a class="btn main dl" href="https://github.com/georgexy/amper/releases/latest">
+      <a class="btn main dl off" href="#instalare">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
         <span>Descarcă imaginea SD</span></a>
     </div>
@@ -288,35 +287,30 @@ footer a { color: var(--muted); }
 
 <footer>
   <div class="wrap">
-    <span>Amper · gratuit pentru uz personal, necomercial
-      (<a href="https://github.com/georgexy/amper/blob/main/LICENSE">PolyForm Noncommercial</a>), fără nicio garanție.</span>
-    <span><a href="https://github.com/georgexy/amper/issues">Întrebări și probleme</a> ·
-      <a href="https://github.com/georgexy/amper">Codul sursă</a></span>
+    <span>Amper · gratuit pentru uz personal, necomercial, fără nicio garanție.</span>
   </div>
 </footer>
 
 <script>
-// Butonul de descărcare: imaginea din ultima versiune stabilă publicată (GitHub nu dă pre-release-uri la „latest”).
+// Butonul de descărcare: imaginea din ultima versiune stabilă publicată (pre-release-urile nu apar la „latest”).
+// Până o găsește, butonul e inactiv („vine în curând”); pe pagină nu e nicio legătură spre GitHub (cerut 2026-10-29).
 (async () => {
   const btns = document.querySelectorAll("a.dl"), notes = document.querySelectorAll(".dlnote");
   const note = (t) => notes.forEach((n) => n.textContent = t);
+  const soon = () => { btns.forEach((b) => { b.classList.add("off"); b.querySelector("span").textContent = "Imaginea SD vine în curând"; });
+    note("Prima versiune stabilă e în pregătire."); };
   try {
     const r = await fetch("https://api.github.com/repos/georgexy/amper/releases/latest");
     const rel = r.ok ? await r.json() : null;
     const img = rel && (rel.assets || []).find((a) => a.name.endsWith(".img.xz"));
-    if (!img) {
-      btns.forEach((b) => { b.classList.add("off"); b.querySelector("span").textContent = "Imaginea SD vine în curând"; });
-      note("Prima versiune stabilă e în pregătire.");
-      return;
-    }
+    if (!img) return soon();
     const gb = (img.size / 1e9).toLocaleString("ro-RO", { maximumFractionDigits: 1 });
-    btns.forEach((b) => { b.href = img.browser_download_url; b.querySelector("span").textContent = `Descarcă imaginea SD · ${gb} GB`; });
-    const sha = rel.assets.find((a) => a.name === img.name + ".sha256");
+    btns.forEach((b) => { b.classList.remove("off"); b.href = img.browser_download_url; b.setAttribute("download", "");
+      b.querySelector("span").textContent = `Descarcă imaginea SD · ${gb} GB`; });
     const ver = (rel.tag_name || "").replace(/^v/, "");
     note(`Versiunea ${ver}` + (rel.published_at ? `, din ${new Date(rel.published_at).toLocaleDateString("ro-RO")}` : "") +
       ". Nu trebuie dezarhivată: Raspberry Pi Imager o scrie direct.");
-    if (sha) notes.forEach((n) => { n.append(" "); const a = document.createElement("a"); a.href = sha.browser_download_url; a.textContent = "Suma de control"; n.append(a); });
-  } catch (e) { /* rămâne legătura spre pagina versiunilor */ }
+  } catch (e) { soon(); }
 })();
 </script>
 </body>

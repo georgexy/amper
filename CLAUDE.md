@@ -419,4 +419,7 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   randare: `data-st` charging (verde, fulger mare) / discharging (albastru, căsuță) / idle (gri) / fault
   (`health.cls === "fault"`, roșu, „!”). Pe alte ecrane cercul e la 78% opacitate; tabul activ = pastilă colorată.
   `body` padding jos 104 px (cercul iese ~24 px peste bară).
+- Site (2026-10-29): utilizatorul NU vrea nicio legătură spre GitHub pe site (scoase: ghidul README, licența, Întrebări,
+  Codul sursă, suma de control, fallback-ul butonului). Butonul de descărcare e inactiv („vine în curând”) până când
+  API-ul GitHub găsește `.img.xz` în ultima versiune stabilă; atunci duce direct la fișier (descărcare, nu pagină).
 
