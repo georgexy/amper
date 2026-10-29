@@ -209,6 +209,16 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `alerts.mos_forced_minutes` (30). UI: `loadCmds/renderCmds/runCmd` în app.js, `#bms-cmds` în view-bms.
   Plan de test pe hardware (cu George): Daly 1 dsg off/on, chg off/on, repornire (durată, setări, cicluri, BLE),
   MOSFET oprit rămâne după repornire?, SOC la Daly 3 după tensiune, apoi Daly 2 (fw 11_2506, 0x40).
+- Sănătatea celulelor (1.0.0-beta.10, cerută 2026-10-29; varianta C aleasă din 3 machete, rândul ULTIMUL în
+  Bateriile): `amper/cell_health.py`. `Tracker.observe` (din Engine, la fiecare citire de pachet cu toate celulele,
+  nu `cells_age`): episoade „chg” (I > 1 A și max ≥ 3,40 V) / „dis” (min ≤ 3,10 V) → un rând pe episod (momentul cel
+  mai extrem, `EPISODE_GAP` 1 h), abaterile față de media modulului în mV; „ir” = ΔV celulă / ΔI la salt ≥ 15 A în
+  ≤ 30 s (mΩ, max 1/5 min). Tabela `cell_events` (120 de zile). `analyze` (28 de zile): mediane chg/dis, de câte ori
+  e la capăt, rezistența relativă, `score` (100 − 0,6·(mV−5) − 0,4·(%R−5) − 5 dacă mereu aceeași), nivel <70 de
+  urmărit, <90 ușor diferită, `trend` 8 săptămâni, `describe` (text). `weekly` luni ≥ 9:00 (meta `cell_health_last`,
+  din maintenance_loop): notificare doar pentru nivel 2 sau ușor diferită dar mereu la capăt (≥ 70%), url `/?v=cells`.
+  API `GET /api/cells/health` (ambele ediții). UI: `#ch-row` (după lista din Bateriile), `view-cells`, `loadCells`.
+  NEVERIFICAT pe date reale: pragurile (3,40/3,10 V, 15 A, scorul) se pot ajusta după primele săptămâni.
 - 2026-10-28 (1.0.0-beta.7): la 0x5F octeții 4..7 se schimbă singuri între citiri (Daly 1: `…00014b32` →
   `…700c7232`); `write_field` compară acum doar octeții câmpului (restul → doar avertisment în jurnal). Scrierea
   bal_start 3,40 V / bal_diff 20 mV s-a aplicat pe 3 Daly (firmware 31_2306, 31_2207, 11_2506).

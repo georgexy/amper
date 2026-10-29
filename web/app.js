@@ -105,6 +105,7 @@ async function boot() {
   const v = new URLSearchParams(location.search).get("v");
   if (v === "alerts") { show("alerts"); history.replaceState(null, "", location.pathname); }
   if (v === "update") { show("settings"); showPanel("update"); history.replaceState(null, "", location.pathname); }
+  if (v === "cells") { show("cells"); history.replaceState(null, "", location.pathname); }
   $("#set-about-sub").textContent = `Amper ${isPro() ? "Pro" : "Lite"} ${state.info.version || ""} · actualizări, Pi-ul`;
   setInterval(tickConn, 1000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -614,6 +615,68 @@ function renderPacks() {
   }
 }
 $("#pk-back").onclick = () => show("now");
+
+/* ------------------------------------------------------------------ SĂNĂTATEA CELULELOR (varianta C) */
+const cellsState = { data: null, at: 0 };
+async function fetchCells(force = false) {
+  if (!force && cellsState.data && Date.now() - cellsState.at < 10 * 60000) return cellsState.data;
+  cellsState.data = await api("/api/cells/health");
+  cellsState.at = Date.now();
+  return cellsState.data;
+}
+const CH_LV = [["ok", "În regulă"], ["wa", "Ușor diferită"], ["al", "De urmărit"]];
+async function loadCellsRow() {
+  try {
+    const r = await fetchCells();
+    const worst = r.cells[0];
+    $("#ch-row").hidden = false;
+    $("#ch-sub").textContent = !r.enough ? "Se adună date (încărcări complete și descărcări adânci)"
+      : worst ? `${worst.name} · celula ${worst.cell}${r.cells.length > 1 ? ` și încă ${r.cells.length - 1}` : ""}`
+      : `${r.tracked || r.ok_count} de celule urmărite`;
+    const [cls, txt] = !r.enough ? ["", "Date puține"] : CH_LV[worst ? worst.level : 0];
+    $("#ch-chip").className = "chip " + cls;
+    $("#ch-chip").textContent = worst?.level === 1 ? "Ușor diferit" : txt;
+  } catch {}
+}
+$("#ch-row").onclick = () => show("cells");
+$("#ch-back").onclick = () => show("packs");
+function spark(v, color) {
+  const pts = v.map((y, i) => [i, y]).filter(([, y]) => y != null);
+  if (pts.length < 2) return "";
+  const ys = pts.map(([, y]) => y), mn = Math.min(...ys), mx = Math.max(...ys), W = 92, H = 30;
+  const p = pts.map(([i, y]) => `${(i * W / (v.length - 1)).toFixed(1)},${(H - 4 - (y - mn) / ((mx - mn) || 1) * (H - 8)).toFixed(1)}`).join(" ");
+  return `<svg viewBox="0 0 ${W} ${H}" width="92" height="30"><polyline points="${p}" fill="none" stroke="${color}" stroke-width="2"/></svg>`;
+}
+async function loadCells() {
+  const box = $("#ch-body");
+  if (!cellsState.data) box.innerHTML = `<div class="note">Analizez…</div>`;
+  let r;
+  try { r = await fetchCells(true); } catch (e) { if (e.message !== "auth") box.innerHTML = `<div class="banner">${esc(e.message)}</div>`; return; }
+  const ev = r.events, data = `Date: ${ev.chg} încărcări complete, ${ev.dis} descărcări adânci și ${ev.ir} salturi de curent în ultimele
+    ${Math.round(r.window_days / 7)} săptămâni. Scorul combină abaterea la încărcare, la descărcare și rezistența internă.`;
+  if (!r.enough) {
+    box.innerHTML = `<div class="mod ch-empty"><b>Se adună date</b><p>Diferențele dintre celule se văd doar la capete: la final de
+      încărcare (peste 3,40 V) și la descărcare adâncă (sub 3,10 V). E nevoie de cel puțin 3 astfel de momente; primele
+      concluzii apar de obicei după 2–3 săptămâni.</p></div><p class="note">${data}</p>`;
+    return;
+  }
+  const mv = (v) => `${v > 0 ? "+" : ""}${num(v, 0)} mV`;
+  const worst = r.cells[0];
+  box.innerHTML = (worst && worst.level ? `<div class="ch-alert ${worst.level === 2 ? "al" : ""}"><b>${esc(worst.text.split(":")[0])}</b>${esc(worst.text.split(":").slice(1).join(":").trim())}</div>` : "") +
+    r.cells.map((c) => {
+      const color = c.level === 2 ? "var(--alarm)" : "var(--warn)";
+      const m = [c.dis != null ? `la descărcare <b>${mv(c.dis)}</b>${c.dis_low && c.dis_low[0] ? ` (${c.dis_low[0]} din ${c.dis_low[1]})` : ""}` : null,
+        c.chg != null ? `la încărcare <b>${mv(c.chg)}</b>${c.chg_top && c.chg_top[0] ? ` (${c.chg_top[0]} din ${c.chg_top[1]})` : ""}` : null,
+        c.ir_rel != null ? `rezistență <b>${c.ir_rel > 0 ? "+" : ""}${c.ir_rel}%</b>` : null].filter(Boolean);
+      return `<div class="rk"><div><div class="n">${esc(c.name)} · celula ${c.cell}</div><span class="chip ${CH_LV[c.level][0]}">${CH_LV[c.level][1]}</span></div>
+        <div class="score" style="color:${color}">${c.score}<small>scor / 100</small></div>
+        <div class="m">${m.map((x) => `<span>${x}</span>`).join("")}</div>
+        <div class="tr">abatere în ultimele 8 săptămâni ${spark(c.trend, color)}</div></div>`;
+    }).join("") +
+    `<h2>${r.cells.length ? `Celelalte ${r.ok_count} de celule` : `Toate cele ${r.ok_count} de celule`}</h2>
+    <div class="mod ch-ok"><span>${r.ok_range ? `Toate în regulă · scor ${r.ok_range[0] === r.ok_range[1] ? r.ok_range[0] : r.ok_range.join("–")}` : "Toate în regulă"}</span><span class="chip ok">În regulă</span></div>
+    <p class="note">${data}</p>`;
+}
 
 /* ------------------------------------------------------------------ ecranul INVERTOR */
 const inv = { data: null, edit: null };
@@ -1540,12 +1603,13 @@ function renderSheet() {
 $$("nav.tabs button").forEach((b) => (b.onclick = () => show(b.dataset.view)));
 function show(v) {
   state.view = v;
-  const tab = ["packs", "inverter", "bms"].includes(v) ? "now" : v;      // se deschid din „Acum”
+  const tab = ["packs", "inverter", "bms", "cells"].includes(v) ? "now" : v;      // se deschid din „Acum”
   $$("nav.tabs button").forEach((b) => b.dataset.view === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
-  for (const k of ["now", "hist", "alerts", "packs", "inverter", "bms", "settings"]) $("#view-" + k).hidden = v !== k;
+  for (const k of ["now", "hist", "alerts", "packs", "inverter", "bms", "cells", "settings"]) $("#view-" + k).hidden = v !== k;
   $("#pvpop").hidden = true;
   if (v === "bms") loadBms();
-  if (v === "packs") renderPacks();
+  if (v === "packs") { renderPacks(); loadCellsRow(); }
+  if (v === "cells") loadCells();
   if (v === "inverter") {
     renderInverterLive();
     $("#iv-pro").hidden = !isPro();                 // Lite: doar starea invertorului, fără setări
@@ -2311,6 +2375,7 @@ navigator.serviceWorker?.addEventListener("message", (e) => {
   if ($("#app").hidden) return;
   if (u.includes("v=alerts")) show("alerts");
   if (u.includes("v=update")) { show("settings"); showPanel("update"); }
+  if (u.includes("v=cells")) show("cells");
 });
 
 /* ---------- ecranul „Actualizez Amper”: cercul se umple după pașii serviciului de actualizare; cât Amper

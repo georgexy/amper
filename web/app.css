@@ -601,6 +601,37 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 #bms-cmds .btn.danger:disabled { opacity: .45; }
 .banner.ok { border-left-color: var(--charge); }
 
+/* sănătatea celulelor */
+.ch-row { display: flex; align-items: center; gap: 12px; width: 100%; margin-top: 10px; background: var(--panel); border: 0;
+  border-radius: 16px; padding: 11px 14px; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ch-row .ic { width: 34px; height: 34px; flex: none; border-radius: 10px; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--cell) 18%, transparent); }
+.ch-row .ic svg { width: 20px; height: 20px; fill: none; stroke: var(--cell); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ch-row .tx { flex: 1; min-width: 0; display: grid; gap: 1px; } .ch-row .tx b { font-size: 15px; }
+.ch-row .tx small { color: var(--muted); font-size: 12.5px; }
+.ch-row .ar { color: var(--muted); font-size: 20px; margin-left: -4px; }
+.chip { font: 600 12px "Barlow", sans-serif; padding: 3px 9px; border-radius: 99px; white-space: nowrap; color: var(--muted);
+  background: var(--panel-2); justify-self: start; }
+.chip.ok { color: var(--charge); background: color-mix(in srgb, var(--charge) 15%, transparent); }
+.chip.wa { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); }
+.chip.al { color: var(--alarm); background: color-mix(in srgb, var(--alarm) 15%, transparent); }
+.ch-alert { border-left: 4px solid var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--panel)); border-radius: 12px;
+  padding: 10px 12px; margin: 4px 0 12px; font-size: 13.5px; line-height: 1.4; }
+.ch-alert.al { border-left-color: var(--alarm); background: color-mix(in srgb, var(--alarm) 10%, var(--panel)); }
+.ch-alert b { display: block; font-size: 14.5px; }
+#ch-body .mod { background: var(--panel); border-radius: 16px; padding: 12px 14px; }
+#ch-body .ch-ok { display: flex; justify-content: space-between; align-items: center; }
+#ch-body .ch-empty p { color: var(--muted); font-size: 13.5px; margin: 6px 0 0; line-height: 1.4; }
+.rk { background: var(--panel); border-radius: 16px; padding: 11px 13px; margin-bottom: 8px; display: grid;
+  grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
+.rk .n { font: 700 17px "Barlow Condensed", sans-serif; margin-bottom: 3px; }
+.rk .m { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+.rk .m span { font-size: 11.5px; background: var(--panel-2); border-radius: 8px; padding: 3px 7px; color: var(--muted); }
+.rk .m span b { color: var(--text); }
+.rk .tr { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--muted); }
+.rk .score { font: 700 26px "Barlow Condensed", sans-serif; text-align: right; }
+.rk .score small { font-size: 12px; color: var(--muted); display: block; margin-top: -4px; }
+
 /* partajează Amper */
 .list .row.share-row { grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; }
 .share-row small { display: block; color: var(--muted); font-size: 13px; }

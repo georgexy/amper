@@ -77,6 +77,8 @@ class Engine:
         for r in self.alerts.restore(self.db.open_alerts(), self.started):
             self.db.close_alert(r["id"], int(self.started))
         self._load_forced()
+        from .cell_health import Tracker
+        self.cells = Tracker(self.db)            # sănătatea celulelor: momentele utile, analizate săptămânal
         self.subscribers: set[asyncio.Queue] = set()
         self._tasks: dict[str, asyncio.Task] = {}
         self._energy_t: dict[str, float] = {}
@@ -211,6 +213,11 @@ class Engine:
                                        title="Amper: modul nou", priority="default")
                 st.connected = True
                 self._clear_forced(st, r)
+                if isinstance(r, PackReading):
+                    try:
+                        self.cells.observe(st.cfg["id"], r)
+                    except Exception:
+                        log.exception("sănătatea celulelor: %s", st.cfg["id"])
                 if isinstance(r, InverterReading):
                     self._integrate_energy(r)
                 self._push(self.snapshot())      # pe ecran imediat, nu la următorul tick
@@ -238,6 +245,9 @@ class Engine:
                 log.exception("eroare la evaluarea alertelor")
             snap["alerts"] = self.alerts.active_list()
             self._push(snap)
+
+    def device_names(self) -> dict[str, str]:
+        return {k: st.cfg.get("name", k) for k, st in self.devices.items()}
 
     def connected_days(self) -> float:
         return float(self.cfg.get("connected_days") or 5)
@@ -295,6 +305,12 @@ class Engine:
                 await asyncio.to_thread(self.db.rollup, self.cfg["raw_retention_days"])
             except Exception:
                 log.exception("eroare la agregarea datelor")
+            try:
+                from . import cell_health
+                if cell_health.weekly_due(self.db):
+                    await asyncio.to_thread(cell_health.weekly, self.db, self.notifier, self.device_names())
+            except Exception:
+                log.exception("eroare la analiza săptămânală a celulelor")
             await asyncio.sleep(3600)
 
     # ---------------- energie ----------------

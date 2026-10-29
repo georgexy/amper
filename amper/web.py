@@ -14,6 +14,7 @@ from aiohttp import WSMsgType, web
 
 from . import __version__
 from .drivers.base import DriverError
+from .models import PackReading
 
 log = logging.getLogger(__name__)
 STATIC = Path(__file__).resolve().parent.parent / "web"
@@ -893,6 +894,17 @@ def make_app(engine) -> web.Application:
         support.reset(skey, body.get("action") or None)
         return _json(dict(ok=True))
 
+    # ---------------- sănătatea celulelor (ambele ediții) ----------------
+    from . import cell_health
+
+    async def cells_health(request):
+        res = await asyncio.to_thread(cell_health.analyze, engine.db, engine.device_names())
+        last = await asyncio.to_thread(engine.db.get_meta, cell_health.META)
+        res["last_weekly"] = int(float(last)) if last else None
+        res["tracked"] = sum(len(st.reading.cells or []) for st in engine.devices.values()
+                             if isinstance(st.reading, PackReading) and st.connected)
+        return _json(res)
+
     # ---------------- alerte proprii (setate de utilizator) ----------------
     from .alerts import METRICS
 
@@ -969,6 +981,7 @@ def make_app(engine) -> web.Application:
     app.router.add_post("/api/daly/{device}/action", daly_action)
     app.router.add_post("/api/daly/{device}/actions/retry", daly_actions_retry)
     app.router.add_get("/api/system", system_info)
+    app.router.add_get("/api/cells/health", cells_health)
     app.router.add_get("/api/wifi/scan", wifi_scan)
     app.router.add_get("/api/wifi/status", wifi_status)
     app.router.add_post("/api/wifi/connect", wifi_connect)

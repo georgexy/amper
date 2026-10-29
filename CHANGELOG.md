@@ -13,6 +13,10 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Alertă nouă: un MOSFET oprit din Amper și uitat așa mai mult de 30 de minute. Cât un BMS repornește din Amper,
   nu apare „nu comunică”.
 - Comenzile la care un BMS nu răspunde de 2 ori la rând sunt ascunse pentru acel firmware, cu „Încearcă din nou”.
+- Sănătatea celulelor: Amper urmărește fiecare celulă în momentele în care diferențele se văd (final de
+  încărcare, descărcare adâncă, salturi de curent) și, o dată pe săptămână (luni), te anunță dacă o celulă rămâne
+  mereu în urmă sau o ia mereu înainte, sau dacă are rezistența mai mare. Ecranul nou „Sănătatea celulelor”
+  (ultimul rând din Bateriile) arată celulele care se abat, cele mai slabe primele, cu scor și evoluția pe 8 săptămâni.
 
 ## 1.0.0-beta.9 — 2026-10-29
 - Tema Flux: în stânga bateriei, puterea e verde când se încarcă și roșie când se descarcă.
