@@ -117,7 +117,8 @@ button { font: inherit; color: inherit; }
 
 /* ---------- tema Flux de energie ---------- */
 /* toată înălțimea ecranului (fără antet și bara de jos), împărțită egal între diagramă și baterie */
-.f-wrap { display: flex; flex-direction: column; min-height: calc(100dvh - 54px - 112px); }
+.f-wrap { display: flex; flex-direction: column; justify-content: center;
+  min-height: calc(100dvh - 54px - 112px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
 /* starea invertorului, lângă invertor */
 .f-inv { position: absolute; transform: translateY(-50%); max-width: 38%; font-size: 12px; line-height: 1.25; color: var(--muted); }
 .f-inv b { display: block; font: 600 14px/1.15 "Barlow Condensed", sans-serif; color: var(--acc); }
@@ -143,10 +144,11 @@ button { font: inherit; color: inherit; }
 .f-node.sm .disc { width: 56px; height: 56px; } .f-node.sm .disc svg { width: 28px; height: 28px; }
 .f-node.dim .disc { border-style: dashed; box-shadow: none; opacity: .55; }
 /* bateria jos, pe ultimul rând: încărcarea/descărcarea în stânga, capacitatea în dreapta */
-.f-batt { flex: 1; display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; width: 100%; margin: 0; border: 0;
+.f-batt { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; width: 100%; margin: 0; border: 0;
   background: none; color: inherit; padding: 0 0 6px; }
 .f-bico { display: flex; flex-direction: column; }
-.f-link { flex: 1; min-height: 10px; width: 3px; margin: 0 auto; background: var(--lc, #4A6A80); opacity: .9; position: relative; }
+/* legătura invertor → baterie: puțin mai lungă pe ecranele înalte, dar fără să se întindă peste tot ecranul */
+.f-link { height: clamp(14px, calc(100dvh - 660px), 70px); width: 3px; margin: 0 auto; background: var(--lc, #4A6A80); opacity: .9; position: relative; }
 .f-link.on::after { content: ""; position: absolute; inset: 0 -2px; animation: flink 1.4s linear infinite;
   background: radial-gradient(circle, color-mix(in srgb, var(--lc) 45%, #fff) 2.6px, transparent 3px) 0 0 / 7px 22px repeat-y; }
 .f-link.rev::after { animation-direction: reverse; }
