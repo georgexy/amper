@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.7 — în pregătire
+## 1.0.0-beta.7 — 2026-10-29
 - Reparat: la setările de echilibrare ale BMS-ului Daly, aplicația spunea „BMS-ul arată altceva decât s-a trimis”
   deși valoarea se schimbase. Unele Daly modifică singure alți octeți din același bloc; acum se verifică doar
   valoarea scrisă.
