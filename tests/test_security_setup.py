@@ -315,3 +315,14 @@ def test_api_disconnect_needs_password_and_excluded_list(tmp_path):
     assert devs == ["inv"] and ex["items"][0]["label"] == "daly2: DL-B77B" and allow["items"] == []
     over = yaml.safe_load((tmp_path / "settings.yaml").read_text())
     assert [d["id"] for d in over["devices"]] == ["inv"]
+
+
+def test_page_ids_are_unique():
+    """Două elemente cu același id: `$("#…")` îl găsește doar pe primul, iar celălalt buton nu mai face nimic
+    (așa s-a stricat „Scrie” din fereastra de modificare, din cauza butonului „Activează Pro”, până la 1.0.0-beta.11)."""
+    import re
+    from collections import Counter
+    from pathlib import Path
+    html = (Path(__file__).parent.parent / "web" / "index.html").read_text(encoding="utf-8")
+    dup = [k for k, n in Counter(re.findall(r'\bid="([^"]+)"', html)).items() if n > 1]
+    assert dup == []
