@@ -742,7 +742,7 @@ function openEditor(x, target, write) {
   $("#ed-now").innerHTML = `Acum: <b>${esc(x.text)}</b>`;
   $("#ed-field").innerHTML = x.kind === "enum"
     ? `<select id="ed-val" class="ed-in">${x.options.map(([v, t]) => `<option value="${v}" ${v === x.raw ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>`
-    : `<div class="ed-num"><input id="ed-val" class="ed-in" type="number" inputmode="decimal" min="${x.min}" max="${x.max}" step="${x.step}" value="${x.value ?? ""}">
+    : `<div class="ed-num"><input id="ed-val" class="ed-in" type="number" inputmode="decimal" min="${x.min}" max="${x.max}" step="${x.step}" value="${x.initial ?? x.value ?? ""}">
        <span>${esc(x.unit)}</span></div><p class="note">Între ${num(x.min, decimals(x.step))} și ${num(x.max, decimals(x.step))} ${esc(x.unit)}.${x.role ? ` Acest prag e <b>${esc(x.role_text || x.role)}</b>.` : ""}${x.alert ? `<br><b class="bad">${esc(x.alert)}</b>` : ""}</p>`;
   $("#ed-warn").hidden = !(x.risky || x.note);
   $("#ed-warn").innerHTML = (x.risky ? "<b>Atenție: setare cu risc.</b> " : "") + esc(x.note || (x.risky ? "O valoare greșită poate opri alimentarea sau afecta bateria." : ""));
@@ -766,7 +766,8 @@ function editValue() {
 
 function updateDiff() {
   const x = inv.edit, e = editValue();
-  const same = !e.error && (x.kind === "enum" ? e.value === x.raw : Math.abs(e.value - x.value) < 1e-9);
+  // x.value = valoarea de acum (x.initial e doar ce apare la început în câmp, ex. SOC-ul sugerat)
+  const same = !e.error && (x.kind === "enum" ? e.value === x.raw : x.value != null && Math.abs(e.value - x.value) < 1e-9);
   $("#ed-diff").innerHTML = e.error ? `<span class="err">${esc(e.error)}</span>` : same ? "Aceeași valoare ca acum." :
     `${esc(x.text)} → <b>${esc(e.text)}</b>`;
   $("#ed-go").disabled = !!e.error || same || (x.risky && !$("#ed-ack").checked);
@@ -861,7 +862,7 @@ function renderCmds(msg = "") {
   }));
   const so = $("#cmd-soc");
   if (so) so.onclick = () => openEditor({ key: "set_soc", label: "Setează SOC", group: "", text: r.soc == null ? "–" : num(r.soc, 1) + " %",
-    value: s ? s.soc : r.soc, min: 0, max: 100, step: 0.1, unit: "%", risky: true,
+    value: r.soc, initial: s ? s.soc : r.soc, min: 0, max: 100, step: 0.1, unit: "%", risky: true,
     note: soc.warn + (sug ? ` Sugestie: ${sug}.` : "") }, "BMS", (v) => runCmd("set_soc", v, true));
   const rb = $("#cmd-restart");
   if (rb) rb.onclick = () => runCmd("restart");

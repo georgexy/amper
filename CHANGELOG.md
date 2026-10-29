@@ -3,6 +3,8 @@
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
 ## 1.0.0-beta.12 — în pregătire
+- Reparat: la „Setează SOC”, butonul „Scrie în BMS” rămânea dezactivat când în câmp era SOC-ul sugerat (aplicația
+  credea că e aceeași valoare ca acum). Câmpul pornește tot de la sugestie, dar se compară cu SOC-ul real.
 - Spații între butoane și cardurile vecine: „Confirmă” (parola), „Instalează acum”, „Caută actualizări” și notele
   versiunii nu se mai lipesc unele de altele.
 
