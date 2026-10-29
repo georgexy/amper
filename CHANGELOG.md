@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.9 — în pregătire
+## 1.0.0-beta.9 — 2026-10-29
 - Tema Flux: în stânga bateriei, puterea e verde când se încarcă și roșie când se descarcă.
 - Tema Flux: pe telefoanele înalte (ex. iPhone 15) bateria nu mai ajunge sub bara de jos și linia spre baterie
   nu se mai întinde pe jumătate de ecran: totul stă centrat, cu spații egale sus și jos.
