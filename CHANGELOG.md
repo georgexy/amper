@@ -3,6 +3,7 @@
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
 ## 1.0.0-beta.12 — în pregătire
+- BMS-urile PACE apar în aplicație ca „PACE / Daren” (nu mai scrie PowerCube).
 - Invertoare noi (doar citire, încă neverificate pe un aparat real):
   - **Deye** hibrid monofazat (și Sunsynk, Sol-Ark), pe RS485 (Modbus);
   - **Easun ISolar / SMH** și celelalte Voltronic / Axpert (MPP Solar, PowMr vechi), pe RS232 (protocolul PI30);

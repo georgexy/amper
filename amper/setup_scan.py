@@ -10,7 +10,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
-NAMES = {"daly": "Daly", "jk": "JK", "seplos": "Seplos", "pace": "PowerCube", "growatt_spf": "Invertor Growatt SPF",
+NAMES = {"daly": "Daly", "jk": "JK", "seplos": "Seplos", "pace": "PACE", "growatt_spf": "Invertor Growatt SPF",
          "deye": "Invertor Deye", "voltronic": "Invertor Easun / Voltronic", "srne": "Invertor Easun SMG / SRNE"}
 INVERTERS = {"growatt_spf", "deye", "voltronic", "srne"}
 BASE = {"daly": "daly", "jk": "jk", "seplos": "seplos", "pace": "pace", **{t: "inverter" for t in INVERTERS}}

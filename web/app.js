@@ -949,7 +949,7 @@ function renderLooks() {
   }));
 }
 /* Setări → Dispozitive conectate: Invertoare și BMS-uri (grupate după tip, în ordinea adresei), cu legătura și starea */
-const DEV_TYPE = { daly: "Daly", jk: "JK", sim_daly: "Daly (simulat)", seplos: "Seplos V2 (RS485)", pace: "PowerCube / PACE (RS485)", sim_seplos: "Seplos (simulat)",
+const DEV_TYPE = { daly: "Daly", jk: "JK", sim_daly: "Daly (simulat)", seplos: "Seplos V2 (RS485)", pace: "PACE / Daren (RS485)", sim_seplos: "Seplos (simulat)",
   growatt_spf: "Growatt SPF", deye: "Deye", voltronic: "Easun / Voltronic", srne: "Easun SMG / SRNE", sim_growatt: "Growatt (simulat)" };
 function devLink(info, d) {
   const live = d.reading?.raw?.link;                          // Daly: legătura găsită („Bluetooth AA:…”, „cablu …”)
@@ -1019,7 +1019,7 @@ $("#daly-search").onclick = async () => {
 /* ---------- Adaugă dispozitiv: ce e nou pe cablu (căutat singur) + căutare prin Bluetooth, apoi tipul BMS ---------- */
 const da = { cable: null, ble: null, types: [], timer: 0 };
 const INV_TYPES = new Set(["growatt_spf", "deye", "voltronic", "srne", "sim_growatt"]);
-const DA_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", pace: "PowerCube", growatt_spf: "Invertor Growatt SPF",
+const DA_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", pace: "PACE", growatt_spf: "Invertor Growatt SPF",
   deye: "Invertor Deye", voltronic: "Invertor Easun / Voltronic", srne: "Invertor Easun SMG / SRNE" };
 function devAddOpen() {
   da.ble = null;

@@ -464,6 +464,7 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - `__main__.probe`: după Growatt, PACE 0x25 la 9600 pe adresele 0–15 (`PROBE_WAIT` 0,8 s), apoi bucla Seplos (0x20,
   19200/9600) separă Seplos de Pylon cu `pace.is_seplos`. Ghid/„Adaugă dispozitiv”: `setup_scan` (NAMES „PowerCube”,
   `protocol` păstrat), `app.js` (DEV_TYPE „PowerCube / PACE (RS485)”).
+- În aplicație NU apare „PowerCube” (cerut 2026-10-29): numele afișat e „PACE / Daren” (`NAMES`, catalog, `DEV_TYPE`).
 - DE VERIFICAT la PowerCube: dacă răspunde la 0x25 sau 0x20 (programul lui e „BMS_Monitor”, nu PbmsTools), adresa
   (master 0 pentru toate modulele?), semnul curentului, ordinea temperaturilor, biții de stare. Doar citire.
 

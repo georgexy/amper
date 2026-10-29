@@ -33,7 +33,7 @@ CATALOG = [
     E(id="seplos", kind="bms", brand="Seplos", model="V2 (RS485)", driver="seplos", links=["cable"],
       supported=True, address=True,
       hint="Adaptor USB–RS485 în portul RS485 al primului pachet; pachetele legate între ele au adrese diferite (DIP)."),
-    E(id="pace", kind="bms", brand="Ecobat / PACE", model="PowerCube P15A și alte BMS PACE (RS485)", driver="pace",
+    E(id="pace", kind="bms", brand="PACE / Daren", model="BMS PACE și Daren (RS485, și protocolul Pylontech)", driver="pace",
       links=["cable"], supported=True, address=True,
       hint="Adaptor USB–RS485 în portul RS485; adresa din comutatoarele DIP."),
     E(id="jbd", kind="bms", brand="JBD", model="JBD / Xiaoxiang", driver="jbd", links=["ble"], supported=False,
