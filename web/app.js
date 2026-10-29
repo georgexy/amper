@@ -564,6 +564,8 @@ function renderNow() {
 
 /* ------------------------------------------------------------------ ecranul BATERIILE */
 // Bluetooth: numele modulului (ca în aplicația Daly de pe telefon) și adresa — ca să știi care baterie e care
+// celulele din ultima citire completă (Daly: au lipsit cadre la citirea de acum)
+const cellsOld = (r) => (r.raw?.cells_age != null ? ` · <span class="old" title="Au lipsit celule (${esc(r.raw.cells_missing)}); arăt ultima citire completă">de acum ${r.raw.cells_age} s</span>` : "");
 function bleId(r) {
   const n = r.raw?.ble_name, mac = r.raw?.ble_mac;
   if (!n && !mac) return "";
@@ -605,7 +607,7 @@ function renderPacks() {
       <div class="soc">${r.soc == null ? "–" : num(r.soc, 0)}<sup>%</sup></div></div>
       ${cells.length ? `<div class="pk-cells">${cells.map((v) => `<i class="${hi - lo > 0.005 ? (v === hi ? "hi" : v === lo ? "lo" : "") : ""}"
         style="height:${Math.max(8, ((v - floor) / span) * 100)}%"></i>`).join("")}</div>` : ""}
-      <div class="ft"><span>${cells.length ? `${cells.length} celule · min <b>${num(lo, 3)}</b> · max <b>${num(hi, 3)}</b>` : ""}</span>
+      <div class="ft"><span>${cells.length ? `${cells.length} celule · min <b>${num(lo, 3)}</b> · max <b>${num(hi, 3)}</b>${cellsOld(r)}` : ""}</span>
       <span class="mos">${mos(r.charge_mos, "încărcare")}${mos(r.discharge_mos, "descărcare")}</span></div>`;
   }
 }
@@ -671,12 +673,12 @@ function openEdit(key) {
 function openEditor(x, target, write) {
   Object.assign(editor, { item: x, target, write });
   inv.edit = x;
-  $("#ed-title").textContent = x.group ? `${x.group}: ${x.label}` : x.label;
+  $("#ed-title").textContent = (x.group ? `${x.group}: ${x.label}` : x.label) + (x.role_text ? ` — ${x.role_text}` : "");
   $("#ed-now").innerHTML = `Acum: <b>${esc(x.text)}</b>`;
   $("#ed-field").innerHTML = x.kind === "enum"
     ? `<select id="ed-val" class="ed-in">${x.options.map(([v, t]) => `<option value="${v}" ${v === x.raw ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>`
     : `<div class="ed-num"><input id="ed-val" class="ed-in" type="number" inputmode="decimal" min="${x.min}" max="${x.max}" step="${x.step}" value="${x.value ?? ""}">
-       <span>${esc(x.unit)}</span></div><p class="note">Între ${num(x.min, decimals(x.step))} și ${num(x.max, decimals(x.step))} ${esc(x.unit)}.${x.role ? ` Acum e pragul de <b>${esc(x.role)}</b>.` : ""}</p>`;
+       <span>${esc(x.unit)}</span></div><p class="note">Între ${num(x.min, decimals(x.step))} și ${num(x.max, decimals(x.step))} ${esc(x.unit)}.${x.role ? ` Acest prag e <b>${esc(x.role_text || x.role)}</b>.` : ""}${x.alert ? `<br><b class="bad">${esc(x.alert)}</b>` : ""}</p>`;
   $("#ed-warn").hidden = !(x.risky || x.note);
   $("#ed-warn").innerHTML = (x.risky ? "<b>Atenție: setare cu risc.</b> " : "") + esc(x.note || (x.risky ? "O valoare greșită poate opri alimentarea sau afecta bateria." : ""));
   $("#ed-go").textContent = `Scrie în ${target}`;
@@ -766,12 +768,16 @@ async function loadBms() {
 }
 function renderBms() {
   const r = bms.data, groups = [...new Set(r.settings.map((x) => x.group))];
+  const alerts = r.settings.filter((x) => x.alert);
   $("#bms-list").innerHTML = (r.can_write ? "" : `<div class="banner warning"><b>Modificarea e dezactivată</b>
       <small>Setați o parolă pentru aplicație ca să poată fi schimbate setările.</small></div>`) +
+    (alerts.length ? `<div class="banner warning"><b>Praguri de verificat</b>${alerts.map((x) =>
+      `<small><b>${esc(x.group)}, ${esc(x.label.toLowerCase())}:</b> ${esc(x.alert)}</small>`).join("")}</div>` : "") +
     groups.map((g) => `<h2>${esc(g)}</h2><div class="list iv-set">${r.settings.filter((x) => x.group === g).map((x) => `
       <button class="row iv-row" data-key="${esc(x.key)}" ${r.can_write ? "" : "disabled"}>
         <span class="k">${esc(x.label)}${x.risky ? ' <i class="risk" title="Setare cu risc">!</i>' : ""}${x.role
-          ? ` <span class="role ${x.role === "protecție" ? "p" : ""}">${esc(x.role)}</span>` : ""}</span>
+          ? ` <span class="role ${x.role === "protecție" ? "p" : ""}" title="${esc(x.role_text || x.role)}">${esc(x.role_text || x.role)}</span>` : ""}${x.alert
+          ? '<small class="bad">protecția e mai puțin severă decât avertismentul</small>' : ""}</span>
         <span class="v">${esc(x.text)}</span>${r.can_write ? '<span class="ed">Modifică ›</span>' : ""}</button>`).join("")}</div>`).join("");
   $$(".iv-row", $("#bms-list")).forEach((el) => (el.onclick = () => {
     const x = bms.data.settings.find((s) => s.key === el.dataset.key);
@@ -1428,14 +1434,17 @@ function renderSheet() {
   if (cells.length) {
     const lo = Math.min(...cells), hi = Math.max(...cells);
     const floor = Math.min(lo, 3.0) - 0.05, top = Math.max(hi, 3.45) + 0.02;
-    $("#sh-cellnote").textContent = `min ${num(lo, 3)} V, max ${num(hi, 3)} V`;
+    $("#sh-cellnote").textContent = `min ${num(lo, 3)} V, max ${num(hi, 3)} V` + (r.raw?.cells_age != null
+      ? ` · ultima citire completă, de acum ${r.raw.cells_age} s (au lipsit celule: ${r.raw.cells_missing})` : "");
     $("#sh-cells").innerHTML = cells.map((v, i) => {
       const h = ((v - floor) / (top - floor)) * 100;
       const c = cells.length > 1 && hi - lo > 0.005 ? (v === hi ? "hi" : v === lo ? "lo" : "") : "";
       return `<div class="cellbar ${c}"><div class="tube"><i style="height:${h}%"></i></div><b>${num(v, 3).slice(0, 5)}</b>${i + 1}</div>`;
     }).join("");
   } else {
-    $("#sh-cellnote").textContent = "BMS-ul nu a trimis tensiunile pe celule.";
+    $("#sh-cellnote").textContent = r.raw?.cells_missing
+      ? `Citire incompletă a celulelor (${r.raw.cells_missing}); se reîncearcă la următoarea citire.`
+      : "BMS-ul nu a trimis tensiunile pe celule.";
     $("#sh-cells").innerHTML = "";
   }
   $("#sh-alarms").innerHTML = (r.protections || []).map((a) => `<li class="prot">Protecție: ${esc(a)}</li>`).join("") +

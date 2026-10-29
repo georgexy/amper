@@ -139,17 +139,8 @@ class DalyProtocol:
         r.raw["load_connected"] = bool(d[3])
         r.cycles = u16(d, 5)
 
-        # tensiuni pe celule: 3 celule / cadru
         if self.cell_count:
-            n_frames = (self.cell_count + 2) // 3
-            cells: dict[int, float] = {}
-            for fr in self._query(0x95, n_frames):
-                idx = fr[0]
-                for k in range(3):
-                    cell_no = (idx - 1) * 3 + k
-                    if 1 <= idx and cell_no < self.cell_count:
-                        cells[cell_no] = u16(fr, 1 + 2 * k) / 1000
-            r.cells = [cells[i] for i in sorted(cells)]
+            self._read_cells(r)
 
         # temperaturi: 7 senzori / cadru
         if self.temp_count:
@@ -187,6 +178,40 @@ class DalyProtocol:
                 str(self.link.target).upper() if ":" in str(self.link.target) else None)
         self._check_glitch(r)
         return r
+
+    # Văzut pe hardware (2026-10-29, Daly 3 prin Bluetooth): la 0x95 se pierd cadre și vin 15, 12, 10 celule din 16.
+    # O citire incompletă nu înlocuiește tensiunile: se reîncearcă o dată, apoi se păstrează ultimele complete (cel
+    # mult CELLS_KEEP_S, marcate cu vârsta în raw.cells_age); altfel nicio celulă, deci nici min/max/diferență din
+    # celulele lipsă. Restul citirii (tensiune, curent, SOC) rămâne valid. La fel pe cablu.
+    CELLS_KEEP_S = 120
+
+    def _read_cells(self, r: PackReading) -> None:
+        want = self.cell_count
+        cells: dict[int, float] = {}
+        for _ in range(2):
+            try:
+                frames = self._query(0x95, (want + 2) // 3)
+            except DriverError:
+                frames = []
+            for fr in frames:
+                idx = fr[0]
+                for k in range(3):
+                    cell_no = (idx - 1) * 3 + k
+                    if 1 <= idx and cell_no < want:
+                        cells[cell_no] = u16(fr, 1 + 2 * k) / 1000
+            if len(cells) >= want:
+                r.cells = [cells[i] for i in range(want)]
+                self._last_cells = (r.cells, r.ts)
+                return
+        r.raw["cells_missing"] = f"{len(cells)}/{want}"
+        n = getattr(self, "_cell_gaps", 0) + 1
+        self._cell_gaps = n
+        if n in (1, 10) or n % 100 == 0:
+            log.warning("%s: doar %d din %d celule la 0x95 (#%d), păstrez ultimele complete", self.id, len(cells), want, n)
+        last = getattr(self, "_last_cells", None)
+        if last and r.ts - last[1] <= self.CELLS_KEEP_S:
+            r.cells = list(last[0])
+            r.raw["cells_age"] = round(r.ts - last[1])
 
     # Comenzile de CITIRE a parametrilor (protocolul Daly UART/485). Doar citire — nicio comandă de scriere aici.
     PARAM_COMMANDS = list(range(0x50, 0x64))

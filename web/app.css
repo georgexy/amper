@@ -377,6 +377,7 @@ nav.tabs .nav-now[data-st="fault"] .nic { fill: none; stroke-width: 3.2; width: 
 .iv-set .iv-row:first-child { border-top: 0; }
 .iv-set .iv-row:disabled { cursor: default; }
 .iv-row .k { font-size: 15px; }
+.iv-row .k small.bad, #ed-field .bad { display: block; color: var(--alarm); font-size: 12px; font-weight: 600; }
 .iv-row .v { font: 600 18px "Barlow Condensed", sans-serif; text-align: right; }
 .iv-row .ed { grid-column: 2; font-size: 12.5px; color: var(--acc); text-align: right; }
 .risk { display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: var(--warn); color: #1a1000;
@@ -490,7 +491,7 @@ nav.tabs .nav-now[data-st="fault"] .nic { fill: none; stroke-width: 3.2; width: 
 .pk-gear { margin-left: auto; font-size: 18px; line-height: 1; padding: 4px 6px; border-radius: 8px; color: var(--muted);
   background: var(--panel-2); cursor: pointer; }
 .pk-gear:hover { color: var(--acc); }
-.role { font: 600 11px "Barlow", sans-serif; padding: 1px 7px; border-radius: 99px; color: var(--warn);
+.role { font: 600 11px "Barlow", sans-serif; padding: 1px 7px; border-radius: 99px; color: var(--warn); white-space: nowrap;
   background: color-mix(in srgb, var(--warn) 15%, transparent); vertical-align: 1px; }
 .role.p { color: var(--alarm); background: color-mix(in srgb, var(--alarm) 15%, transparent); }
 
