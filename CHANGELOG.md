@@ -2,6 +2,9 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.9 — în pregătire
+- Tema Flux: puterea bateriei apare din nou și pe linia dintre invertor și baterie.
+
 ## 1.0.0-beta.8 — 2026-10-29
 - Actualizări: istoricul și „Revino la versiunea anterioară” s-au mutat într-un ecran separat, „Istoric versiuni”.
 - Mesajele de la Actualizări spun „server” în loc de GitHub.

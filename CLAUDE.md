@@ -447,4 +447,5 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   Bateria (cerut 2026-10-29): `.f-batt` = grilă `.f-bl` („Se descarcă:”/„Se încarcă:”/„Stare:” + `bw`;
   „Descărcare/Încărcare completă:” + durata; etichete șterse, valori albe, ca dreapta; fără tensiune) | `.f-bico` | `.f-br`
   („Total:” `capKwh`, „Actual:” `b.kwh`); `flex: 1` o împinge jos, iar `.f-link` (bară cu puncte animate, `--lc`)
-  continuă linia invertor → baterie. `.f-blabel` (puterea pe linie) scos: puterea e în stânga.
+  continuă linia invertor → baterie. `.f-blabel` (puterea pe linie, left 53% top 87%; SE 93%) pus înapoi în
+  1.0.0-beta.9 (cerut 2026-10-29): puterea apare și pe linie, și în stânga bateriei.

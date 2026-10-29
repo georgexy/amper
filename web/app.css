@@ -123,6 +123,7 @@ button { font: inherit; color: inherit; }
 .f-inv b { display: block; font: 600 14px/1.15 "Barlow Condensed", sans-serif; color: var(--acc); }
 /* diagrama: cât încape pe înălțime, cel mult 400 px */
 .f-diag { position: relative; width: min(100%, 400px, calc((100dvh - 340px) * 1.09)); margin: 12px auto 0; aspect-ratio: 360 / 330; }
+.f-blabel { position: absolute; font: 700 18px "Barlow Condensed", sans-serif; color: var(--mc); transform: translateY(-50%); }
 .f-diag svg.lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .f-diag .ln { fill: none; stroke-width: 3; opacity: .9; }
 .f-diag .dots { fill: none; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 0 22; opacity: 0; }
@@ -172,6 +173,7 @@ button { font: inherit; color: inherit; }
   .f-node .w { font-size: 18px; margin-top: 3px; }
   .f-node.sm .disc { width: 42px; height: 42px; } .f-node.sm .disc svg { width: 21px; height: 21px; }
   .f-node[data-open="inverter"] .disc { width: 48px !important; height: 48px !important; }
+  .f-blabel { top: 93% !important; }
   .f-inv { top: 78% !important; max-width: 40%; font-size: 11px; } .f-inv b { font-size: 13px; }
   .f-cap { width: 26px; height: 6px; } .f-cell { width: 72px; height: 82px; border-radius: 15px; } .f-cell b { font-size: 28px; }
   .f-bl, .f-br { height: 88px; font-size: 11px; } .f-bl b, .f-br b { font-size: 17px; margin-bottom: 2px; }
