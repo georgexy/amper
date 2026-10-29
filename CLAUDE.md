@@ -384,8 +384,12 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - Ecran: beta sus, `#up-check` „Caută actualizări”, `.up-new-head` (titlu + „Descarcă”), bara/instalarea înaintea notelor.
 
 ## Conectare: automat sau din listă (1.0.0-beta.12, cerut 2026-10-29)
-- Ghid → Dispozitivele: `su.mode` auto | manual; manual = `su.man` {kind → model → link, address}; „‹ Alege alt
-  model”, „Schimbă” între moduri oricând; `su.found` + `su.pick` adună rezultatele mai multor căutări.
+- Ghid → Dispozitivele (forma cerută de utilizator 2026-10-29): întâi două butoane UNUL SUB ALTUL „Configurare
+  automată” / „Configurare manuală” (`su.mode` null → auto | manual; alegerea golește `su.found`/`su.pick`). Automat:
+  card „Înainte de căutare” + „Caută”, rezultatele în DOUĂ liste (Invertor / BMS, `suKind` după catalog). Manual:
+  `su.man.stage` inverter → bms (Mai departe trece la BMS), în fiecare: model din listă → tipul conexiunii (+ adresa
+  DIP) → „Caută”; BMS-urile se pot căuta de mai multe ori (se adună). „‹ Înapoi” = un sub-pas înapoi. Butonul
+  „+ Daly (se găsește singur)” SCOS (cerut).
 - `amper/catalog.py` (`CATALOG`: id, kind inverter|bms, brand, model, driver, links, supported, address, hint) →
   `GET /api/setup/catalog`. `POST /api/setup/scan {model, link, address}` → `setup_scan.scan(..., model, link,
   address)`: `__main__.probe(port, only={driver}, addresses)` sau `scan_ble_model` (nume DL-/JK-). Fiecare găsit pe

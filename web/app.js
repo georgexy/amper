@@ -2257,64 +2257,88 @@ function suMerge(found) {                     // rezultatele mai multor căutăr
     if (f.ok !== false) su.pick.add(k);
   }
 }
-function suManualHtml() {
-  const cat = su.cat.catalog, m = su.man;
-  if (!m.kind) return `<p class="note">Ce vrei să legi?</p>
-    <div class="su-kind"><button class="card" data-kind="inverter"><b>Invertor</b><small>Growatt, Deye, Easun…</small></button>
-      <button class="card" data-kind="bms"><b>Baterie / BMS</b><small>Daly, JK, Seplos, PowerCube…</small></button></div>`;
-  const e = cat.find((x) => x.id === m.model);
-  if (!e) return `<p class="note"><a href="#" class="su-up" data-up="kind">‹ ${m.kind === "inverter" ? "Invertor" : "Baterie / BMS"}</a> · alege modelul:</p>
-    <div class="list">${cat.filter((x) => x.kind === m.kind).map((x) => `<button class="row su-model" data-model="${x.id}" ${x.supported ? "" : "disabled"}>
-      <span><b>${esc(x.brand)}</b> · ${esc(x.model)}</span>${x.supported ? '<span class="t">›</span>' : '<span class="t">în curând</span>'}</button>`).join("")}</div>
-    <p class="note">Nu-ți găsești modelul? Încearcă <a href="#" class="su-up" data-up="auto">detectarea automată</a>.</p>`;
-  const link = m.link || e.links[0];
-  return `<p class="note"><a href="#" class="su-up" data-up="model">‹ Alege alt model</a></p>
-    <div class="card su-pick"><b>${esc(e.brand)} · ${esc(e.model)}</b>
-      ${e.links.length > 1 ? `<div class="su-links">${e.links.map((l) => `<button class="${l === link ? "on" : ""}" data-link="${l}">${esc(su.cat.links[l] || l)}</button>`).join("")}</div>` : ""}
-      ${e.hint ? `<p class="note">${esc(e.hint)}</p>` : ""}
-      ${e.address && link === "cable" ? `${suField("su-addr", "Adresa (din comutatoarele DIP), dacă o știi", `type="number" inputmode="numeric" min="0" max="15" placeholder="toate (0–15)" value="${m.address ?? ""}"`)}` : ""}
-    </div>`;
+// tipul unui dispozitiv găsit (după catalog): invertor sau BMS
+const suKind = (f) => su.cat.catalog.find((e) => e.driver === f.type)?.kind || (f.type === "growatt_spf" ? "inverter" : "bms");
+function suFoundHtml(kind, title) {
+  const list = su.found.map((f, i) => [f, i]).filter(([f]) => suKind(f) === kind);
+  if (!list.length) return title ? `<h3 class="su-h">${title}</h3><div class="empty">Nimic găsit.</div>` : "";
+  return `${title ? `<h3 class="su-h">${title}</h3>` : ""}<div class="list">${list.map(([f, i]) => `<label class="row-check">
+    <input type="checkbox" class="su-f" data-i="${i}" ${su.pick.has(suKey(f)) ? "checked" : ""}>
+    <span><b>${esc(f.label)}</b><small>${esc(f.link)}${f.short ? " · " + esc(f.short) : ""}${f.rssi ? ` · semnal ${f.rssi} dBm` : ""}</small>
+    ${f.check && Object.keys(f.check).length ? `<small>${esc(suCheck(f.check))} — corect?</small>` : ""}
+    ${f.ok === false ? `<small class="warnc">Nu pare BMS (egalizator activ?) — nebifat.</small>` : ""}</span></label>
+    ${f.binding ? `<button class="btn sm danger su-rej" data-rej="${i}">Respinge ${esc(f.name || "")}</button>` : ""}`).join("")}</div>`;
+}
+function suManualHtml(sc, running) {
+  const kind = su.man.stage, cat = su.cat.catalog;
+  const what = kind === "inverter" ? "invertorul" : "acumulatorii (BMS-urile)";
+  const e = cat.find((x) => x.id === su.man.model && x.kind === kind);
+  let h = `<p class="su-stage">${kind === "inverter" ? "Pasul 1 din 2 · Invertorul" : "Pasul 2 din 2 · Acumulatorii (BMS)"}</p>`;
+  if (!e) {
+    h += `<p class="note">Ce ${kind === "inverter" ? "invertor" : "BMS"} ai?</p>
+      <div class="list">${cat.filter((x) => x.kind === kind).map((x) => `<button class="row su-model" data-model="${x.id}" ${x.supported ? "" : "disabled"}>
+        <span><b>${esc(x.brand)}</b> · ${esc(x.model)}</span><span class="t">${x.supported ? "›" : "în curând"}</span></button>`).join("")}</div>`;
+  } else {
+    const link = su.man.link || e.links[0];
+    h += `<div class="card su-pick"><b>${esc(e.brand)} · ${esc(e.model)}</b>
+        <span class="su-l">Tipul conexiunii</span>
+        <div class="su-links">${e.links.map((l) => `<button class="${l === link ? "on" : ""}" data-link="${l}">${esc(su.cat.links[l] || l)}</button>`).join("")}</div>
+        ${e.hint ? `<p class="note">${esc(e.hint)}</p>` : ""}
+        ${e.address && link === "cable" ? suField("su-addr", "Adresa (din comutatoarele DIP), dacă o știi",
+          `type="number" inputmode="numeric" min="0" max="15" placeholder="toate (0–15)" value="${su.man.address ?? ""}"`) : ""}
+        <button class="btn" id="su-scan" ${running ? "disabled" : ""}>${running ? "Caut…" : `Caută ${esc(e.brand)}`}</button>
+      </div>
+      <p class="note"><a href="#" class="su-up" data-up="model">‹ Alt model</a></p>`;
+  }
+  h += `<p class="note" id="su-scan-msg">${esc(running ? sc.message : sc.state === "failed" ? sc.message : sc.ble_note || "")}</p>`;
+  h += suFoundHtml(kind, su.found.some((f) => suKind(f) === kind) ? (kind === "inverter" ? "Invertor găsit" : "BMS găsite") : "");
+  if (kind === "bms" && su.found.some((f) => suKind(f) === "bms"))
+    h += `<p class="note">Mai ai alte acumulatoare (alt model)? Alege-l din listă și caută din nou; se adaugă la cele de mai sus.</p>`;
+  h += `<p class="note">${kind === "inverter" ? "Apasă „Mai departe” pentru acumulatori (și dacă n-ai invertor de legat)."
+    : "Apasă „Mai departe” când ai găsit toate ce vrei să păstrezi."}</p>`;
+  return h;
 }
 function suRenderDevices() {
   const d = su.d, sc = d.scan || {}, b = $("#su-body");
   const real = d.devices.filter((x) => !x.type.startsWith("sim_"));
   const running = sc.state === "running";
   if (sc.state === "done" && sc !== su.merged) { suMerge(sc.found); su.merged = sc; }
-  const e = su.cat.catalog.find((x) => x.id === su.man.model);
-  b.innerHTML = `<h2>Dispozitivele</h2>
-    ${real.length ? `<div class="list">${real.map((x) => `<div class="row"><span><b>${esc(x.name)}</b></span>
-      <span class="t">${esc(x.port || x.ble || "")}${x.capacity_ah ? ` · ${x.capacity_ah} Ah` : ""}</span></div>`).join("")}</div>
-      <label class="row-check"><input type="checkbox" id="su-keep" ${su.keep ? "checked" : ""}>
-        <span><b>Păstrează dispozitivele de acum</b><small>Nu schimb nimic la dispozitive.</small></span></label>` : ""}
-    <p class="note">Leagă la Pi cablurile USB (invertor, RS485, BMS) și pornește modulele Bluetooth. Apoi alege cum le găsim:</p>
-    <div class="su-mode"><button data-m="auto" class="${su.mode === "auto" ? "on" : ""}"><b>Detectare automată</b><small>Amper încearcă singur toate tipurile (1–2 minute)</small></button>
-      <button data-m="manual" class="${su.mode === "manual" ? "on" : ""}"><b>Aleg eu din listă</b><small>Spui ce ai; Amper caută doar acel model (câteva secunde)</small></button></div>
-    ${su.mode === "manual" ? suManualHtml() : ""}
-    ${su.mode === "auto" || (su.mode === "manual" && e) ? `<button class="btn" id="su-scan" ${running ? "disabled" : ""}>${running ? "Caut…"
-      : su.mode === "auto" ? (su.found.length ? "Caută din nou" : "Caută dispozitivele") : `Caută ${esc(e.brand)}`}</button>` : ""}
-    <p class="note" id="su-scan-msg">${esc(running ? sc.message : sc.state === "failed" ? sc.message : sc.ble_note || "")}</p>
-    ${su.found.length ? `<h3 class="su-h">Găsite (bifează ce păstrezi)</h3><div class="list">${su.found.map((f, i) => `<label class="row-check">
-        <input type="checkbox" class="su-f" data-i="${i}" ${su.pick.has(suKey(f)) ? "checked" : ""}>
-        <span><b>${esc(f.label)}</b><small>${esc(f.link)}${f.short ? " · " + esc(f.short) : ""}${f.rssi ? ` · semnal ${f.rssi} dBm` : ""}</small>
-        ${f.check && Object.keys(f.check).length ? `<small>${esc(suCheck(f.check))} — corect?</small>` : ""}
-        ${f.ok === false ? `<small class="warnc">Nu pare BMS (egalizator activ?) — nebifat.</small>` : ""}</span></label>
-        ${f.binding ? `<button class="btn sm danger su-rej" data-rej="${i}">Respinge ${esc(f.name || "")}</button>` : ""}`).join("")}</div>`
-      : sc.state === "done" ? `<div class="empty">N-am găsit nimic. Verifică cablurile și că BMS-urile sunt treze (pornește un consumator).
-        ${su.mode === "auto" ? `Sau <a href="#" class="su-up" data-up="manual">alege din listă</a> ce ai.` : `Sau încearcă <a href="#" class="su-up" data-up="auto">detectarea automată</a>.`}</div>` : ""}
-    <p class="note">Ai module Daly care nu sunt încă legate? Adaugă-le acum: se vor găsi singure când apar
-      (pe cablu sau Bluetooth).</p>
-    <div class="su-add"><button class="btn sm" id="su-add-daly">+ Daly (se găsește singur)</button>
-      <span class="note" id="su-add-n">${su.extraDaly ? `${su.extraDaly} adăugate` : ""}</span></div>`;
-  $$(".su-mode button", b).forEach((x) => (x.onclick = () => { su.mode = x.dataset.m; suRenderDevices(); }));
-  $$("[data-kind]", b).forEach((x) => (x.onclick = () => { su.man = { kind: x.dataset.kind }; suRenderDevices(); }));
-  $$(".su-model", b).forEach((x) => (x.onclick = () => { su.man.model = x.dataset.model; su.man.link = null; suRenderDevices(); }));
+  let h = `<h2>Dispozitivele</h2>`;
+  if (!su.mode) {
+    h += `${real.length ? `<div class="list">${real.map((x) => `<div class="row"><span><b>${esc(x.name)}</b></span>
+        <span class="t">${esc(x.port || x.ble || "")}${x.capacity_ah ? ` · ${x.capacity_ah} Ah` : ""}</span></div>`).join("")}</div>
+        <label class="row-check"><input type="checkbox" id="su-keep" ${su.keep ? "checked" : ""}>
+          <span><b>Păstrează dispozitivele de acum</b><small>Nu schimb nimic la dispozitive.</small></span></label>` : ""}
+      <p class="note">Cum vrei să găsim invertorul și acumulatorii?</p>
+      <div class="su-mode">
+        <button data-m="auto"><b>Configurare automată</b><small>Amper încearcă singur toate tipurile cunoscute și îți arată ce a găsit (1–2 minute).</small></button>
+        <button data-m="manual"><b>Configurare manuală</b><small>Alegi tu din listă invertorul, apoi BMS-urile, și tipul conexiunii; Amper caută doar ce ai ales.</small></button>
+      </div>`;
+  } else if (su.mode === "auto") {
+    h += `<p class="su-stage">Configurare automată</p>
+      <div class="card su-info"><b>Înainte de căutare</b>
+        <p>1. Leagă la Pi cablurile USB: invertorul, adaptorul RS485 al bateriilor, cablurile BMS-urilor.</p>
+        <p>2. Pornește modulele Bluetooth ale BMS-urilor (un BMS adormit se trezește dacă pornești un consumator).</p></div>
+      <button class="btn" id="su-scan" ${running ? "disabled" : ""}>${running ? "Caut…" : su.found.length ? "Caută din nou" : "Caută dispozitivele"}</button>
+      <p class="note" id="su-scan-msg">${esc(running ? sc.message : sc.state === "failed" ? sc.message : sc.ble_note || "")}</p>
+      ${sc.state === "done" || su.found.length ? suFoundHtml("inverter", "Invertor") + suFoundHtml("bms", "BMS / acumulatori") +
+        (su.found.length ? "" : `<p class="note">N-am găsit nimic? Verifică cablurile sau încearcă <a href="#" class="su-up" data-up="manual">configurarea manuală</a>.</p>`) : ""}`;
+  } else {
+    h += suManualHtml(sc, running);
+  }
+  b.innerHTML = h;
+  if (su.mode) { $("#su-back").hidden = false; $("#su-back").textContent = "‹ Înapoi"; }
+  $$(".su-mode button", b).forEach((x) => (x.onclick = () => {
+    // modul ales de la capăt: rezultatele căutărilor de dinainte nu se amestecă
+    su.mode = x.dataset.m; su.man = { stage: "inverter" }; su.found = []; su.pick = new Set(); su.d.scan = {};
+    suRenderDevices();
+  }));
+  $$(".su-model", b).forEach((x) => (x.onclick = () => { su.man.model = x.dataset.model; su.man.link = null; su.man.address = null; suRenderDevices(); }));
   $$("[data-link]", b).forEach((x) => (x.onclick = () => { su.man.link = x.dataset.link; suRenderDevices(); }));
   $$(".su-up", b).forEach((x) => (x.onclick = (ev) => {
     ev.preventDefault();
-    const up = x.dataset.up;
-    if (up === "kind") su.man = {};
-    else if (up === "model") su.man = { kind: su.man.kind };
-    else { su.mode = up; if (up === "manual") su.man = {}; }
+    if (x.dataset.up === "model") { su.man.model = null; su.man.link = null; }
+    else { su.mode = x.dataset.up; su.man = { stage: "inverter" }; }
     suRenderDevices();
   }));
   $$(".su-f", b).forEach((x) => (x.onchange = () => {
@@ -2323,9 +2347,12 @@ function suRenderDevices() {
   }));
   if ($("#su-scan")) $("#su-scan").onclick = async () => {
     su.keep = false;
-    const body = su.mode === "manual" ? { model: e.id, link: su.man.link || e.links[0],
-      address: $("#su-addr") ? $("#su-addr").value : null } : {};
-    if (su.mode === "manual" && $("#su-addr")) su.man.address = $("#su-addr").value;
+    let body = {};
+    if (su.mode === "manual") {
+      const e = su.cat.catalog.find((x) => x.id === su.man.model);
+      su.man.address = $("#su-addr") ? $("#su-addr").value : null;
+      body = { model: e.id, link: su.man.link || e.links[0], address: su.man.address };
+    }
     try {
       su.d.scan = await api("/api/setup/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     } catch (err) { $("#su-err").textContent = err.message; return; }
@@ -2341,7 +2368,6 @@ function suRenderDevices() {
       su.pick.delete(suKey(f)); su.found.splice(+x.dataset.rej, 1); suRenderDevices();
     } catch (err) { if (err.message !== "Anulat.") $("#su-err").textContent = err.message; }
   }));
-  $("#su-add-daly").onclick = () => { su.extraDaly = (su.extraDaly || 0) + 1; $("#su-add-n").textContent = `${su.extraDaly} adăugate`; };
   if ($("#su-keep")) $("#su-keep").onchange = (ev) => (su.keep = ev.target.checked);
   if (running) suPollScan();
 }
@@ -2378,9 +2404,12 @@ async function suNext() {
       if (su.reset) { location.reload(); return; }
     }
   } else if (st.k === "devices") {
-    if (su.keep) { su.chosen = null; su.i += 2; return suRender(); }       // sari peste capacități
+    if (su.keep && !su.mode) { su.chosen = null; su.i += 2; return suRender(); }       // sari peste capacități
+    if (!su.mode) throw new Error("Alege configurarea automată sau manuală.");
+    if (su.mode === "manual" && su.man.stage === "inverter") {           // invertorul e gata: urmează BMS-urile
+      su.man = { stage: "bms" }; su.d.scan = {}; return suRenderDevices();
+    }
     const sel = su.found.filter((f) => su.pick.has(suKey(f))).map((f) => ({ ...f }));
-    for (let k = 0; k < (su.extraDaly || 0); k++) sel.push({ type: "daly", link: "se găsește singur", label: "Daly" });
     if (!sel.length) {
       if (su.d.devices.some((x) => !x.type.startsWith("sim_")))
         throw new Error("Alege dispozitivele găsite sau bifează „Păstrează dispozitivele de acum”.");
@@ -2423,6 +2452,13 @@ $("#su-next").onclick = async () => {
   b.disabled = false;
 };
 $("#su-back").onclick = () => {
+  if (SU_STEPS[su.i].k === "devices" && su.mode) {                    // în pasul Dispozitivele: un sub-pas înapoi
+    if (su.mode === "manual" && su.man.model) { su.man.model = null; su.man.link = null; }
+    else if (su.mode === "manual" && su.man.stage === "bms") su.man = { stage: "inverter" };
+    else su.mode = null;
+    su.d.scan = su.d.scan?.state === "running" ? su.d.scan : {};
+    return suRenderDevices();
+  }
   if (su.i === su.start) { $("#setup").hidden = true; $("#app").hidden = false; return; }   // reluat din Setări: renunță
   su.i -= SU_STEPS[su.i].k === "notif" && !su.chosen ? 2 : 1;
   suRender();

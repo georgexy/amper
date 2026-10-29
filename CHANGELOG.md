@@ -3,11 +3,12 @@
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
 ## 1.0.0-beta.12 — în pregătire
-- Ghid de configurare → Dispozitivele: alegi „Detectare automată” (Amper încearcă singur toate tipurile) sau „Aleg
-  eu din listă” (tip → marcă și model → cablu sau Bluetooth, adresa din DIP dacă o știi; Amper caută doar acel model,
-  în câteva secunde). Poți schimba oricând alegerea și te poți întoarce un pas; rezultatele mai multor căutări se
-  adună. La fiecare dispozitiv găsit pe cablu vezi valori citite din el (ex. „ieșire 230 V · baterie 52,8 V — corect?”).
-  În listă apar deja Deye și Easun (ISolar/SMH și SMG), marcate „în curând”.
+- Ghid de configurare → Dispozitivele: două variante, una sub alta. „Configurare automată”: îți spune ce să legi
+  și ce să pornești, caută singur și arată separat invertorul găsit și BMS-urile găsite. „Configurare manuală”: întâi
+  invertorul (modelul din listă și tipul conexiunii), apoi acumulatorii (BMS); Amper caută doar ce ai ales, în câteva
+  secunde. „‹ Înapoi” te duce un pas înapoi (alt model, înapoi la invertor, altă variantă). La fiecare dispozitiv găsit
+  vezi valori citite din el („… — corect?”). În listă apar deja Deye și Easun (ISolar/SMH și SMG), „în curând”.
+  Butonul „+ Daly (se găsește singur)” a fost scos.
 - Reparat: la „Setează SOC”, butonul „Scrie în BMS” rămânea dezactivat când în câmp era SOC-ul sugerat (aplicația
   credea că e aceeași valoare ca acum). Câmpul pornește tot de la sugestie, dar se compară cu SOC-ul real.
 - Spații între butoane și cardurile vecine: „Confirmă” (parola), „Instalează acum”, „Caută actualizări” și notele

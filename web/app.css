@@ -641,7 +641,11 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .rk .score small { font-size: 12px; color: var(--muted); display: block; margin-top: -4px; }
 
 /* ghid → dispozitive: detectare automată sau din listă */
-.su-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 12px; }
+.su-mode { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 8px 0 12px; }
+.su-mode button { padding: 14px 16px; } .su-mode b { font-size: 17px; }
+.su-stage { margin: 4px 0 8px; font: 600 13px "Barlow", sans-serif; color: var(--acc); letter-spacing: .02em; text-transform: uppercase; }
+.su-info { padding: 12px 14px; display: grid; gap: 4px; margin-bottom: 10px; } .su-info p { margin: 0; font-size: 14px; color: var(--muted); }
+.su-pick .btn { margin-top: 4px; }
 .su-mode button, .su-kind button { text-align: left; border: 1px solid var(--line); background: var(--panel); color: inherit;
   border-radius: 14px; padding: 10px 12px; font: inherit; cursor: pointer; display: grid; gap: 3px; }
 .su-mode button.on { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 12%, var(--panel)); }
