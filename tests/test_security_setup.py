@@ -326,3 +326,51 @@ def test_page_ids_are_unique():
     html = (Path(__file__).parent.parent / "web" / "index.html").read_text(encoding="utf-8")
     dup = [k for k, n in Counter(re.findall(r'\bid="([^"]+)"', html)).items() if n > 1]
     assert dup == []
+
+
+def test_catalog_and_model_scan(tmp_path, monkeypatch):
+    """„Aleg eu din listă”: catalogul (cu modelele încă nesuportate marcate) și căutarea doar pentru modelul ales."""
+    from amper import __main__ as cli
+    from amper import catalog, setup_scan
+    tried = []
+    monkeypatch.setattr(cli, "list_ports", lambda: ["/dev/ttyUSB0"])
+    monkeypatch.setattr(cli, "probe", lambda p, only=None, addresses=None: tried.append((p, only, addresses))
+                        or ['seplos {"baudrate": 19200, "address": 2}'])
+    monkeypatch.setattr(setup_scan, "live_check", lambda item: {"voltage": 53.1, "soc": 71})
+    res = setup_scan.scan({"devices": []}, model="seplos", link="cable", address=2)
+    assert tried == [("/dev/ttyUSB0", {"seplos"}, [2])]
+    assert res["found"][0]["label"] == "Seplos (adresa 2)" and res["found"][0]["check"]["soc"] == 71
+    import pytest
+    with pytest.raises(ValueError):
+        setup_scan.scan({"devices": []}, model="deye", link="cable")       # încă nesuportat
+    ids = {e["id"]: e for e in catalog.CATALOG}
+    assert ids["growatt_spf"]["supported"] and not ids["deye"]["supported"]
+    assert {e["kind"] for e in catalog.CATALOG} == {"inverter", "bms"}
+
+    async def steps(c, eng, n):
+        return await (await c.get("/api/setup/catalog")).json()
+    cat = run({}, steps, tmp_path)
+    assert any(e["brand"] == "Easun" for e in cat["catalog"]) and cat["links"]["ble"] == "Bluetooth"
+
+
+def test_probe_only_tries_the_chosen_type(monkeypatch):
+    from amper import __main__ as cli
+    from amper.drivers import daly, growatt_spf
+    calls = []
+
+    class Fake:
+        def __init__(self, cfg):
+            calls.append(cfg["type"])
+
+        def _query(self, *a):
+            raise OSError("nimic")
+
+        def _read_block(self, *a):
+            raise OSError("nimic")
+
+        def close(self):
+            pass
+    monkeypatch.setattr(daly, "DalyDriver", Fake)
+    monkeypatch.setattr(growatt_spf, "GrowattSPFDriver", Fake)
+    assert cli.probe("/dev/x", only={"growatt_spf"}) == []
+    assert calls == ["growatt_spf"]

@@ -383,6 +383,17 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   actualiza.” `app.js`: `?v=update` și mesajul SW deschid Setări → Actualizări.
 - Ecran: beta sus, `#up-check` „Caută actualizări”, `.up-new-head` (titlu + „Descarcă”), bara/instalarea înaintea notelor.
 
+## Conectare: automat sau din listă (1.0.0-beta.12, cerut 2026-10-29)
+- Ghid → Dispozitivele: `su.mode` auto | manual; manual = `su.man` {kind → model → link, address}; „‹ Alege alt
+  model”, „Schimbă” între moduri oricând; `su.found` + `su.pick` adună rezultatele mai multor căutări.
+- `amper/catalog.py` (`CATALOG`: id, kind inverter|bms, brand, model, driver, links, supported, address, hint) →
+  `GET /api/setup/catalog`. `POST /api/setup/scan {model, link, address}` → `setup_scan.scan(..., model, link,
+  address)`: `__main__.probe(port, only={driver}, addresses)` sau `scan_ble_model` (nume DL-/JK-). Fiecare găsit pe
+  cablu are `check` din `live_check` (o citire: BMS → V/SOC/celule; invertor → out_v/bat_v/pv_w/load_w).
+- Invertoare de făcut, în ordine (decis 2026-10-29): Deye (+Sunsynk/Sol-Ark, Modbus RS485), Voltronic/Axpert PI30
+  (Easun ISolar/SMH, MPP Solar, PowMr vechi), SRNE Modbus (Easun SMG/SMG-II, PowMr nou, Anenji). Doar citire la
+  început; setările după confirmarea pe aparat. „Adaugă dispozitiv” (Setări) încă are doar cablu/Bluetooth automat.
+
 ## Deconectare BMS, module excluse, egalizatoare (1.0.0-beta.1, în pregătire)
 - Pe Pi-ul utilizatorului, căutarea a legat un EGALIZATOR ACTIV (BLE „DL-B77B020306D3”) ca daly2: răspunde la 0x90 cu
   tensiuni reale, SOC 0, 0 cicluri, MOSFET 0. Utilizatorul a scos modulele BLE de pe egalizatoare și va deconecta daly2.

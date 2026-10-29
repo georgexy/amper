@@ -640,6 +640,26 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .rk .score { font: 700 26px "Barlow Condensed", sans-serif; text-align: right; }
 .rk .score small { font-size: 12px; color: var(--muted); display: block; margin-top: -4px; }
 
+/* ghid → dispozitive: detectare automată sau din listă */
+.su-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 12px; }
+.su-mode button, .su-kind button { text-align: left; border: 1px solid var(--line); background: var(--panel); color: inherit;
+  border-radius: 14px; padding: 10px 12px; font: inherit; cursor: pointer; display: grid; gap: 3px; }
+.su-mode button.on { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 12%, var(--panel)); }
+.su-mode small, .su-kind small { color: var(--muted); font-size: 12.5px; line-height: 1.3; }
+.su-kind { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.su-model { width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0; cursor: pointer;
+  display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.su-model:disabled { opacity: .5; cursor: default; }
+.list .row.su-model { display: flex; }
+.su-up { color: var(--acc); }
+.su-pick { padding: 12px 14px; display: grid; gap: 8px; }
+.su-links { display: flex; gap: 6px; }
+.su-links button { flex: 1; border: 1px solid var(--line); background: var(--panel-2); color: inherit; border-radius: 99px;
+  padding: 7px 10px; font: inherit; cursor: pointer; }
+.su-links button.on { border-color: var(--acc); color: var(--acc); }
+.su-h { margin: 14px 0 6px; font-size: 15px; color: var(--muted); }
+#su-scan { margin: 4px 0; }
+
 /* partajează Amper */
 .list .row.share-row { grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; }
 .share-row small { display: block; color: var(--muted); font-size: 13px; }

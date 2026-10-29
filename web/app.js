@@ -2158,6 +2158,8 @@ async function openSetup(again, step, reset = false) {
   su.again = again; su.chosen = null; su.keep = false; su.reset = reset;
   su.i = su.start = Math.max(0, SU_STEPS.findIndex((x) => x.k === step));     // „+ Adaugă dispozitiv” → direct la Dispozitive
   try { su.d = await api("/api/setup"); } catch { return; }
+  try { su.cat = su.cat || (await api("/api/setup/catalog")); } catch { su.cat = { catalog: [], links: {} }; }
+  su.found = []; su.pick = new Set(); su.mode = null; su.man = {};
   $("#app").hidden = true; $("#login").hidden = true; $("#setup").hidden = false;
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
   suRender();
@@ -2235,6 +2237,9 @@ function suRender() {
   if (first && st.k !== "capacity") first.focus();
 }
 function suCheck(c) {
+  if (c.out_v != null || c.bat_v != null)                 // invertor: valori ușor de verificat pe afișajul lui
+    return [c.out_v != null ? `ieșire ${num(c.out_v, 0)} V` : "", c.bat_v != null ? `baterie ${num(c.bat_v, 1)} V` : "",
+      c.pv_w != null ? `panouri ${num(c.pv_w, 0)} W` : "", c.load_w != null ? `consum ${num(c.load_w, 0)} W` : ""].filter(Boolean).join(" · ");
   return [c.voltage != null ? `${num(c.voltage, 1)} V` : "", c.soc != null ? `SOC ${num(c.soc, 0)}%` : "",
     c.capacity_ah ? `${num(c.capacity_ah, 0)} Ah` : "fără capacitate", c.cells ? `${c.cells} celule` : "",
     c.cycles != null ? `${c.cycles} cicluri` : ""].filter(Boolean).join(" · ");
@@ -2243,48 +2248,102 @@ function suDefaultName(c, i) {
   const same = (su.chosen || []).filter((x) => x.type === c.type);
   return same.length > 1 || c.type !== "growatt_spf" ? `${DEV_NAME[c.type]} ${same.indexOf(c) + 1}` : DEV_NAME[c.type];
 }
+const suKey = (f) => f.ble ? `ble:${f.ble}` : `${f.port}|${f.type}|${f.address ?? ""}`;
+function suMerge(found) {                     // rezultatele mai multor căutări se adună (ex. invertorul, apoi bateriile)
+  for (const f of found || []) {
+    const k = suKey(f);
+    if (su.found.some((x) => suKey(x) === k)) continue;
+    su.found.push(f);
+    if (f.ok !== false) su.pick.add(k);
+  }
+}
+function suManualHtml() {
+  const cat = su.cat.catalog, m = su.man;
+  if (!m.kind) return `<p class="note">Ce vrei să legi?</p>
+    <div class="su-kind"><button class="card" data-kind="inverter"><b>Invertor</b><small>Growatt, Deye, Easun…</small></button>
+      <button class="card" data-kind="bms"><b>Baterie / BMS</b><small>Daly, JK, Seplos, PowerCube…</small></button></div>`;
+  const e = cat.find((x) => x.id === m.model);
+  if (!e) return `<p class="note"><a href="#" class="su-up" data-up="kind">‹ ${m.kind === "inverter" ? "Invertor" : "Baterie / BMS"}</a> · alege modelul:</p>
+    <div class="list">${cat.filter((x) => x.kind === m.kind).map((x) => `<button class="row su-model" data-model="${x.id}" ${x.supported ? "" : "disabled"}>
+      <span><b>${esc(x.brand)}</b> · ${esc(x.model)}</span>${x.supported ? '<span class="t">›</span>' : '<span class="t">în curând</span>'}</button>`).join("")}</div>
+    <p class="note">Nu-ți găsești modelul? Încearcă <a href="#" class="su-up" data-up="auto">detectarea automată</a>.</p>`;
+  const link = m.link || e.links[0];
+  return `<p class="note"><a href="#" class="su-up" data-up="model">‹ Alege alt model</a></p>
+    <div class="card su-pick"><b>${esc(e.brand)} · ${esc(e.model)}</b>
+      ${e.links.length > 1 ? `<div class="su-links">${e.links.map((l) => `<button class="${l === link ? "on" : ""}" data-link="${l}">${esc(su.cat.links[l] || l)}</button>`).join("")}</div>` : ""}
+      ${e.hint ? `<p class="note">${esc(e.hint)}</p>` : ""}
+      ${e.address && link === "cable" ? `${suField("su-addr", "Adresa (din comutatoarele DIP), dacă o știi", `type="number" inputmode="numeric" min="0" max="15" placeholder="toate (0–15)" value="${m.address ?? ""}"`)}` : ""}
+    </div>`;
+}
 function suRenderDevices() {
   const d = su.d, sc = d.scan || {}, b = $("#su-body");
   const real = d.devices.filter((x) => !x.type.startsWith("sim_"));
-  const found = sc.found || [];
-  if (!su.chosen) su.chosen = null;
+  const running = sc.state === "running";
+  if (sc.state === "done" && sc !== su.merged) { suMerge(sc.found); su.merged = sc; }
+  const e = su.cat.catalog.find((x) => x.id === su.man.model);
   b.innerHTML = `<h2>Dispozitivele</h2>
-    <p class="note">Leagă acum la Pi cablurile USB (invertor, RS485, Daly) și pornește modulele Daly cu Bluetooth.
-      Apoi caută. Căutarea durează 1–2 minute.</p>
     ${real.length ? `<div class="list">${real.map((x) => `<div class="row"><span><b>${esc(x.name)}</b></span>
       <span class="t">${esc(x.port || x.ble || "")}${x.capacity_ah ? ` · ${x.capacity_ah} Ah` : ""}</span></div>`).join("")}</div>
       <label class="row-check"><input type="checkbox" id="su-keep" ${su.keep ? "checked" : ""}>
         <span><b>Păstrează dispozitivele de acum</b><small>Nu schimb nimic la dispozitive.</small></span></label>` : ""}
-    <button class="btn" id="su-scan" ${sc.state === "running" ? "disabled" : ""}>${sc.state === "running" ? "Caut…" : found.length ? "Caută din nou" : "Caută dispozitivele"}</button>
-    <p class="note" id="su-scan-msg">${esc(sc.state === "running" ? sc.message : sc.state === "failed" ? sc.message : sc.ble_note || "")}</p>
-    ${sc.state === "done" ? `<div class="list">${found.length ? found.map((f, i) => `<label class="row-check">
-        <input type="checkbox" class="su-f" data-i="${i}" ${f.ok === false ? "" : "checked"}>
+    <p class="note">Leagă la Pi cablurile USB (invertor, RS485, BMS) și pornește modulele Bluetooth. Apoi alege cum le găsim:</p>
+    <div class="su-mode"><button data-m="auto" class="${su.mode === "auto" ? "on" : ""}"><b>Detectare automată</b><small>Amper încearcă singur toate tipurile (1–2 minute)</small></button>
+      <button data-m="manual" class="${su.mode === "manual" ? "on" : ""}"><b>Aleg eu din listă</b><small>Spui ce ai; Amper caută doar acel model (câteva secunde)</small></button></div>
+    ${su.mode === "manual" ? suManualHtml() : ""}
+    ${su.mode === "auto" || (su.mode === "manual" && e) ? `<button class="btn" id="su-scan" ${running ? "disabled" : ""}>${running ? "Caut…"
+      : su.mode === "auto" ? (su.found.length ? "Caută din nou" : "Caută dispozitivele") : `Caută ${esc(e.brand)}`}</button>` : ""}
+    <p class="note" id="su-scan-msg">${esc(running ? sc.message : sc.state === "failed" ? sc.message : sc.ble_note || "")}</p>
+    ${su.found.length ? `<h3 class="su-h">Găsite (bifează ce păstrezi)</h3><div class="list">${su.found.map((f, i) => `<label class="row-check">
+        <input type="checkbox" class="su-f" data-i="${i}" ${su.pick.has(suKey(f)) ? "checked" : ""}>
         <span><b>${esc(f.label)}</b><small>${esc(f.link)}${f.short ? " · " + esc(f.short) : ""}${f.rssi ? ` · semnal ${f.rssi} dBm` : ""}</small>
-        ${f.check ? `<small>${esc(suCheck(f.check))}</small>` : ""}
+        ${f.check && Object.keys(f.check).length ? `<small>${esc(suCheck(f.check))} — corect?</small>` : ""}
         ${f.ok === false ? `<small class="warnc">Nu pare BMS (egalizator activ?) — nebifat.</small>` : ""}</span></label>
-        ${f.binding ? `<button class="btn sm danger su-rej" data-rej="${i}">Respinge ${esc(f.name || "")}</button>` : ""}`).join("")
-      : `<div class="empty">N-am găsit nimic. Verifică cablurile și că BMS-urile sunt treze (pornește un consumator), apoi caută din nou.</div>`}</div>` : ""}
+        ${f.binding ? `<button class="btn sm danger su-rej" data-rej="${i}">Respinge ${esc(f.name || "")}</button>` : ""}`).join("")}</div>`
+      : sc.state === "done" ? `<div class="empty">N-am găsit nimic. Verifică cablurile și că BMS-urile sunt treze (pornește un consumator).
+        ${su.mode === "auto" ? `Sau <a href="#" class="su-up" data-up="manual">alege din listă</a> ce ai.` : `Sau încearcă <a href="#" class="su-up" data-up="auto">detectarea automată</a>.`}</div>` : ""}
     <p class="note">Ai module Daly care nu sunt încă legate? Adaugă-le acum: se vor găsi singure când apar
       (pe cablu sau Bluetooth).</p>
     <div class="su-add"><button class="btn sm" id="su-add-daly">+ Daly (se găsește singur)</button>
       <span class="note" id="su-add-n">${su.extraDaly ? `${su.extraDaly} adăugate` : ""}</span></div>`;
-  $("#su-scan").onclick = async () => {
+  $$(".su-mode button", b).forEach((x) => (x.onclick = () => { su.mode = x.dataset.m; suRenderDevices(); }));
+  $$("[data-kind]", b).forEach((x) => (x.onclick = () => { su.man = { kind: x.dataset.kind }; suRenderDevices(); }));
+  $$(".su-model", b).forEach((x) => (x.onclick = () => { su.man.model = x.dataset.model; su.man.link = null; suRenderDevices(); }));
+  $$("[data-link]", b).forEach((x) => (x.onclick = () => { su.man.link = x.dataset.link; suRenderDevices(); }));
+  $$(".su-up", b).forEach((x) => (x.onclick = (ev) => {
+    ev.preventDefault();
+    const up = x.dataset.up;
+    if (up === "kind") su.man = {};
+    else if (up === "model") su.man = { kind: su.man.kind };
+    else { su.mode = up; if (up === "manual") su.man = {}; }
+    suRenderDevices();
+  }));
+  $$(".su-f", b).forEach((x) => (x.onchange = () => {
+    const k = suKey(su.found[+x.dataset.i]);
+    x.checked ? su.pick.add(k) : su.pick.delete(k);
+  }));
+  if ($("#su-scan")) $("#su-scan").onclick = async () => {
     su.keep = false;
-    su.d.scan = await api("/api/setup/scan", { method: "POST" });
+    const body = su.mode === "manual" ? { model: e.id, link: su.man.link || e.links[0],
+      address: $("#su-addr") ? $("#su-addr").value : null } : {};
+    if (su.mode === "manual" && $("#su-addr")) su.man.address = $("#su-addr").value;
+    try {
+      su.d.scan = await api("/api/setup/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    } catch (err) { $("#su-err").textContent = err.message; return; }
+    if (su.d.scan.error) { $("#su-err").textContent = su.d.scan.error; su.d.scan = {}; return; }
     suRenderDevices(); suPollScan();
   };
-  $$(".su-rej").forEach((b) => (b.onclick = async () => {
-    const f = found[+b.dataset.rej];
+  $$(".su-rej", b).forEach((x) => (x.onclick = async () => {
+    const f = su.found[+x.dataset.rej];
     if (!confirm(`Respingi ${f.name}? Nu va mai fi legat automat (se poate permite din nou din Setări).`)) return;
     try {
       const { r, j } = await securePost("/api/daly/reject", { keys: f.keys, binding: f.binding, label: f.label });
       if (!r.ok) throw new Error(j.error || "Nu a mers.");
-      found.splice(+b.dataset.rej, 1); suRenderDevices();
-    } catch (e) { if (e.message !== "Anulat.") $("#su-err").textContent = e.message; }
+      su.pick.delete(suKey(f)); su.found.splice(+x.dataset.rej, 1); suRenderDevices();
+    } catch (err) { if (err.message !== "Anulat.") $("#su-err").textContent = err.message; }
   }));
   $("#su-add-daly").onclick = () => { su.extraDaly = (su.extraDaly || 0) + 1; $("#su-add-n").textContent = `${su.extraDaly} adăugate`; };
-  if ($("#su-keep")) $("#su-keep").onchange = (e) => (su.keep = e.target.checked);
-  if (sc.state === "running") suPollScan();
+  if ($("#su-keep")) $("#su-keep").onchange = (ev) => (su.keep = ev.target.checked);
+  if (running) suPollScan();
 }
 function suPollScan() {
   clearTimeout(su.pollT);
@@ -2320,8 +2379,7 @@ async function suNext() {
     }
   } else if (st.k === "devices") {
     if (su.keep) { su.chosen = null; su.i += 2; return suRender(); }       // sari peste capacități
-    const found = su.d.scan?.found || [];
-    const sel = $$(".su-f").filter((x) => x.checked).map((x) => ({ ...found[+x.dataset.i] }));
+    const sel = su.found.filter((f) => su.pick.has(suKey(f))).map((f) => ({ ...f }));
     for (let k = 0; k < (su.extraDaly || 0); k++) sel.push({ type: "daly", link: "se găsește singur", label: "Daly" });
     if (!sel.length) {
       if (su.d.devices.some((x) => !x.type.startsWith("sim_")))

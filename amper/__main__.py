@@ -131,9 +131,13 @@ def list_ports() -> list[str]:
     return ports
 
 
-def probe(port: str) -> list[str]:
+def probe(port: str, only: set[str] | None = None, addresses=None) -> list[str]:
     """Ce dispozitive răspund pe un port. Întoarce o listă de 'tip {json cu parametri}'.
-    Pe RS485 pot fi mai multe pachete Seplos / PACE (adrese diferite) — le întoarce pe toate."""
+    Pe RS485 pot fi mai multe pachete Seplos / PACE (adrese diferite) — le întoarce pe toate.
+    `only` = doar aceste tipuri (alegerea din listă: mai repede și fără să încerce alte protocoale);
+    `addresses` = doar aceste adrese la Seplos / PACE (cea setată din DIP)."""
+    want = (lambda t: only is None or t in only)
+    addrs = list(addresses) if addresses is not None else list(range(16))
     from .drivers.daly import DalyDriver
     from .drivers.growatt_spf import GrowattSPFDriver
     from .drivers.seplos import SeplosDriver
@@ -147,13 +151,14 @@ def probe(port: str) -> list[str]:
         finally:
             drv.close()
 
-    for addr in (0x40, 0x80):
+    for addr in ((0x40, 0x80) if want("daly") else ()):
         if ok(DalyDriver({"id": "probe", "type": "daly", "port": port, "address": addr}), lambda d: d._query(0x90)):
             return [f"daly {json.dumps({'address': addr})}"]
     from .drivers.jk import JkUartDriver           # JK cu modulul RS485/UART (115200)
-    if ok(JkUartDriver({"id": "probe", "type": "jk", "port": port}), lambda d: d.read()):
+    if want("jk") and ok(JkUartDriver({"id": "probe", "type": "jk", "port": port}), lambda d: d.read()):
         return ['jk {"baudrate": 115200}']
-    if ok(GrowattSPFDriver({"id": "probe", "type": "growatt_spf", "port": port}), lambda d: d._read_block(0, 3)):
+    if want("growatt_spf") and ok(GrowattSPFDriver({"id": "probe", "type": "growatt_spf", "port": port}),
+                                  lambda d: d._read_block(0, 3)):
         return ['growatt_spf {"baudrate": 9600}']
     from .drivers import pace                      # PACE (PowerCube / BMS Daren...), versiunea 0x25, adresele 0–15
 
@@ -161,19 +166,20 @@ def probe(port: str) -> list[str]:
         d = pace.PaceDriver({"id": "probe", "type": "pace", "port": port, "address": a, "protocol": "25"})
         d.answer_wait = pace.PROBE_WAIT
         return d
-    found = [f"pace {json.dumps({'baudrate': 9600, 'address': a, 'protocol': 25})}" for a in range(16)
-             if ok(pace25(a), lambda d: d._analog())]
+    found = [f"pace {json.dumps({'baudrate': 9600, 'address': a, 'protocol': 25})}" for a in addrs
+             if want("pace") and ok(pace25(a), lambda d: d._analog())]
     if found:
         return found
     # versiunea 0x20: Seplos V2 sau Pylon (aceeași cerere; se deosebesc după răspuns, pace.is_seplos)
-    for baud in (19200, 9600):
+    for baud in ((19200, 9600) if want("seplos") or want("pace") else ()):
         found = []
-        for a in range(16):
+        for a in addrs:
             info = []
             if ok(SeplosDriver({"id": "probe", "type": "seplos", "port": port, "baudrate": baud, "address": a}),
                   lambda d: info.append(d._query(0x42))):
                 found.append(f"seplos {json.dumps({'baudrate': baud, 'address': a})}" if pace.is_seplos(info[0])
                              else f"pace {json.dumps({'baudrate': baud, 'address': a, 'protocol': 20})}")
+        found = [f for f in found if want(f.split(" ", 1)[0])]
         if found:
             return found
     return []

@@ -537,9 +537,22 @@ def make_app(engine) -> web.Application:
         set_cookies(request, resp, quiet=True)          # browserul care a pus parola rămâne logat
         return resp
 
+    async def setup_catalog(request):
+        from .catalog import CATALOG, LINK_TEXT
+        return _json(dict(catalog=CATALOG, links=LINK_TEXT))
+
     async def setup_scan_start(request):
         if scan_job.get("state") == "running":
             return _json(scan_job)
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        model, link = body.get("model") or None, body.get("link") or None
+        try:
+            address = int(body["address"]) if body.get("address") not in (None, "") else None
+        except (TypeError, ValueError):
+            return _json({"error": "Adresa trebuie să fie un număr (0–15)."}, 400)
         scan_job.clear()
         scan_job.update(state="running", message="Pornesc căutarea…", started=time.time())
 
@@ -548,8 +561,8 @@ def make_app(engine) -> web.Application:
 
         async def run():
             try:
-                res = await asyncio.to_thread(setup_scan.scan, cfg, progress)
-                scan_job.update(state="done", message="", **res)
+                res = await asyncio.to_thread(setup_scan.scan, cfg, progress, 8, model, link, address)
+                scan_job.update(state="done", message="", model=model, link=link, **res)
             except Exception as e:
                 log.exception("căutarea dispozitivelor")
                 scan_job.update(state="failed", message=f"Căutarea a eșuat: {e}")
@@ -988,6 +1001,7 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/api/setup", setup_get)
     app.router.add_post("/api/setup/name", setup_name)
     app.router.add_post("/api/setup/password", setup_password)
+    app.router.add_get("/api/setup/catalog", setup_catalog)
     app.router.add_post("/api/setup/scan", setup_scan_start)
     app.router.add_get("/api/setup/scan", setup_scan_get)
     app.router.add_post("/api/setup/devices", setup_devices)

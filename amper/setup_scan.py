@@ -63,8 +63,49 @@ def scan_ble(cfg: dict, seconds: float = 10) -> dict:
     return {"found": found, "types": BLE_TYPES}
 
 
-def scan(cfg: dict, progress=lambda msg: None, ble_seconds: float = 8) -> dict:
+def live_check(item: dict) -> dict:
+    """Citește o dată dispozitivul găsit pe cablu, ca utilizatorul să vadă valori pe care le poate verifica
+    („Growatt · ieșire 230 V · baterie 52,8 V — corect?”). Gol dacă citirea nu merge."""
+    from .drivers import make_driver
+    from .models import PackReading
+    conf = {"id": "verificare", "name": item.get("label", ""), "type": item["type"], "port": item["port"],
+            **{k: item[k] for k in ("baudrate", "address", "protocol") if item.get(k) is not None}}
+    drv = None
+    try:
+        drv = make_driver(conf, [conf])
+        r = drv.read()
+    except Exception as e:
+        log.warning("verificare %s: %s", item.get("label"), e)
+        return {}
+    finally:
+        if drv is not None:
+            try:
+                drv.close()
+            except Exception:
+                pass
+    if isinstance(r, PackReading):
+        return {k: v for k, v in dict(voltage=r.voltage, soc=r.soc, cells=len(r.cells or []) or None,
+                                      capacity_ah=r.capacity_ah, cycles=r.cycles).items() if v is not None}
+    return {k: v for k, v in dict(out_v=getattr(r, "output_voltage", None), bat_v=getattr(r, "battery_voltage", None),
+                                  pv_w=getattr(r, "pv_power", None), load_w=getattr(r, "load_power", None)).items()
+            if v is not None}
+
+
+def scan(cfg: dict, progress=lambda msg: None, ble_seconds: float = 8, model: str | None = None,
+         link: str | None = None, address: int | None = None) -> dict:
+    """Detectarea automată (fără `model`) sau doar modelul ales din listă (`catalog.py`): numai protocolul lui, pe
+    porturile libere (`link` = cable) sau prin Bluetooth (`link` = ble); `address` = adresa din DIP (Seplos/PACE)."""
     from .__main__ import list_ports, probe
+    from .catalog import BY_ID
+    only = None
+    if model:
+        entry = BY_ID.get(model)
+        if not entry or not entry["supported"]:
+            raise ValueError("Modelul ales nu e suportat încă.")
+        only = {entry["driver"]}
+        if link == "ble":
+            return scan_ble_model(cfg, entry, progress, ble_seconds or 10)
+        ble_seconds = 0
     used = used_ports(cfg)
     found, ports = [], []
     for p in list_ports():
@@ -74,7 +115,7 @@ def scan(cfg: dict, progress=lambda msg: None, ble_seconds: float = 8) -> dict:
             continue
         progress(f"Încerc portul {short}…")
         try:
-            res = probe(p)
+            res = probe(p, only, [address] if address is not None else None)
         except Exception as e:                      # port care dispare, permisiuni
             log.warning("căutare %s: %s", p, e)
             res = []
@@ -83,6 +124,8 @@ def scan(cfg: dict, progress=lambda msg: None, ble_seconds: float = 8) -> dict:
             typ, extra = r.split(" ", 1)
             item = {"type": typ, "port": p, "short": short, **json.loads(extra), "link": "cablu"}
             item["label"] = NAMES.get(typ, typ) + (f" (adresa {item['address']})" if typ in ("seplos", "pace") else "")
+            progress(f"Citesc {item['label']}…")
+            item["check"] = live_check(item)
             found.append(item)
     ble_note = ""
     if not ble_seconds:
@@ -108,6 +151,37 @@ def scan(cfg: dict, progress=lambda msg: None, ble_seconds: float = 8) -> dict:
     except Exception as e:                           # fără adaptor, fără bleak
         ble_note = f"Bluetooth indisponibil ({e.__class__.__name__})"
     return {"found": found, "ports": ports, "ble_note": ble_note}
+
+
+def scan_ble_model(cfg: dict, entry: dict, progress, seconds: float) -> dict:
+    """Bluetooth, pentru modelul ales: doar modulele cu numele potrivit (Daly „DL-…”, JK „JK-…”), citite o dată."""
+    from .drivers import ble, daly_auto
+    from .drivers.jk import JK_NAME
+    progress(f"Caut modulele {entry['brand']} prin Bluetooth ({seconds:g} s)…")
+    try:
+        mods = ble.scan(seconds)
+    except Exception as e:
+        return {"found": [], "ports": [], "ble_note": f"Bluetooth indisponibil ({e.__class__.__name__})"}
+    used = used_ble(cfg)
+    match = ble.is_daly_name if entry["driver"] == "daly" else (lambda n: bool(JK_NAME.match(n or "")))
+    mods = [d for d in mods if d["name"] and match(d["name"]) and d["address"].upper() not in used
+            and d["name"].upper() not in used]
+    found = []
+    for i, d in enumerate(mods, 1):
+        progress(f"Citesc modulul {d['name']} ({i} din {len(mods)})…")
+        item = {"type": entry["driver"], "ble": d["address"], "name": d["name"], "rssi": d["rssi"], "link": "Bluetooth",
+                "label": f"{entry['brand']} {d['name']}"}
+        if entry["driver"] == "daly":
+            b = {"type": "ble", "ble": d["address"], "name": d["name"]}
+            try:
+                item["ok"] = daly_auto._probe({"id": "cautare", "name": d["name"], "type": "daly"}, b)
+            except Exception as e:
+                log.warning("citire %s: %s", d["name"], e)
+                item["ok"] = False
+            item.update(check=b.get("check") or {}, keys=sorted(daly_auto.link_keys(b)), binding=b)
+        found.append(item)
+    note = "" if mods else f"N-am găsit niciun modul {entry['brand']} prin Bluetooth în apropiere."
+    return {"found": found, "ports": [], "ble_note": note}
 
 
 def add_device(existing: list[dict], c: dict) -> dict:
