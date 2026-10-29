@@ -425,6 +425,8 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - 1.0.0-beta.8 (în pregătire): în aplicație NU apare cuvântul GitHub (mesajele `UpdateError` din `update.py` spun
   „server”/„serverul de actualizări”). Actualizări: buton „Istoric versiuni” → panoul `set-uphist` (`#up-prev` +
   `#up-hist`, înapoi → update).
-- 1.0.0-beta.8 (în pregătire): Flux compact (cerut 2026-10-29): `.f-batt` = rând (`.f-bico` + `.f-btxt`), căsuțele
-  `.f-tile` (4 pe rând, `--tc` culoarea, iconiță în cerc), autonomia scurtă (~N h). Încape fără glisare pe 390×664
-  și, cu `@media (max-height: 620px)`, pe 320×568 (iPhone SE). Măsurat cu Playwright (scrollHeight = innerHeight).
+- 1.0.0-beta.8 (în pregătire): Flux compact (cerut 2026-10-29). Prima variantă (bateria cu text alături + 4 căsuțe pe
+  un rând) și alte 4 machete au fost respinse: utilizatorul a cerut FĂRĂ căsuțe, fiecare valoare la nodul ei —
+  `.f-node .t` (`tpv` sub Panouri, `tld` sub Consum casă, `tgr` sub Rețea); autonomia = `eta` sub baterie. Bateria
+  rămâne centrată (96×112). Liniile pv/load pornesc de la y 156 (sub textul nou). Încape pe 390×664 și, cu
+  `@media (max-height: 620px)`, pe 320×568 (iPhone SE). Măsurat cu Playwright (scrollHeight = innerHeight).

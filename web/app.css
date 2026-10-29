@@ -116,11 +116,9 @@ button { font: inherit; color: inherit; }
 .inv-line { font-size: 13.5px; color: var(--muted); padding: 10px 2px 0; }
 
 /* ---------- tema Flux de energie ---------- */
-.f-inv { font-size: 12.5px; color: var(--muted); text-align: right; margin-top: -4px; white-space: nowrap; overflow: hidden;
-  text-overflow: ellipsis; }
+.f-inv { font-size: 13px; color: var(--muted); text-align: right; margin-top: -2px; }
 .f-inv b { color: var(--acc); font-weight: 600; }
-/* tema Flux: totul încape pe un ecran de telefon, fără derulare (cerut 2026-10-29) */
-.f-diag { position: relative; width: 100%; max-width: 300px; margin: 0 auto; aspect-ratio: 360 / 330; }
+.f-diag { position: relative; width: 100%; max-width: 296px; margin: 18px auto 0; aspect-ratio: 360 / 330; }
 .f-diag svg.lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .f-diag .ln { fill: none; stroke-width: 3; opacity: .9; }
 .f-diag .dots { fill: none; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 0 22; opacity: 0; }
@@ -129,48 +127,38 @@ button { font: inherit; color: inherit; }
 @keyframes fdash { to { stroke-dashoffset: -44; } }
 @media (prefers-reduced-motion: reduce) { .f-diag .dots.on { animation: none; } }
 .f-diag .off { stroke-dasharray: 4 6; opacity: .5; }
-.f-node { position: absolute; transform: translate(-50%, -50%); text-align: center; width: 34%; }
-.f-node .disc { width: 62px; height: 62px; margin: 0 auto; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  background: #142631; border: 2px solid var(--c); box-shadow: 0 0 20px -4px var(--c), inset 0 0 14px -8px var(--c); }
-.f-node .disc svg { width: 30px; height: 30px; fill: none; stroke: var(--c); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.f-node .w { font: 700 21px/1 "Barlow Condensed", sans-serif; margin-top: 5px; }
-.f-node .l { font-size: 12px; color: var(--muted); }
-.f-node.sm .disc { width: 46px; height: 46px; } .f-node.sm .disc svg { width: 24px; height: 24px; }
+.f-node { position: absolute; transform: translate(-50%, -50%); text-align: center; width: 30%; }
+.f-node .disc { width: 78px; height: 78px; margin: 0 auto; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: #142631; border: 2px solid var(--c); box-shadow: 0 0 24px -4px var(--c), inset 0 0 18px -8px var(--c); }
+.f-node .disc svg { width: 38px; height: 38px; fill: none; stroke: var(--c); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.f-node .w { font: 700 24px/1 "Barlow Condensed", sans-serif; margin-top: 8px; }
+.f-node .l { font-size: 12.5px; color: var(--muted); }
+.f-node .t { font-size: 11.5px; color: var(--muted); margin-top: 1px; white-space: nowrap; }
+.f-node .t b { font: 600 14px "Barlow Condensed", sans-serif; color: var(--text); }
+.f-node.sm .disc { width: 56px; height: 56px; } .f-node.sm .disc svg { width: 28px; height: 28px; }
 .f-node.dim .disc { border-style: dashed; box-shadow: none; opacity: .55; }
-.f-blabel { position: absolute; font: 700 17px "Barlow Condensed", sans-serif; color: var(--mc); transform: translateY(-50%); }
-/* bateria: mică, cu textul alături */
-.f-batt { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 2px auto 0; border: 0; background: none;
-  color: inherit; padding: 0; text-align: left !important; }
-.f-cap { width: 26px; height: 7px; border-radius: 3px 3px 0 0; background: #4A6A80; margin: 0 auto; }
-.f-cell { width: 76px; height: 92px; margin: 0 auto; position: relative; border-radius: 15px; border: 3px solid #4A6A80;
-  background: #0F1D26; overflow: hidden; box-shadow: 0 0 30px -10px var(--mc); }
-.f-batt.fault .f-cell { border-color: var(--alarm); box-shadow: 0 0 30px -6px var(--alarm); }
-.f-fill { position: absolute; left: 5px; right: 5px; bottom: 5px; border-radius: 10px; transition: height .8s ease;
+.f-blabel { position: absolute; font: 700 18px "Barlow Condensed", sans-serif; color: var(--mc); transform: translateY(-50%); }
+.f-batt { display: block; margin: 0 auto; border: 0; background: none; color: inherit; text-align: center; padding: 0; }
+.f-cap { width: 34px; height: 8px; border-radius: 4px 4px 0 0; background: #4A6A80; margin: 0 auto; }
+.f-cell { width: 96px; height: 112px; margin: 0 auto; position: relative; border-radius: 20px; border: 3px solid #4A6A80;
+  background: #0F1D26; overflow: hidden; box-shadow: 0 0 40px -10px var(--mc); }
+.f-batt.fault .f-cell { border-color: var(--alarm); box-shadow: 0 0 40px -6px var(--alarm); }
+.f-fill { position: absolute; left: 6px; right: 6px; bottom: 6px; border-radius: 13px; transition: height .8s ease;
   background: linear-gradient(180deg, color-mix(in srgb, var(--mc) 55%, #fff), var(--mc)); }
 .f-cell b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  font: 700 28px "Barlow Condensed", sans-serif; color: #fff; text-shadow: 0 1px 6px rgb(0 0 0 / .5); }
-.f-btxt { min-width: 0; max-width: 230px; }
-.f-batt .k { font: 600 17px/1.2 "Barlow Condensed", sans-serif; }
-.f-batt .s { font-size: 12.5px; color: var(--muted); }
-.f-batt .health { display: inline-block; margin-top: 3px; font-size: 13px; }
-/* cele patru căsuțe: o singură linie, cu iconiță colorată */
-.f-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-top: 12px; }
-.f-tile { position: relative; border-radius: 16px; padding: 9px 4px 8px; text-align: center; overflow: hidden;
-  background: linear-gradient(170deg, color-mix(in srgb, var(--tc) 16%, var(--panel)) 0%, var(--panel) 70%);
-  border: 1px solid color-mix(in srgb, var(--tc) 30%, var(--line)); }
-.f-tile i { width: 28px; height: 28px; margin: 0 auto 4px; border-radius: 50%; display: grid; place-items: center;
-  background: color-mix(in srgb, var(--tc) 20%, transparent); }
-.f-tile i svg { width: 17px; height: 17px; fill: none; stroke: var(--tc); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.f-tile b { display: block; font: 700 19px/1.05 "Barlow Condensed", sans-serif; white-space: nowrap; }
-.f-tile b .u { font-size: 12px; color: var(--muted); margin-left: 1px; }
-.f-tile span:not(.u) { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
-/* ecrane scunde (iPhone SE): diagrama și bateria mai mici, ca pagina să încapă fără glisare */
+  font: 700 38px "Barlow Condensed", sans-serif; color: #fff; text-shadow: 0 1px 6px rgb(0 0 0 / .45); }
+.f-batt .k { font: 600 17px "Barlow Condensed", sans-serif; margin-top: 4px; }
+.f-batt .s { font-size: 13px; color: var(--muted); }
+.f-batt .health { display: inline-block; margin-top: 4px; }
+/* ecrane scunde (iPhone SE): totul mai mic, ca pagina să încapă fără glisare */
 @media (max-height: 620px) {
-  .f-diag { max-width: 222px; margin-top: 10px; }
-  .f-node .disc { width: 52px; height: 52px; } .f-node .disc svg { width: 26px; height: 26px; }
-  .f-node .w { font-size: 19px; margin-top: 3px; }
-  .f-cell { width: 64px; height: 76px; border-radius: 13px; } .f-cell b { font-size: 24px; }
-  .f-cards { margin-top: 8px; } .f-tile { padding: 7px 3px 6px; } .f-tile i { width: 24px; height: 24px; margin-bottom: 2px; }
+  .f-diag { max-width: 214px; margin-top: 26px; }
+  .f-node { width: 50%; } .f-node .l { white-space: nowrap; }
+  .f-node .disc { width: 50px; height: 50px; } .f-node .disc svg { width: 25px; height: 25px; }
+  .f-node .w { font-size: 18px; margin-top: 3px; }
+  .f-node.sm .disc { width: 42px; height: 42px; } .f-node.sm .disc svg { width: 21px; height: 21px; }
+  .f-node[data-open="inverter"] .disc { width: 48px !important; height: 48px !important; }
+  .f-cap { width: 26px; height: 6px; } .f-cell { width: 72px; height: 82px; border-radius: 15px; } .f-cell b { font-size: 28px; }
 }
 
 /* ---------- tema Carduri ---------- */

@@ -415,7 +415,7 @@ function drawDay(svg) {
 /* ---------- tema Flux de energie ---------- */
 // coordonate în viewBox 360 × 330; bateria e sub diagramă
 const FLUX = {
-  pv: "M72 128 C72 182 128 205 152 213", load: "M208 213 C232 205 288 182 288 128",
+  pv: "M72 156 C72 194 128 205 152 213", load: "M208 213 C232 205 288 194 288 156",
   bat: "M180 247 L180 330", grid: "M58 290 C100 290 148 262 160 240",
 };
 const flux = {
@@ -424,20 +424,16 @@ const flux = {
     <div class="f-diag">
       <svg class="lines" viewBox="0 0 360 330">${Object.entries(FLUX).map(([k, d]) =>
         `<path class="ln" data-ln="${k}" d="${d}"/><path class="dots" data-dots="${k}" d="${d}"/>`).join("")}</svg>
-      <div class="f-node" style="left:20%;top:19%;--c:var(--sun)"><div class="disc">${icon("sun")}</div><div class="w" data-k="pv">–</div><div class="l">Panouri ${PV_I}</div></div>
-      <div class="f-node" style="left:80%;top:19%;--c:var(--load)"><div class="disc">${icon("home")}</div><div class="w" data-k="load">–</div><div class="l">Consum casă</div></div>
-      <div class="f-node sm" data-open="inverter" role="button" tabindex="0" aria-label="Invertor" style="left:50%;top:69%;--c:var(--cell)"><div class="disc" style="width:54px;height:54px">${icon("inv")}</div></div>
-      <div class="f-node sm" data-k-cls="grid" style="left:11%;top:88%;--c:var(--muted)"><div class="disc">${icon("grid")}</div><div class="l" data-k="grid">Rețea</div></div>
+      <div class="f-node" style="left:20%;top:19%;--c:var(--sun)"><div class="disc">${icon("sun")}</div><div class="w" data-k="pv">–</div><div class="l">Panouri ${PV_I}</div><div class="t" data-k="tpv"></div></div>
+      <div class="f-node" style="left:80%;top:19%;--c:var(--load)"><div class="disc">${icon("home")}</div><div class="w" data-k="load">–</div><div class="l">Consum casă</div><div class="t" data-k="tld"></div></div>
+      <div class="f-node sm" data-open="inverter" role="button" tabindex="0" aria-label="Invertor" style="left:50%;top:69%;--c:var(--cell)"><div class="disc" style="width:64px;height:64px">${icon("inv")}</div></div>
+      <div class="f-node sm" data-k-cls="grid" style="left:11%;top:88%;--c:var(--muted)"><div class="disc">${icon("grid")}</div><div class="l" data-k="grid">Rețea</div><div class="t" data-k="tgr"></div></div>
       <div class="f-blabel" data-k="bat" style="left:53%;top:87%"></div>
     </div>
     <button class="f-batt" data-open="packs" aria-label="Bateria — vezi pachetele">
-      <div class="f-bico"><div class="f-cap"></div><div class="f-cell"><div class="f-fill"></div><b><span data-k="soc">–</span>%</b></div></div>
-      <div class="f-btxt"><div class="k" data-k="kwh"></div><div class="s" data-k="eta"></div><span class="health" data-k="health"></span></div>
-    </button>
-    <div class="f-cards">${[["tpv", "Produs azi", "--sun", "sun"], ["tgr", "Din rețea", "--charge", "grid"],
-      ["tld", "Consumat", "--load", "home"], ["aut", "Autonomie", "--cell", "clock"]].map(([k, l, c, i]) => `
-      <div class="f-tile" style="--tc:var(${c})"><i>${i === "clock" ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>' : icon(i)}</i>
-        <b data-k="${k}">–</b><span>${l}</span></div>`).join("")}</div>`,
+      <div class="f-cap"></div><div class="f-cell"><div class="f-fill"></div><b><span data-k="soc">–</span>%</b></div>
+      <div class="k" data-k="kwh"></div><div class="s" data-k="eta"></div><span class="health" data-k="health"></span>
+    </button>`,
   update(root, h) {
     const { b, ir, bp } = h;
     const ac = ir?.ac_in_power || 0;
@@ -470,12 +466,10 @@ const flux = {
     put(root, "eta", [h.eta, b.voltage ? num(b.voltage, 1) + " V" : ""].filter(Boolean).join(" · "));
     put(root, "health", h.health.text);
     root.querySelector('[data-k="health"]').className = "health " + h.health.cls;
-    put(root, "tpv", kv(h.today.pv_kwh, "kWh", 1));
-    put(root, "tld", kv(h.today.load_kwh, "kWh", 1));
-    put(root, "tgr", h.today.pv_kwh == null ? "–" : kv(h.today.ac_in_kwh || 0, "kWh", 1));
-    // în căsuță: doar orele (sau minutele); detaliul e sub baterie
-    put(root, "aut", h.autonomy == null ? "–" : h.autonomy > 72 ? `~${num(h.autonomy / 24, 0)}<span class="u">zile</span>`
-      : h.autonomy >= 1 ? `~${Math.round(h.autonomy)}<span class="u">h</span>` : `~${Math.round(h.autonomy * 60)}<span class="u">min</span>`);
+    const today = (label, v) => v == null ? "" : `${label} <b>${num(v, 1)} kWh</b>`;
+    put(root, "tpv", today("produs azi", h.today.pv_kwh));
+    put(root, "tld", today("consumat azi", h.today.load_kwh));
+    put(root, "tgr", today("din rețea azi", h.today.pv_kwh == null ? null : h.today.ac_in_kwh || 0));
   },
 };
 
