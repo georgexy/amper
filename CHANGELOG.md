@@ -2,6 +2,10 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.12 — în pregătire
+- Spații între butoane și cardurile vecine: „Confirmă” (parola), „Instalează acum”, „Caută actualizări” și notele
+  versiunii nu se mai lipesc unele de altele.
+
 ## 1.0.0-beta.11 — 2026-10-29
 - Reparat: butonul „Scrie” din fereastra de modificare nu făcea nimic (setări BMS, setări invertor, „Setează SOC”)
   și scria „Scrie în invertor” și la BMS. Cauza: butonul „Activează Pro” (de la 1.0.0-beta.6) avea același nume

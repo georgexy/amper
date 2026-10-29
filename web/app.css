@@ -510,6 +510,14 @@ nav.tabs .nav-now[data-st="fault"] .nic { fill: none; stroke-width: 3.2; width: 
 
 /* Setări → Actualizări */
 .up-notes { background: var(--panel); border-radius: var(--radius-l); padding: 12px 14px; font-size: 14.5px; line-height: 1.5; }
+/* spații între butoane și ce e lângă ele (raportat 2026-10-29: „Caută actualizări”, „Instalează acum” și „Confirmă”
+   se lipeau de cardurile vecine) */
+#up-check { margin-top: 12px; }
+#up-go { margin: 4px 0 12px; }
+#up-new .up-notes { margin-top: 12px; }
+#up-ready + .up-notes, #up-ready:not([hidden]) ~ .up-notes { margin-top: 0; }
+#pwask .ed-in { margin: 4px 0 14px; }
+#pwask .note { margin: 0 0 10px; }
 #set-update .ed-in { margin: 10px 0; }
 
 /* ghidul de configurare */
