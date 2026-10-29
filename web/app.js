@@ -430,7 +430,7 @@ const flux = {
       <div class="f-inv" data-k="inv" data-open="inverter" role="button" tabindex="0" style="left:62%;top:71%"></div>
     </div>
     <button class="f-batt" data-open="packs" aria-label="Bateria — vezi pachetele">
-      <div class="f-bl"><b data-k="flow"></b><em data-k="bw"></em><span data-k="eta"></span><span data-k="volt"></span></div>
+      <div class="f-bl"><span data-k="flow"></span><b data-k="bw"></b><span data-k="etal"></span><b data-k="eta"></b></div>
       <div class="f-bico"><div class="f-link"></div><div class="f-cap"></div><div class="f-cell"><div class="f-fill"></div><b><span data-k="soc">–</span>%</b></div></div>
       <div class="f-br"><span>Total:</span><b data-k="cap"></b><span>Actual:</span><b data-k="kwh"></b></div>
     </button></div>`,
@@ -464,12 +464,13 @@ const flux = {
     modeClass(root.querySelector(".f-batt"), h, "f-batt");
     root.querySelector(".f-fill").style.height = `calc(${Math.max(0, Math.min(100, b.soc ?? 0))}% - 12px)`;
     put(root, "soc", b.soc == null ? "–" : num(b.soc, 0));
-    // stânga bateriei: starea, puterea, cât mai durează (fără rupere între număr și unitate)
-    const moving = h.mode !== "idle" && bp != null;
-    put(root, "flow", moving ? (h.mode === "charging" ? "Se încarcă" : "Se descarcă") : h.modeText);
-    put(root, "bw", moving ? watts(Math.abs(bp)) : "");
-    put(root, "eta", h.eta.replace(/(\d) (h|min|zile|zi)\b/g, "$1\u00a0$2"));
-    put(root, "volt", b.voltage ? num(b.voltage, 1) + " V" : "");
+    // stânga bateriei, ca dreapta: eticheta ștearsă, valoarea albă dedesubt
+    const moving = h.mode !== "idle" && bp != null, chg = h.mode === "charging";
+    put(root, "flow", moving ? (chg ? "Se încarcă:" : "Se descarcă:") : "Stare:");
+    put(root, "bw", moving ? watts(Math.abs(bp)) : esc(h.modeText));
+    const full = moving && b.hours ? duration(b.hours).replace(/(\d) (h|min|zile|zi)\b/g, "$1\u00a0$2") : "";
+    put(root, "etal", full ? (chg ? "Încărcare completă:" : "Descărcare completă:") : "");
+    put(root, "eta", full);
     put(root, "cap", kv(h.capKwh, "kWh", 1));
     put(root, "kwh", kv(b.kwh, "kWh", 1));
     // erorile nu apar sub baterie: se văd în ecranul Bateriile

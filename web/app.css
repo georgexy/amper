@@ -154,11 +154,9 @@ button { font: inherit; color: inherit; }
 .f-bl, .f-br { align-self: end; height: 120px; display: flex; flex-direction: column; justify-content: center; min-width: 0;
   font-size: 12px; line-height: 1.3; color: var(--muted); }
 .f-bl { text-align: right !important; } .f-br { text-align: left !important; }
-.f-bl b { font: 600 15px/1.15 "Barlow Condensed", sans-serif; color: var(--text); }
-.f-bl em { font: 700 19px/1.15 "Barlow Condensed", sans-serif; font-style: normal; color: var(--mc, var(--text)); margin-bottom: 2px; }
-.f-bl em:empty { display: none; }
-.f-br b { font: 700 19px/1.1 "Barlow Condensed", sans-serif; color: var(--text); margin-bottom: 4px; }
-.f-br b:last-child { margin-bottom: 0; }
+.f-bl b, .f-br b { font: 700 19px/1.1 "Barlow Condensed", sans-serif; color: var(--text); margin-bottom: 4px; }
+.f-bl b:last-child, .f-br b:last-child { margin-bottom: 0; }
+.f-bl :empty { display: none; }
 .f-cap { width: 34px; height: 8px; border-radius: 4px 4px 0 0; background: #4A6A80; margin: 0 auto; }
 .f-cell { width: 96px; height: 112px; margin: 0 auto; position: relative; border-radius: 20px; border: 3px solid #4A6A80;
   background: #0F1D26; overflow: hidden; box-shadow: 0 0 40px -10px var(--mc); }
@@ -176,7 +174,7 @@ button { font: inherit; color: inherit; }
   .f-node[data-open="inverter"] .disc { width: 48px !important; height: 48px !important; }
   .f-inv { top: 78% !important; max-width: 40%; font-size: 11px; } .f-inv b { font-size: 13px; }
   .f-cap { width: 26px; height: 6px; } .f-cell { width: 72px; height: 82px; border-radius: 15px; } .f-cell b { font-size: 28px; }
-  .f-bl, .f-br { height: 88px; font-size: 11px; } .f-bl b { font-size: 14px; } .f-bl em { font-size: 17px; } .f-br b { font-size: 17px; margin-bottom: 2px; }
+  .f-bl, .f-br { height: 88px; font-size: 11px; } .f-bl b, .f-br b { font-size: 17px; margin-bottom: 2px; }
 }
 
 /* ---------- tema Carduri ---------- */
