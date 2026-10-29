@@ -447,4 +447,10 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   Bateria (cerut 2026-10-29): `.f-batt` = grilă `.f-bl` („Se descarcă:”/„Se încarcă:”/„Stare:” + `bw`;
   „Descărcare/Încărcare completă:” + durata; etichete șterse, valori albe, ca dreapta; fără tensiune) | `.f-bico` | `.f-br`
   („Total:” `capKwh`, „Actual:” `b.kwh`); `flex: 1` o împinge jos, iar `.f-link` (bară cu puncte animate, `--lc`)
-  continuă linia invertor → baterie. `.f-blabel` (puterea pe linie) scos: puterea e în stânga.
+  continuă linia invertor → baterie. `.f-blabel` (puterea pe linie, left 53% top 87%; SE 93%) pus înapoi în
+  1.0.0-beta.9 (cerut 2026-10-29): puterea apare și pe linie, și în stânga bateriei.
+  1.0.0-beta.9: pe iPhone-ul real (PWA, zone sigure ~59/34 px) bateria intra sub bară și `.f-link` (flex: 1) se
+  întindea ~300 px. Acum `.f-wrap` = `justify-content: center` cu min-height minus `env(safe-area-inset-*)`,
+  `.f-batt` flex none, `.f-link` = clamp(14px, 100dvh − 660px, 70px). Verificat 390×664, 320×568, 393×759.
+  Puterea din stânga (`bw`): clasa `chg` verde / `dis` roșu. Eticheta de pe linie (`.f-blabel`) SCOASĂ definitiv
+  (cerut 2026-10-29: „scrisul de pe linie îl eliminăm, rămâne doar cel din stânga”).

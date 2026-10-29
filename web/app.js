@@ -468,6 +468,8 @@ const flux = {
     const moving = h.mode !== "idle" && bp != null, chg = h.mode === "charging";
     put(root, "flow", moving ? (chg ? "Se încarcă:" : "Se descarcă:") : "Stare:");
     put(root, "bw", moving ? watts(Math.abs(bp)) : esc(h.modeText));
+    // puterea din stânga: verde la încărcare, roșu la descărcare (pe linie nu se mai scrie)
+    root.querySelector('[data-k="bw"]').className = moving ? (chg ? "chg" : "dis") : "";
     const full = moving && b.hours ? duration(b.hours).replace(/(\d) (h|min|zile|zi)\b/g, "$1\u00a0$2") : "";
     put(root, "etal", full ? (chg ? "Încărcare completă:" : "Descărcare completă:") : "");
     put(root, "eta", full);
