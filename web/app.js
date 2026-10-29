@@ -432,7 +432,7 @@ const flux = {
     </div>
     <button class="f-batt" data-open="packs" aria-label="Bateria — vezi pachetele">
       <div class="f-cap"></div><div class="f-cell"><div class="f-fill"></div><b><span data-k="soc">–</span>%</b></div>
-      <div class="k" data-k="kwh"></div><div class="s" data-k="eta"></div><span class="health" data-k="health"></span>
+      <div class="k" data-k="kwh"></div><div class="s" data-k="eta"></div>
     </button>`,
   update(root, h) {
     const { b, ir, bp } = h;
@@ -464,8 +464,7 @@ const flux = {
     put(root, "soc", b.soc == null ? "–" : num(b.soc, 0));
     put(root, "kwh", b.kwh == null ? h.modeText : `${num(b.kwh, 1)} kWh · ${h.modeText[0].toLowerCase() + h.modeText.slice(1)}`);
     put(root, "eta", [h.eta, b.voltage ? num(b.voltage, 1) + " V" : ""].filter(Boolean).join(" · "));
-    put(root, "health", h.health.text);
-    root.querySelector('[data-k="health"]').className = "health " + h.health.cls;
+    // erorile nu apar sub baterie: se văd în ecranul Bateriile
     const today = (label, v) => v == null ? "" : `${label} <b>${num(v, 1)} kWh</b>`;
     put(root, "tpv", today("produs azi", h.today.pv_kwh));
     put(root, "tld", today("consumat azi", h.today.load_kwh));

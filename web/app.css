@@ -147,9 +147,8 @@ button { font: inherit; color: inherit; }
   background: linear-gradient(180deg, color-mix(in srgb, var(--mc) 55%, #fff), var(--mc)); }
 .f-cell b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   font: 700 38px "Barlow Condensed", sans-serif; color: #fff; text-shadow: 0 1px 6px rgb(0 0 0 / .45); }
-.f-batt .k { font: 600 17px "Barlow Condensed", sans-serif; margin-top: 4px; }
-.f-batt .s { font-size: 13px; color: var(--muted); }
-.f-batt .health { display: inline-block; margin-top: 4px; }
+.f-batt .k { font: 600 14px "Barlow Condensed", sans-serif; margin-top: 4px; }
+.f-batt .s { font-size: 12px; color: var(--muted); }
 /* ecrane scunde (iPhone SE): totul mai mic, ca pagina să încapă fără glisare */
 @media (max-height: 620px) {
   .f-diag { max-width: 214px; margin-top: 26px; }

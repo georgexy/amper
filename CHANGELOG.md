@@ -7,7 +7,8 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Mesajele de la Actualizări spun „server” în loc de GitHub.
 - Tema Flux: ecranul principal încape pe telefon fără glisare (și pe ecrane mici, ca iPhone SE). Căsuțele de jos
   au dispărut: „produs azi” e sub panouri, „consumat azi” sub consumul casei, „din rețea azi” sub rețea, iar
-  autonomia rămâne sub baterie.
+  autonomia rămâne sub baterie. Sub baterie nu mai apar erorile modulelor (se văd în ecranul Bateriile), iar
+  textul cu energia rămasă e mai mic.
 
 ## 1.0.0-beta.7 — 2026-10-29
 - Reparat: la setările de echilibrare ale BMS-ului Daly, aplicația spunea „BMS-ul arată altceva decât s-a trimis”

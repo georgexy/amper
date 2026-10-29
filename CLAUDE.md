@@ -430,3 +430,4 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `.f-node .t` (`tpv` sub Panouri, `tld` sub Consum casă, `tgr` sub Rețea); autonomia = `eta` sub baterie. Bateria
   rămâne centrată (96×112). Liniile pv/load pornesc de la y 156 (sub textul nou). Încape pe 390×664 și, cu
   `@media (max-height: 620px)`, pe 320×568 (iPhone SE). Măsurat cu Playwright (scrollHeight = innerHeight).
+  Sub baterie NU se afișează `health` (erorile; cerut 2026-10-29: se văd în Bateriile); `.k` 14 px, `.s` 12 px.
