@@ -191,6 +191,34 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   condiție `comm:port:<port>` (rule comm_lost, device None, `members`, `replaces` = cheile comm:<id>, închise în
   tăcere). `drop_device` scoate dispozitivul din `members`; alerta se închide în tăcere la ultimul.
 - `alerts.mos_note`: la `bms_protection` se spune dacă MOSFET-ul e chiar oprit sau e doar semnal (Daly 2, 2026-10-29).
+- Comenzi Daly (1.0.0-beta.10, cerute 2026-10-29; NEVERIFICATE pe hardware — se testează cu utilizatorul, pas cu
+  pas, la consum mic, câte un BMS): `amper/daly_actions.py` (`ACTIONS`): 0x00 repornire, 0xD9 descărcare, 0xDA
+  încărcare (data[0] 01/00), 0x21 SOC ([an−2000, lună, zi, oră, min, s, SOC×10 BE], ora locală). `execute` verifică
+  citind înapoi: MOSFET → 0x93 după 1 s (dacă rămâne oprit, motivul din 0x98); SOC → 0x90 ±0,5 %; repornire →
+  așteaptă ≤ 60 s, ciclurile (0x94) și capacitatea (0x50) trebuie să fie aceleași, altfel `critical` (notificare 🔴).
+  `precheck` (pe server): oprire dsg refuzată dacă celelalte cu dsg pornit nu duc `load_power / V` (sau curentul
+  băncii) × 1,3 cu limitele 0x5B nivel 1 (dis_a / chg_a, cache 1 h în web.py) ori dacă n-ar rămâne niciunul; chg la
+  fel cu curentul de încărcare; repornire: un singur BMS odată și restul cu ambele MOSFET-uri pornite. La MOSFET-uri
+  refuzul e doar avertisment: cu `force: true` (a doua confirmare în aplicație) oprirea se face oricum — cerut
+  2026-10-29 („indiferent de celelalte”, pentru intervenții la conexiuni); repornirea nu se poate forța. `Support`
+  (tabela meta, cheia firmware 0x62 + adresa): 2 eșecuri la rând fără motiv raportat → nesuportată.
+  API: `GET /api/daly/<id>/actions`, `POST …/action {action, value?, app_password}` (confirm „comandă BMS”, daly_lock,
+  409 dacă e ocupat/refuzat), `POST …/actions/retry`; în PRO_ONLY. `settings_log` „comandă: …”, notificare ⚙️.
+  Engine: `DeviceState.restart_until` (fără comm_lost, card „Repornește…”), `forced` {chg|dsg: ts} în meta
+  `daly_forced`, șters când citirea arată MOSFET-ul pornit; alerta `mos_forced_off` (warning) după
+  `alerts.mos_forced_minutes` (30). UI: `loadCmds/renderCmds/runCmd` în app.js, `#bms-cmds` în view-bms.
+  Plan de test pe hardware (cu George): Daly 1 dsg off/on, chg off/on, repornire (durată, setări, cicluri, BLE),
+  MOSFET oprit rămâne după repornire?, SOC la Daly 3 după tensiune, apoi Daly 2 (fw 11_2506, 0x40).
+- Sănătatea celulelor (1.0.0-beta.10, cerută 2026-10-29; varianta C aleasă din 3 machete, rândul ULTIMUL în
+  Bateriile): `amper/cell_health.py`. `Tracker.observe` (din Engine, la fiecare citire de pachet cu toate celulele,
+  nu `cells_age`): episoade „chg” (I > 1 A și max ≥ 3,40 V) / „dis” (min ≤ 3,10 V) → un rând pe episod (momentul cel
+  mai extrem, `EPISODE_GAP` 1 h), abaterile față de media modulului în mV; „ir” = ΔV celulă / ΔI la salt ≥ 15 A în
+  ≤ 30 s (mΩ, max 1/5 min). Tabela `cell_events` (120 de zile). `analyze` (28 de zile): mediane chg/dis, de câte ori
+  e la capăt, rezistența relativă, `score` (100 − 0,6·(mV−5) − 0,4·(%R−5) − 5 dacă mereu aceeași), nivel <70 de
+  urmărit, <90 ușor diferită, `trend` 8 săptămâni, `describe` (text). `weekly` luni ≥ 9:00 (meta `cell_health_last`,
+  din maintenance_loop): notificare doar pentru nivel 2 sau ușor diferită dar mereu la capăt (≥ 70%), url `/?v=cells`.
+  API `GET /api/cells/health` (ambele ediții). UI: `#ch-row` (după lista din Bateriile), `view-cells`, `loadCells`.
+  NEVERIFICAT pe date reale: pragurile (3,40/3,10 V, 15 A, scorul) se pot ajusta după primele săptămâni.
 - 2026-10-28 (1.0.0-beta.7): la 0x5F octeții 4..7 se schimbă singuri între citiri (Daly 1: `…00014b32` →
   `…700c7232`); `write_field` compară acum doar octeții câmpului (restul → doar avertisment în jurnal). Scrierea
   bal_start 3,40 V / bal_diff 20 mV s-a aplicat pe 3 Daly (firmware 31_2306, 31_2207, 11_2506).

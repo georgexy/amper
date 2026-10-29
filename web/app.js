@@ -33,7 +33,7 @@ const SERIES = ["#63B7E6", "#4FD1B5", "#B39DF5", "#F48FB1", "#F0A35E", "#9CCC65"
 const FAULT_RULES = { not_charging: "nu se încarcă", charge_mos_off: "încărcare oprită", discharge_mos_off: "descărcare oprită",
   comm_lost: "fără date", cell_low: "celulă descărcată", temp_high: "prea cald", temp_low_charge: "prea rece",
   low_soc: "aproape goală", cell_high: "celulă prea sus", cell_delta: "dezechilibrată", soc_divergence: "rămâne în urmă",
-  bms_alarm: "avertisment BMS", bms_protection: "protecție BMS" };
+  bms_alarm: "avertisment BMS", bms_protection: "protecție BMS", mos_forced_off: "oprit din Amper" };
 
 /* „Daly 2: BMS-ul a OPRIT încărcarea (MOSFET încărcare OFF)” → textul principal + detaliile (ce e în paranteze) */
 function splitDetail(m) {
@@ -105,6 +105,7 @@ async function boot() {
   const v = new URLSearchParams(location.search).get("v");
   if (v === "alerts") { show("alerts"); history.replaceState(null, "", location.pathname); }
   if (v === "update") { show("settings"); showPanel("update"); history.replaceState(null, "", location.pathname); }
+  if (v === "cells") { show("cells"); history.replaceState(null, "", location.pathname); }
   $("#set-about-sub").textContent = `Amper ${isPro() ? "Pro" : "Lite"} ${state.info.version || ""} · actualizări, Pi-ul`;
   setInterval(tickConn, 1000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -605,7 +606,7 @@ function renderPacks() {
     el.innerHTML = `<div class="h"><div class="pk-mini"><i style="height:${Math.max(0, Math.min(100, r.soc ?? 0))}%"></i></div>
       <div class="t"><div class="n">${esc(d.name)} <span class="tag">${esc(label)}</span>${d.type === "daly" && !d.stale
         && isPro() ? `<span class="pk-gear" data-bms="${esc(d.id)}" role="button" tabindex="0" aria-label="Setările BMS ${esc(d.name)}">⚙</span>` : ""}</div>
-      <div class="s">${d.stale ? `Nu comunică${d.error ? ": " + esc(d.error) : ""}` : facts}</div>${bleId(r)}</div>
+      <div class="s">${d.restarting ? "Repornește…" : d.stale ? `Nu comunică${d.error ? ": " + esc(d.error) : ""}` : facts}</div>${bleId(r)}</div>
       <div class="soc">${r.soc == null ? "–" : num(r.soc, 0)}<sup>%</sup></div></div>
       ${cells.length ? `<div class="pk-cells">${cells.map((v) => `<i class="${hi - lo > 0.005 ? (v === hi ? "hi" : v === lo ? "lo" : "") : ""}"
         style="height:${Math.max(8, ((v - floor) / span) * 100)}%"></i>`).join("")}</div>` : ""}
@@ -614,6 +615,68 @@ function renderPacks() {
   }
 }
 $("#pk-back").onclick = () => show("now");
+
+/* ------------------------------------------------------------------ SĂNĂTATEA CELULELOR (varianta C) */
+const cellsState = { data: null, at: 0 };
+async function fetchCells(force = false) {
+  if (!force && cellsState.data && Date.now() - cellsState.at < 10 * 60000) return cellsState.data;
+  cellsState.data = await api("/api/cells/health");
+  cellsState.at = Date.now();
+  return cellsState.data;
+}
+const CH_LV = [["ok", "În regulă"], ["wa", "Ușor diferită"], ["al", "De urmărit"]];
+async function loadCellsRow() {
+  try {
+    const r = await fetchCells();
+    const worst = r.cells[0];
+    $("#ch-row").hidden = false;
+    $("#ch-sub").textContent = !r.enough ? "Se adună date (încărcări complete și descărcări adânci)"
+      : worst ? `${worst.name} · celula ${worst.cell}${r.cells.length > 1 ? ` și încă ${r.cells.length - 1}` : ""}`
+      : `${r.tracked || r.ok_count} de celule urmărite`;
+    const [cls, txt] = !r.enough ? ["", "Date puține"] : CH_LV[worst ? worst.level : 0];
+    $("#ch-chip").className = "chip " + cls;
+    $("#ch-chip").textContent = worst?.level === 1 ? "Ușor diferit" : txt;
+  } catch {}
+}
+$("#ch-row").onclick = () => show("cells");
+$("#ch-back").onclick = () => show("packs");
+function spark(v, color) {
+  const pts = v.map((y, i) => [i, y]).filter(([, y]) => y != null);
+  if (pts.length < 2) return "";
+  const ys = pts.map(([, y]) => y), mn = Math.min(...ys), mx = Math.max(...ys), W = 92, H = 30;
+  const p = pts.map(([i, y]) => `${(i * W / (v.length - 1)).toFixed(1)},${(H - 4 - (y - mn) / ((mx - mn) || 1) * (H - 8)).toFixed(1)}`).join(" ");
+  return `<svg viewBox="0 0 ${W} ${H}" width="92" height="30"><polyline points="${p}" fill="none" stroke="${color}" stroke-width="2"/></svg>`;
+}
+async function loadCells() {
+  const box = $("#ch-body");
+  if (!cellsState.data) box.innerHTML = `<div class="note">Analizez…</div>`;
+  let r;
+  try { r = await fetchCells(true); } catch (e) { if (e.message !== "auth") box.innerHTML = `<div class="banner">${esc(e.message)}</div>`; return; }
+  const ev = r.events, data = `Date: ${ev.chg} încărcări complete, ${ev.dis} descărcări adânci și ${ev.ir} salturi de curent în ultimele
+    ${Math.round(r.window_days / 7)} săptămâni. Scorul combină abaterea la încărcare, la descărcare și rezistența internă.`;
+  if (!r.enough) {
+    box.innerHTML = `<div class="mod ch-empty"><b>Se adună date</b><p>Diferențele dintre celule se văd doar la capete: la final de
+      încărcare (peste 3,40 V) și la descărcare adâncă (sub 3,10 V). E nevoie de cel puțin 3 astfel de momente; primele
+      concluzii apar de obicei după 2–3 săptămâni.</p></div><p class="note">${data}</p>`;
+    return;
+  }
+  const mv = (v) => `${v > 0 ? "+" : ""}${num(v, 0)} mV`;
+  const worst = r.cells[0];
+  box.innerHTML = (worst && worst.level ? `<div class="ch-alert ${worst.level === 2 ? "al" : ""}"><b>${esc(worst.text.split(":")[0])}</b>${esc(worst.text.split(":").slice(1).join(":").trim())}</div>` : "") +
+    r.cells.map((c) => {
+      const color = c.level === 2 ? "var(--alarm)" : "var(--warn)";
+      const m = [c.dis != null ? `la descărcare <b>${mv(c.dis)}</b>${c.dis_low && c.dis_low[0] ? ` (${c.dis_low[0]} din ${c.dis_low[1]})` : ""}` : null,
+        c.chg != null ? `la încărcare <b>${mv(c.chg)}</b>${c.chg_top && c.chg_top[0] ? ` (${c.chg_top[0]} din ${c.chg_top[1]})` : ""}` : null,
+        c.ir_rel != null ? `rezistență <b>${c.ir_rel > 0 ? "+" : ""}${c.ir_rel}%</b>` : null].filter(Boolean);
+      return `<div class="rk"><div><div class="n">${esc(c.name)} · celula ${c.cell}</div><span class="chip ${CH_LV[c.level][0]}">${CH_LV[c.level][1]}</span></div>
+        <div class="score" style="color:${color}">${c.score}<small>scor / 100</small></div>
+        <div class="m">${m.map((x) => `<span>${x}</span>`).join("")}</div>
+        <div class="tr">abatere în ultimele 8 săptămâni ${spark(c.trend, color)}</div></div>`;
+    }).join("") +
+    `<h2>${r.cells.length ? `Celelalte ${r.ok_count} de celule` : `Toate cele ${r.ok_count} de celule`}</h2>
+    <div class="mod ch-ok"><span>${r.ok_range ? `Toate în regulă · scor ${r.ok_range[0] === r.ok_range[1] ? r.ok_range[0] : r.ok_range.join("–")}` : "Toate în regulă"}</span><span class="chip ok">În regulă</span></div>
+    <p class="note">${data}</p>`;
+}
 
 /* ------------------------------------------------------------------ ecranul INVERTOR */
 const inv = { data: null, edit: null };
@@ -753,11 +816,89 @@ $("#bms-back").onclick = () => show("packs");
 function openBms(id) {
   bms.id = id;
   bms.data = null;
+  bms.cmds = null;
   show("bms");
+}
+/* ---- comenzile BMS (Bateriile → ⚙ → Comenzi): MOSFET-uri, SOC, repornire ---- */
+async function loadCmds() {
+  const box = $("#bms-cmds");
+  if (!bms.cmds) box.innerHTML = `<div class="note">Citesc starea din BMS…</div>`;
+  try {
+    const r = await api(`/api/daly/${encodeURIComponent(bms.id)}/actions`);
+    if (r.error) throw new Error(r.error);
+    bms.cmds = r;
+    renderCmds();
+  } catch (e) {
+    if (e.message !== "auth") box.innerHTML = `<div class="banner">${esc(e.message)}</div>`;
+  }
+}
+function renderCmds(msg = "") {
+  const r = bms.cmds, A = Object.fromEntries(r.actions.map((a) => [a.key, a]));
+  const mosRow = (mos, title) => {
+    const on = r.mos[mos], next = A[`${mos}_${on === false ? "on" : "off"}`];
+    // motivul de refuz e doar un avertisment: comutatorul rămâne activ, iar oprirea cere o confirmare în plus
+    const why = !r.can_write ? "Setați o parolă pentru aplicație." : !next.supported ? "Comanda nu e suportată de acest BMS." : "";
+    const warn = next.refused || "";
+    const since = r.forced?.[mos] ? ` · oprită din Amper ${ago(r.forced[mos])}` : "";
+    return `<label class="row-check cmd"><span><b>${title}</b><small>MOSFET ${on == null ? "–" : on ? "pornit" : "OPRIT"}${since}</small>
+      ${why || warn ? `<small class="why">${esc(why || "Atenție: " + warn)}</small>` : ""}</span>
+      <input type="checkbox" data-mos="${mos}" ${on === false ? "" : "checked"} ${why || on == null ? "disabled" : ""}></label>`;
+  };
+  const s = r.suggest, soc = A.set_soc, rs = A.restart;
+  const sug = s ? `după tensiunea celulelor ~${num(s.soc, 0)} %${s.rest ? "" : " (curentul nu e mic: estimare aproximativă)"}` : "";
+  $("#bms-cmds").innerHTML = (msg ? `<div class="banner ${msg.ok ? "ok" : "warning"}"><b>${esc(msg.t)}</b></div>` : "") +
+    `<div class="cmd-list">${mosRow("chg", "Încărcare")}${mosRow("dsg", "Descărcare")}</div>
+    <div class="list iv-set">${soc.supported ? `<button class="row iv-row" id="cmd-soc" ${r.can_write ? "" : "disabled"}>
+      <span class="k">Setează SOC…<small class="t">Acum ${r.soc == null ? "–" : num(r.soc, 1) + " %"}${sug ? " · " + sug : ""}</small></span>
+      <span class="ed">Setează ›</span></button>` : ""}</div>
+    ${rs.supported ? `<button class="btn danger" id="cmd-restart" ${rs.refused || !r.can_write || r.restarting ? "disabled" : ""}>
+      ${r.restarting ? "Repornește…" : "Repornește BMS"}</button>${rs.refused ? `<p class="note why">${esc(rs.refused)}</p>` : ""}` : ""}
+    ${r.unsupported.length ? `<p class="note">Nesuportate la acest BMS (firmware ${esc(r.firmware)}):
+      ${r.unsupported.map((k) => esc(A[k]?.label || k)).join(", ")}. <a href="#" id="cmd-retry">Încearcă din nou</a></p>` : ""}`;
+  $$("[data-mos]", $("#bms-cmds")).forEach((el) => (el.onchange = () => {
+    const key = `${el.dataset.mos}_${el.checked ? "on" : "off"}`;
+    runCmd(key).finally(() => (el.checked = bms.cmds.mos[el.dataset.mos] !== false));
+  }));
+  const so = $("#cmd-soc");
+  if (so) so.onclick = () => openEditor({ key: "set_soc", label: "SOC", group: "Setează SOC", text: r.soc == null ? "–" : num(r.soc, 1) + " %",
+    value: s ? s.soc : r.soc, min: 0, max: 100, step: 0.1, unit: "%", risky: true,
+    note: soc.warn + (sug ? ` Sugestie: ${sug}.` : "") }, "BMS", (v) => runCmd("set_soc", v, true));
+  const rb = $("#cmd-restart");
+  if (rb) rb.onclick = () => runCmd("restart");
+  const rt = $("#cmd-retry");
+  if (rt) rt.onclick = async (e) => {
+    e.preventDefault();
+    await fetch(`/api/daly/${encodeURIComponent(bms.id)}/actions/retry`, { method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" }, body: "{}" });
+    loadCmds();
+  };
+}
+async function runCmd(key, value, fromEditor = false) {
+  const a = bms.cmds.actions.find((x) => x.key === key);
+  if (!fromEditor && !confirm(`${a.label}?\n\n${a.warn}`)) return;
+  // oprire peste avertisment (ex. intervenție la conexiuni): a doua confirmare, cu motivul
+  const force = !!(a.refused && a.can_force);
+  if (force && !confirm(`ATENȚIE: ${a.refused}\n\nOprești totuși ${a.mos === "chg" ? "încărcarea" : "descărcarea"} acestui modul?`)) return;
+  if (key === "restart") {
+    bms.cmds.restarting = true;
+    renderCmds({ ok: true, t: "BMS-ul repornește… poate dura până la un minut." });
+  }
+  let res;
+  try {
+    const { r, j } = await securePost(`/api/daly/${encodeURIComponent(bms.id)}/action`, { action: key, value, force });
+    res = r.ok && j.ok ? { ok: true, t: `${a.label}: gata${j.old ? ` (${j.old} → ${j.new})` : ""}${j.seconds ? `, în ${j.seconds} s` : ""}.` }
+      : { ok: false, t: j.error || `eroare ${r.status}` };
+  } catch (e) {
+    res = { ok: false, t: e.message };
+  }
+  await loadCmds();
+  renderCmds(res);
+  if (fromEditor && !res.ok) throw new Error(res.t);
 }
 async function loadBms() {
   const d = state.snap?.devices?.[bms.id];
   $("#bms-title").textContent = `Setări BMS — ${d?.name || bms.id}`;
+  loadCmds();
   if (!bms.data) $("#bms-list").innerHTML = `<div class="note">Citesc setările din BMS…</div>`;
   try {
     const r = await api(`/api/daly/${encodeURIComponent(bms.id)}/settings`);
@@ -1462,12 +1603,13 @@ function renderSheet() {
 $$("nav.tabs button").forEach((b) => (b.onclick = () => show(b.dataset.view)));
 function show(v) {
   state.view = v;
-  const tab = ["packs", "inverter", "bms"].includes(v) ? "now" : v;      // se deschid din „Acum”
+  const tab = ["packs", "inverter", "bms", "cells"].includes(v) ? "now" : v;      // se deschid din „Acum”
   $$("nav.tabs button").forEach((b) => b.dataset.view === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
-  for (const k of ["now", "hist", "alerts", "packs", "inverter", "bms", "settings"]) $("#view-" + k).hidden = v !== k;
+  for (const k of ["now", "hist", "alerts", "packs", "inverter", "bms", "cells", "settings"]) $("#view-" + k).hidden = v !== k;
   $("#pvpop").hidden = true;
   if (v === "bms") loadBms();
-  if (v === "packs") renderPacks();
+  if (v === "packs") { renderPacks(); loadCellsRow(); }
+  if (v === "cells") loadCells();
   if (v === "inverter") {
     renderInverterLive();
     $("#iv-pro").hidden = !isPro();                 // Lite: doar starea invertorului, fără setări
@@ -2233,6 +2375,7 @@ navigator.serviceWorker?.addEventListener("message", (e) => {
   if ($("#app").hidden) return;
   if (u.includes("v=alerts")) show("alerts");
   if (u.includes("v=update")) { show("settings"); showPanel("update"); }
+  if (u.includes("v=cells")) show("cells");
 });
 
 /* ---------- ecranul „Actualizez Amper”: cercul se umple după pașii serviciului de actualizare; cât Amper

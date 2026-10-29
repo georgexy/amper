@@ -66,6 +66,20 @@
       <div class="pk-sum" id="pk-sum"></div>
       <div id="pk-list"></div>
       <p class="note">Atinge un pachet pentru celule, temperaturi și MOSFET-uri.</p>
+      <button class="ch-row" id="ch-row" hidden>
+        <span class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="13" rx="2.5"/><path d="M9 3.5h6M8 10v5M12 10v5M16 10v5"/></svg></span>
+        <span class="tx"><b>Sănătatea celulelor</b><small id="ch-sub"></small></span><span class="chip" id="ch-chip"></span><span class="ar">›</span>
+      </button>
+    </main>
+
+    <!-- ====================== SĂNĂTATEA CELULELOR ====================== -->
+    <main id="view-cells" class="wrap" hidden>
+      <div class="pk-top">
+        <button class="back" id="ch-back" aria-label="Înapoi la baterii">‹</button>
+        <h2>Sănătatea celulelor</h2>
+      </div>
+      <p class="note">Celulele care se abat cel mai mult de la celelalte din modul, cele mai slabe primele.</p>
+      <div id="ch-body"></div>
     </main>
 
     <!-- ====================== SETĂRI BMS (Daly) ====================== -->
@@ -77,6 +91,10 @@
       <p class="note">Valorile sunt citite acum din BMS. La fiecare pereche de praguri, primul e avertismentul (nivel 1),
         al doilea e protecția (nivel 2): la el BMS-ul taie încărcarea sau descărcarea. Fiecare modificare se citește înapoi din BMS ca să fie verificată.</p>
       <div id="bms-list"></div>
+      <h2>Comenzi</h2>
+      <p class="note">Comenzi trimise direct BMS-ului. Fiecare cere confirmare și parola, iar rezultatul se citește înapoi
+        din BMS. Dacă restul băncii nu poate duce curentul de acum, oprirea unui MOSFET arată un avertisment și cere o confirmare în plus.</p>
+      <div id="bms-cmds"></div>
       <h2>Modificări făcute</h2>
       <div class="list" id="bms-log"></div>
     </main>

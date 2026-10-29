@@ -34,6 +34,7 @@ DEFAULTS = {
         "temp_high_c": 50,
         "temp_low_charge_c": 1,
         "comm_lost_seconds": 120,
+        "mos_forced_minutes": 30,        # MOSFET oprit din Amper (comenzi Daly) și uitat așa
     },
     "notify": {
         "ntfy": {"enabled": False, "server": "https://ntfy.sh", "topic": ""},
