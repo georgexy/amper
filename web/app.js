@@ -419,8 +419,7 @@ const FLUX = {
   bat: "M180 247 L180 330", grid: "M58 290 C100 290 148 262 160 240",
 };
 const flux = {
-  html: () => `
-    <div class="f-inv" data-k="inv" data-open="inverter" role="button" tabindex="0"></div>
+  html: () => `<div class="f-wrap">
     <div class="f-diag">
       <svg class="lines" viewBox="0 0 360 330">${Object.entries(FLUX).map(([k, d]) =>
         `<path class="ln" data-ln="${k}" d="${d}"/><path class="dots" data-dots="${k}" d="${d}"/>`).join("")}</svg>
@@ -429,11 +428,12 @@ const flux = {
       <div class="f-node sm" data-open="inverter" role="button" tabindex="0" aria-label="Invertor" style="left:50%;top:69%;--c:var(--cell)"><div class="disc" style="width:64px;height:64px">${icon("inv")}</div></div>
       <div class="f-node sm" data-k-cls="grid" style="left:11%;top:88%;--c:var(--muted)"><div class="disc">${icon("grid")}</div><div class="l" data-k="grid">Rețea</div><div class="t" data-k="tgr"></div></div>
       <div class="f-blabel" data-k="bat" style="left:53%;top:87%"></div>
+      <div class="f-inv" data-k="inv" data-open="inverter" role="button" tabindex="0" style="left:62%;top:71%"></div>
     </div>
     <button class="f-batt" data-open="packs" aria-label="Bateria — vezi pachetele">
       <div class="f-cap"></div><div class="f-cell"><div class="f-fill"></div><b><span data-k="soc">–</span>%</b></div>
       <div class="k" data-k="kwh"></div><div class="s" data-k="eta"></div>
-    </button>`,
+    </button></div>`,
   update(root, h) {
     const { b, ir, bp } = h;
     const ac = ir?.ac_in_power || 0;
@@ -457,7 +457,7 @@ const flux = {
     const gridOn = ir?.ac_in_voltage > 50;
     root.querySelector('[data-k-cls="grid"]').classList.toggle("dim", !gridOn);
     put(root, "grid", ir?.ac_in_voltage == null ? "Rețea" : `Rețea<br>${num(ir.ac_in_voltage, 0)} V`);
-    put(root, "inv", ir ? `Invertor: <b>${esc(ir.status || "–")}</b> · ${num(ir.inverter_temp, 0)} °C`
+    put(root, "inv", ir ? `Invertor · ${num(ir.inverter_temp, 0)} °C<b>${esc(ir.status || "–")}</b>`
       : h.inv ? `${esc(h.inv.name)}: fără date` : "");
     modeClass(root.querySelector(".f-batt"), h, "f-batt");
     root.querySelector(".f-fill").style.height = `calc(${Math.max(0, Math.min(100, b.soc ?? 0))}% - 12px)`;

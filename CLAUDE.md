@@ -431,3 +431,6 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   rămâne centrată (96×112). Liniile pv/load pornesc de la y 156 (sub textul nou). Încape pe 390×664 și, cu
   `@media (max-height: 620px)`, pe 320×568 (iPhone SE). Măsurat cu Playwright (scrollHeight = innerHeight).
   Sub baterie NU se afișează `health` (erorile; cerut 2026-10-29: se văd în Bateriile); `.k` 14 px, `.s` 12 px.
+  `.f-inv` (starea invertorului) e în `.f-diag`, lângă invertor (left 62%, top 71%; pe SE 78%). `.f-wrap` = coloană
+  flex `space-evenly` cu min-height 100dvh − 54 (antet) − 112 (bara de jos); `.f-diag` lățime
+  min(100%, 400px, (100dvh − 340px) × 1,09) → diagrama crește cu ecranul.
