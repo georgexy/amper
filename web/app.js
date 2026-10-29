@@ -426,18 +426,18 @@ const flux = {
         `<path class="ln" data-ln="${k}" d="${d}"/><path class="dots" data-dots="${k}" d="${d}"/>`).join("")}</svg>
       <div class="f-node" style="left:20%;top:19%;--c:var(--sun)"><div class="disc">${icon("sun")}</div><div class="w" data-k="pv">–</div><div class="l">Panouri ${PV_I}</div></div>
       <div class="f-node" style="left:80%;top:19%;--c:var(--load)"><div class="disc">${icon("home")}</div><div class="w" data-k="load">–</div><div class="l">Consum casă</div></div>
-      <div class="f-node sm" data-open="inverter" role="button" tabindex="0" aria-label="Invertor" style="left:50%;top:69%;--c:var(--cell)"><div class="disc" style="width:64px;height:64px">${icon("inv")}</div></div>
+      <div class="f-node sm" data-open="inverter" role="button" tabindex="0" aria-label="Invertor" style="left:50%;top:69%;--c:var(--cell)"><div class="disc" style="width:54px;height:54px">${icon("inv")}</div></div>
       <div class="f-node sm" data-k-cls="grid" style="left:11%;top:88%;--c:var(--muted)"><div class="disc">${icon("grid")}</div><div class="l" data-k="grid">Rețea</div></div>
       <div class="f-blabel" data-k="bat" style="left:53%;top:87%"></div>
     </div>
     <button class="f-batt" data-open="packs" aria-label="Bateria — vezi pachetele">
-      <div class="f-cap"></div><div class="f-cell"><div class="f-fill"></div><b><span data-k="soc">–</span>%</b></div>
-      <div class="k" data-k="kwh"></div><div class="s" data-k="eta"></div><span class="health" data-k="health"></span>
+      <div class="f-bico"><div class="f-cap"></div><div class="f-cell"><div class="f-fill"></div><b><span data-k="soc">–</span>%</b></div></div>
+      <div class="f-btxt"><div class="k" data-k="kwh"></div><div class="s" data-k="eta"></div><span class="health" data-k="health"></span></div>
     </button>
-    <div class="f-cards"><div class="card"><span>Produs azi</span><b data-k="tpv">–</b></div>
-      <div class="card"><span>Din rețea azi</span><b data-k="tgr">–</b></div>
-      <div class="card"><span>Consumat azi</span><b data-k="tld">–</b></div>
-      <div class="card"><span>Autonomie</span><b data-k="aut">–</b></div></div>`,
+    <div class="f-cards">${[["tpv", "Produs azi", "--sun", "sun"], ["tgr", "Din rețea", "--charge", "grid"],
+      ["tld", "Consumat", "--load", "home"], ["aut", "Autonomie", "--cell", "clock"]].map(([k, l, c, i]) => `
+      <div class="f-tile" style="--tc:var(${c})"><i>${i === "clock" ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>' : icon(i)}</i>
+        <b data-k="${k}">–</b><span>${l}</span></div>`).join("")}</div>`,
   update(root, h) {
     const { b, ir, bp } = h;
     const ac = ir?.ac_in_power || 0;
@@ -460,8 +460,8 @@ const flux = {
     put(root, "bat", bp == null || Math.abs(bp) <= 20 ? "" : watts(Math.abs(bp)));
     const gridOn = ir?.ac_in_voltage > 50;
     root.querySelector('[data-k-cls="grid"]').classList.toggle("dim", !gridOn);
-    put(root, "grid", `Rețea<br>${ir?.ac_in_voltage == null ? "–" : num(ir.ac_in_voltage, 0) + " V"}`);
-    put(root, "inv", ir ? `Invertor: <b>${esc(ir.status || "–")}</b><br>${num(ir.inverter_temp, 0)} °C · ${num(ir.output_voltage, 0)} V · ${num(ir.output_freq, 1)} Hz`
+    put(root, "grid", ir?.ac_in_voltage == null ? "Rețea" : `Rețea<br>${num(ir.ac_in_voltage, 0)} V`);
+    put(root, "inv", ir ? `Invertor: <b>${esc(ir.status || "–")}</b> · ${num(ir.inverter_temp, 0)} °C`
       : h.inv ? `${esc(h.inv.name)}: fără date` : "");
     modeClass(root.querySelector(".f-batt"), h, "f-batt");
     root.querySelector(".f-fill").style.height = `calc(${Math.max(0, Math.min(100, b.soc ?? 0))}% - 12px)`;
@@ -473,7 +473,9 @@ const flux = {
     put(root, "tpv", kv(h.today.pv_kwh, "kWh", 1));
     put(root, "tld", kv(h.today.load_kwh, "kWh", 1));
     put(root, "tgr", h.today.pv_kwh == null ? "–" : kv(h.today.ac_in_kwh || 0, "kWh", 1));
-    put(root, "aut", h.autonomy == null ? "–" : `~${duration(h.autonomy)}`);
+    // în căsuță: doar orele (sau minutele); detaliul e sub baterie
+    put(root, "aut", h.autonomy == null ? "–" : h.autonomy > 72 ? `~${num(h.autonomy / 24, 0)}<span class="u">zile</span>`
+      : h.autonomy >= 1 ? `~${Math.round(h.autonomy)}<span class="u">h</span>` : `~${Math.round(h.autonomy * 60)}<span class="u">min</span>`);
   },
 };
 

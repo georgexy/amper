@@ -5,6 +5,9 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 ## 1.0.0-beta.8 — în pregătire
 - Actualizări: istoricul și „Revino la versiunea anterioară” s-au mutat într-un ecran separat, „Istoric versiuni”.
 - Mesajele de la Actualizări spun „server” în loc de GitHub.
+- Tema Flux: ecranul principal încape pe telefon fără glisare (și pe ecrane mici, ca iPhone SE); bateria are
+  textul alături, iar cele patru căsuțe de jos (Produs azi, Din rețea, Consumat, Autonomie) sunt pe un rând, cu
+  iconițe colorate.
 
 ## 1.0.0-beta.7 — 2026-10-29
 - Reparat: la setările de echilibrare ale BMS-ului Daly, aplicația spunea „BMS-ul arată altceva decât s-a trimis”
