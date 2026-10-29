@@ -773,11 +773,12 @@ function renderCmds(msg = "") {
   const r = bms.cmds, A = Object.fromEntries(r.actions.map((a) => [a.key, a]));
   const mosRow = (mos, title) => {
     const on = r.mos[mos], next = A[`${mos}_${on === false ? "on" : "off"}`];
-    const why = !r.can_write ? "Setați o parolă pentru aplicație." : !next.supported ? "Comanda nu e suportată de acest BMS."
-      : next.refused || "";
+    // motivul de refuz e doar un avertisment: comutatorul rămâne activ, iar oprirea cere o confirmare în plus
+    const why = !r.can_write ? "Setați o parolă pentru aplicație." : !next.supported ? "Comanda nu e suportată de acest BMS." : "";
+    const warn = next.refused || "";
     const since = r.forced?.[mos] ? ` · oprită din Amper ${ago(r.forced[mos])}` : "";
     return `<label class="row-check cmd"><span><b>${title}</b><small>MOSFET ${on == null ? "–" : on ? "pornit" : "OPRIT"}${since}</small>
-      ${why ? `<small class="why">${esc(why)}</small>` : ""}</span>
+      ${why || warn ? `<small class="why">${esc(why || "Atenție: " + warn)}</small>` : ""}</span>
       <input type="checkbox" data-mos="${mos}" ${on === false ? "" : "checked"} ${why || on == null ? "disabled" : ""}></label>`;
   };
   const s = r.suggest, soc = A.set_soc, rs = A.restart;
@@ -812,13 +813,16 @@ function renderCmds(msg = "") {
 async function runCmd(key, value, fromEditor = false) {
   const a = bms.cmds.actions.find((x) => x.key === key);
   if (!fromEditor && !confirm(`${a.label}?\n\n${a.warn}`)) return;
+  // oprire peste avertisment (ex. intervenție la conexiuni): a doua confirmare, cu motivul
+  const force = !!(a.refused && a.can_force);
+  if (force && !confirm(`ATENȚIE: ${a.refused}\n\nOprești totuși ${a.mos === "chg" ? "încărcarea" : "descărcarea"} acestui modul?`)) return;
   if (key === "restart") {
     bms.cmds.restarting = true;
     renderCmds({ ok: true, t: "BMS-ul repornește… poate dura până la un minut." });
   }
   let res;
   try {
-    const { r, j } = await securePost(`/api/daly/${encodeURIComponent(bms.id)}/action`, { action: key, value });
+    const { r, j } = await securePost(`/api/daly/${encodeURIComponent(bms.id)}/action`, { action: key, value, force });
     res = r.ok && j.ok ? { ok: true, t: `${a.label}: gata${j.old ? ` (${j.old} → ${j.new})` : ""}${j.seconds ? `, în ${j.seconds} s` : ""}.` }
       : { ok: false, t: j.error || `eroare ${r.status}` };
   } catch (e) {

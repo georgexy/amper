@@ -265,17 +265,19 @@ def test_api_action_logs_notifies_and_marks_forced(tmp_path, monkeypatch):
         bad = await c.post("/api/daly/daly1/action", json={"action": "dsg_off", "app_password": "gresita"})
         # singurul modul: oprirea descărcării e refuzată pe server (invertorul s-ar opri)
         refused = await c.post("/api/daly/daly1/action", json={"action": "dsg_off", "app_password": "parola-buna"})
-        monkeypatch.setattr(da, "precheck", lambda *a, **k: None)
-        ok = await c.post("/api/daly/daly1/action", json={"action": "dsg_off", "app_password": "parola-buna"})
+        # … dar se poate opri totuși, cu `force` (ex. intervenție la conexiunile modulului)
+        ok = await c.post("/api/daly/daly1/action", json={"action": "dsg_off", "app_password": "parola-buna",
+                                                           "force": True})
         log = eng.db.settings_log("daly1")
         return (lst, bad.status, (refused.status, await refused.json()), ok.status, await ok.json(), log,
                 dict(eng.devices["daly1"].forced), n.sent)
     lst, bad, refused, ok, body, log, forced, sent = web_run(tmp_path, steps, fake)
     assert {a["key"] for a in lst["actions"]} == set(da.BY_KEY) and lst["firmware"] == "31_2306|0x80"
     assert next(a for a in lst["actions"] if a["key"] == "dsg_off")["refused"].startswith("Ar rămâne zero module")
-    assert refused[0] == 409 and refused[1]["refused"]
+    assert refused[0] == 409 and refused[1]["refused"] and refused[1]["can_force"]
     assert bad == 403 and ok == 200 and body["ok"] and fake.dsg is False
-    assert log[0]["setting"] == "comandă: Oprește descărcarea" and log[0]["ok"] == 1
+    assert log[0]["setting"].startswith("comandă: Oprește descărcarea (forțat, deși: Ar rămâne zero module")
+    assert log[0]["ok"] == 1
     assert "dsg" in forced and any("⚙️ Daly 1: Oprește descărcarea" in m for m in sent)
 
 
@@ -293,3 +295,14 @@ def test_forced_off_alert_and_no_comm_lost_while_restarting():
     assert rules["mos_forced_off"].level == "warning"
     dev["forced"] = {"dsg": now - 10 * 60}
     assert "mos_forced_off" not in {c.rule for c in evaluate(dict(devices={"daly1": dev}, started=0, bank={}), a, now)}
+
+
+def test_restart_cannot_be_forced(tmp_path, monkeypatch):
+    monkeypatch.setattr(da, "precheck", lambda *a, **k: "Alt BMS repornește acum. Câte unul odată.")
+
+    async def steps(c, eng, n):
+        r = await c.post("/api/daly/daly1/action", json={"action": "restart", "app_password": "parola-buna",
+                                                          "force": True})
+        return r.status, await r.json()
+    status, body = web_run(tmp_path, steps, FakeDaly())
+    assert status == 409 and not body["can_force"]

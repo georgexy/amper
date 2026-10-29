@@ -198,7 +198,9 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   așteaptă ≤ 60 s, ciclurile (0x94) și capacitatea (0x50) trebuie să fie aceleași, altfel `critical` (notificare 🔴).
   `precheck` (pe server): oprire dsg refuzată dacă celelalte cu dsg pornit nu duc `load_power / V` (sau curentul
   băncii) × 1,3 cu limitele 0x5B nivel 1 (dis_a / chg_a, cache 1 h în web.py) ori dacă n-ar rămâne niciunul; chg la
-  fel cu curentul de încărcare; repornire: un singur BMS odată și restul cu ambele MOSFET-uri pornite. `Support`
+  fel cu curentul de încărcare; repornire: un singur BMS odată și restul cu ambele MOSFET-uri pornite. La MOSFET-uri
+  refuzul e doar avertisment: cu `force: true` (a doua confirmare în aplicație) oprirea se face oricum — cerut
+  2026-10-29 („indiferent de celelalte”, pentru intervenții la conexiuni); repornirea nu se poate forța. `Support`
   (tabela meta, cheia firmware 0x62 + adresa): 2 eșecuri la rând fără motiv raportat → nesuportată.
   API: `GET /api/daly/<id>/actions`, `POST …/action {action, value?, app_password}` (confirm „comandă BMS”, daly_lock,
   409 dacă e ocupat/refuzat), `POST …/actions/retry`; în PRO_ONLY. `settings_log` „comandă: …”, notificare ⚙️.

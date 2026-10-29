@@ -808,7 +808,8 @@ def make_app(engine) -> web.Application:
         r = st.reading
         acts = [dict(key=a["key"], label=a["label"], kind=a["kind"], mos=a.get("mos"), want=a.get("want"),
                      risk=a["risk"], warn=a["warn"], supported=a["key"] not in hidden,
-                     refused=daly_actions.precheck(a["key"], dev, snap, lims, restarting_ids()))
+                     refused=daly_actions.precheck(a["key"], dev, snap, lims, restarting_ids()),
+                     can_force=a["kind"] == "mos")
                 for a in daly_actions.ACTIONS]
         return _json(dict(device=dev, firmware=skey, actions=acts, unsupported=sorted(hidden),
                           mos=dict(chg=getattr(r, "charge_mos", None), dsg=getattr(r, "discharge_mos", None)),
@@ -845,8 +846,11 @@ def make_app(engine) -> web.Application:
                              409)
             lims = await asyncio.to_thread(other_limits, dev)
             why = daly_actions.precheck(key, dev, engine.snapshot(), lims, restarting_ids())
-            if why:
-                return _json({"error": why, "refused": True}, 409)
+            # MOSFET-urile se pot opri și peste avertisment (ex. intervenție la conexiunile unui modul), dar doar
+            # cu `force` trimis explicit după ce utilizatorul a văzut motivul; repornirea rămâne blocată
+            forced = bool(why) and act["kind"] == "mos" and bool(body.get("force"))
+            if why and not forced:
+                return _json({"error": why, "refused": True, "can_force": act["kind"] == "mos"}, 409)
             if act["kind"] == "restart":
                 st.restart_until = time.time() + 120
             try:
@@ -860,6 +864,8 @@ def make_app(engine) -> web.Application:
             engine.set_forced(dev, act["mos"], off=not act["want"])
         now_unsup = support.record(skey, key, res)
         what = res["label"] + (f" la {value:g} %" if value is not None else "")
+        if forced:
+            what += f" (forțat, deși: {why})"
         await asyncio.to_thread(engine.db.log_setting, int(time.time()), dev, f"comandă: {what}", res["old"],
                                 res["new"], res["ok"], res["error"], client_ip(request))
         log.warning("comandă BMS %s: %s: %s (de la %s)", name, what, "ok" if res["ok"] else res["error"],

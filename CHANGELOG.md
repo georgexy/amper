@@ -6,9 +6,10 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Comenzi pentru BMS-urile Daly (Pro; Bateriile → ⚙ → Comenzi): pornește/oprește încărcarea și descărcarea,
   setează SOC-ul (cu o sugestie după tensiunea celulelor) și repornește BMS-ul. Fiecare cere confirmare și parola,
   iar rezultatul se citește înapoi din BMS; dacă BMS-ul ține un MOSFET oprit, aplicația spune de ce.
-- Siguranță: oprirea descărcării sau a încărcării e refuzată dacă restul băncii nu poate duce curentul de acum
-  (cu rezervă de 30%) sau dacă n-ar mai rămâne niciun modul; repornirea, dacă alt BMS repornește sau restul băncii
-  nu e complet pornit. Pornirea e mereu permisă.
+- Siguranță: dacă restul băncii nu poate duce curentul de acum (cu rezervă de 30%) sau n-ar mai rămâne niciun
+  modul, oprirea încărcării/descărcării arată avertismentul și cere o a doua confirmare — se poate face totuși
+  (ex. pentru o intervenție la conexiunile unui modul). Repornirea e refuzată dacă alt BMS repornește sau restul
+  băncii nu e complet pornit. Pornirea e mereu permisă.
 - Alertă nouă: un MOSFET oprit din Amper și uitat așa mai mult de 30 de minute. Cât un BMS repornește din Amper,
   nu apare „nu comunică”.
 - Comenzile la care un BMS nu răspunde de 2 ori la rând sunt ascunse pentru acel firmware, cu „Încearcă din nou”.
