@@ -3,6 +3,12 @@
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
 ## 1.0.0-beta.12 — în pregătire
+- Invertoare noi (doar citire, încă neverificate pe un aparat real):
+  - **Deye** hibrid monofazat (și Sunsynk, Sol-Ark), pe RS485 (Modbus);
+  - **Easun ISolar / SMH** și celelalte Voltronic / Axpert (MPP Solar, PowMr vechi), pe RS232 (protocolul PI30);
+  - **Easun SMG / SMG-II** (PowMr nou, Anenji, SRNE), pe RS485 (Modbus); Amper alege singur harta de registre.
+  Se găsesc la detectarea automată și se pot alege din listă în ghid. Setările lor (ca la Growatt) vin după ce citirea
+  e confirmată pe un invertor real.
 - Ghid de configurare → Dispozitivele: două variante, una sub alta. „Configurare automată”: îți spune ce să legi
   și ce să pornești, caută singur și arată separat invertorul găsit și BMS-urile găsite. „Configurare manuală”: întâi
   invertorul (modelul din listă și tipul conexiunii), apoi acumulatorii (BMS); Amper caută doar ce ai ales, în câteva

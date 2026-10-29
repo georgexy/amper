@@ -342,9 +342,9 @@ def test_catalog_and_model_scan(tmp_path, monkeypatch):
     assert res["found"][0]["label"] == "Seplos (adresa 2)" and res["found"][0]["check"]["soc"] == 71
     import pytest
     with pytest.raises(ValueError):
-        setup_scan.scan({"devices": []}, model="deye", link="cable")       # încă nesuportat
+        setup_scan.scan({"devices": []}, model="jbd", link="ble")          # încă nesuportat
     ids = {e["id"]: e for e in catalog.CATALOG}
-    assert ids["growatt_spf"]["supported"] and not ids["deye"]["supported"]
+    assert ids["growatt_spf"]["supported"] and ids["deye"]["supported"] and not ids["jbd"]["supported"]
     assert {e["kind"] for e in catalog.CATALOG} == {"inverter", "bms"}
 
     async def steps(c, eng, n):

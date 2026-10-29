@@ -160,6 +160,19 @@ def probe(port: str, only: set[str] | None = None, addresses=None) -> list[str]:
     if want("growatt_spf") and ok(GrowattSPFDriver({"id": "probe", "type": "growatt_spf", "port": port}),
                                   lambda d: d._read_block(0, 3)):
         return ['growatt_spf {"baudrate": 9600}']
+    from .drivers.deye import DeyeDriver, looks_like_deye    # Deye / Sunsynk: tipul aparatului + seria (holding 0–7)
+    def deye_ok(d):
+        if not looks_like_deye(d.identify()):
+            raise ValueError("răspunde, dar nu e Deye")
+    if want("deye") and ok(DeyeDriver({"id": "probe", "type": "deye", "port": port}), deye_ok):
+        return ['deye {"baudrate": 9600}']
+    from .drivers.srne import SrneDriver                     # Easun SMG / PowMr / SRNE: una din cele două hărți
+    found_map = []
+    if want("srne") and ok(SrneDriver({"id": "probe", "type": "srne", "port": port}), lambda d: found_map.append(d.detect())):
+        return [f"srne {json.dumps({'baudrate': 9600, 'map': found_map[0]})}"]
+    from .drivers.voltronic import VoltronicDriver           # Voltronic / Axpert (PI30), 2400
+    if want("voltronic") and ok(VoltronicDriver({"id": "probe", "type": "voltronic", "port": port}), lambda d: d.identify()):
+        return ['voltronic {"baudrate": 2400}']
     from .drivers import pace                      # PACE (PowerCube / BMS Daren...), versiunea 0x25, adresele 0–15
 
     def pace25(a):

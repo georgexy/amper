@@ -10,7 +10,10 @@ import logging
 
 log = logging.getLogger(__name__)
 
-NAMES = {"daly": "Daly", "jk": "JK", "seplos": "Seplos", "pace": "PowerCube", "growatt_spf": "Invertor Growatt SPF"}
+NAMES = {"daly": "Daly", "jk": "JK", "seplos": "Seplos", "pace": "PowerCube", "growatt_spf": "Invertor Growatt SPF",
+         "deye": "Invertor Deye", "voltronic": "Invertor Easun / Voltronic", "srne": "Invertor Easun SMG / SRNE"}
+INVERTERS = {"growatt_spf", "deye", "voltronic", "srne"}
+BASE = {"daly": "daly", "jk": "jk", "seplos": "seplos", "pace": "pace", **{t: "inverter" for t in INVERTERS}}
 
 
 def used_ports(cfg: dict) -> dict[str, str]:
@@ -69,7 +72,7 @@ def live_check(item: dict) -> dict:
     from .drivers import make_driver
     from .models import PackReading
     conf = {"id": "verificare", "name": item.get("label", ""), "type": item["type"], "port": item["port"],
-            **{k: item[k] for k in ("baudrate", "address", "protocol") if item.get(k) is not None}}
+            **{k: item[k] for k in ("baudrate", "address", "protocol", "map") if item.get(k) is not None}}
     drv = None
     try:
         drv = make_driver(conf, [conf])
@@ -194,7 +197,7 @@ def add_device(existing: list[dict], c: dict) -> dict:
         raise ValueError(f"{t['label'] if t else typ}: nu e suportat încă.")
     dev = build_devices([c])[0]
     ids, names = {d["id"] for d in existing}, {d.get("name") for d in existing}
-    base = {"daly": "daly", "jk": "jk", "seplos": "seplos", "pace": "pace", "growatt_spf": "inverter"}[typ]
+    base = BASE[typ]
     n = sum(1 for d in existing if d.get("type") == typ) + 1
     while f"{base}{n}" in ids:
         n += 1
@@ -212,17 +215,18 @@ def add_device(existing: list[dict], c: dict) -> dict:
 def build_devices(chosen: list[dict]) -> list[dict]:
     """Din alegerile din ghid: intrările `devices` pentru config (id-uri și nume stabile, în ordine)."""
     out, count = [], {}
-    total = {t: sum(1 for c in chosen if c.get("type") == t) for t in ("daly", "jk", "seplos", "pace", "growatt_spf")}
+    total = {t: sum(1 for c in chosen if c.get("type") == t) for t in BASE}
+    n_inv = sum(1 for c in chosen if c.get("type") in INVERTERS)
     for c in chosen:
         typ = c.get("type")
         if typ not in total:
             raise ValueError(f"tip necunoscut: {typ}")
         count[typ] = count.get(typ, 0) + 1
         n = count[typ]
-        base = {"daly": "daly", "jk": "jk", "seplos": "seplos", "pace": "pace", "growatt_spf": "inverter"}[typ]
-        dev = {"id": f"{base}{n}" if typ != "growatt_spf" or total[typ] > 1 else base,
-               "name": str(c.get("name") or "").strip()[:40] or
-               (f"{NAMES[typ]} {n}" if typ != "growatt_spf" or total[typ] > 1 else NAMES[typ]),
+        base = BASE[typ]
+        single = typ in INVERTERS and n_inv == 1                 # un singur invertor: id „inverter”, fără număr
+        dev = {"id": base if single else f"{base}{n}",
+               "name": str(c.get("name") or "").strip()[:40] or (NAMES[typ] if single else f"{NAMES[typ]} {n}"),
                "type": typ}
         if typ == "daly":
             if c.get("ble"):
@@ -245,7 +249,9 @@ def build_devices(chosen: list[dict]) -> list[dict]:
             if not str(c.get("port", "")).startswith("/dev/"):
                 raise ValueError(f"{dev['name']}: lipsește portul")
             dev["port"] = c["port"]
-            dev["baudrate"] = int(c.get("baudrate") or (19200 if typ == "seplos" else 9600))
+            dev["baudrate"] = int(c.get("baudrate") or (19200 if typ == "seplos" else 2400 if typ == "voltronic" else 9600))
+            if typ == "srne" and c.get("map") in ("smg", "srne"):
+                dev["map"] = c["map"]
             dev["address"] = int(c.get("address") if c.get("address") is not None else (0 if typ in ("seplos", "pace") else 1))
             if typ == "pace" and c.get("protocol") in (20, 25, "20", "25"):
                 dev["protocol"] = int(c["protocol"])

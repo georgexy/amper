@@ -701,6 +701,7 @@ async function loadInverter() {
   if (!inv.data) $("#iv-list").innerHTML = `<div class="note">Citesc setările din invertor…</div>`;
   try {
     const r = await api("/api/inverter/settings");
+    $(".iv-clock").hidden = !!r.no_settings;               // invertor fără setări (Deye, Easun…): nici ceas
     if (r.error) throw new Error(r.error);
     inv.data = r;
     renderInverter();
@@ -949,7 +950,7 @@ function renderLooks() {
 }
 /* Setări → Dispozitive conectate: Invertoare și BMS-uri (grupate după tip, în ordinea adresei), cu legătura și starea */
 const DEV_TYPE = { daly: "Daly", jk: "JK", sim_daly: "Daly (simulat)", seplos: "Seplos V2 (RS485)", pace: "PowerCube / PACE (RS485)", sim_seplos: "Seplos (simulat)",
-  growatt_spf: "Growatt SPF", sim_growatt: "Growatt (simulat)" };
+  growatt_spf: "Growatt SPF", deye: "Deye", voltronic: "Easun / Voltronic", srne: "Easun SMG / SRNE", sim_growatt: "Growatt (simulat)" };
 function devLink(info, d) {
   const live = d.reading?.raw?.link;                          // Daly: legătura găsită („Bluetooth AA:…”, „cablu …”)
   if (live) return live.replace(/\/dev\/serial\/by-id\//, "");
@@ -1017,7 +1018,9 @@ $("#daly-search").onclick = async () => {
 
 /* ---------- Adaugă dispozitiv: ce e nou pe cablu (căutat singur) + căutare prin Bluetooth, apoi tipul BMS ---------- */
 const da = { cable: null, ble: null, types: [], timer: 0 };
-const DA_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", pace: "PowerCube", growatt_spf: "Invertor Growatt SPF" };
+const INV_TYPES = new Set(["growatt_spf", "deye", "voltronic", "srne", "sim_growatt"]);
+const DA_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", pace: "PowerCube", growatt_spf: "Invertor Growatt SPF",
+  deye: "Invertor Deye", voltronic: "Invertor Easun / Voltronic", srne: "Invertor Easun SMG / SRNE" };
 function devAddOpen() {
   da.ble = null;
   $("#da-ble-list").innerHTML = ""; $("#da-form").hidden = true;
@@ -1068,7 +1071,7 @@ function devForm(c) {
   const f = $("#da-form"), ble = c.link === "Bluetooth";
   if (ble && !c.type) c.type = c.guess || "daly";
   const types = ble ? da.types : [];
-  const pack = () => c.type !== "growatt_spf";
+  const pack = () => !INV_TYPES.has(c.type);
   const draw = () => {
     const t = types.find((x) => x.type === c.type);
     const ok = !ble || t?.supported;
@@ -2129,7 +2132,7 @@ const SU_STEPS = [
   { k: "name", t: "Numele instalației" }, { k: "password", t: "Parola aplicației" }, { k: "remote", t: "Acces de oriunde" },
   { k: "devices", t: "Dispozitivele" }, { k: "capacity", t: "Capacitățile" }, { k: "notif", t: "Notificări" },
 ];
-const DEV_NAME = { daly: "Daly", jk: "JK", seplos: "Seplos", pace: "PowerCube", growatt_spf: "Invertor Growatt SPF" };
+const DEV_NAME = DA_NAME;
 const su = { i: 0, d: null, chosen: null, keep: false, again: false, pollT: 0 };
 
 // Pi-ul nu răspunde (Amper oprit sau blocat, Pi fără curent/internet): un mesaj în loc de ecran negru.
@@ -2206,14 +2209,14 @@ function suRender() {
   } else if (st.k === "devices") {
     suRenderDevices();
   } else if (st.k === "capacity") {
-    const packs = (su.chosen || []).filter((c) => c.type !== "growatt_spf");
+    const packs = (su.chosen || []).filter((c) => !INV_TYPES.has(c.type));
     b.innerHTML = `<h2>Numele și capacitățile</h2>
       <p class="note">Capacitatea fiecărui modul (Ah) — din ea se calculează SOC-ul total și energia rămasă.
         O găsești pe eticheta bateriei.</p>
       ${(su.chosen || []).map((c, i) => `<div class="card su-dev">
         ${suField(`su-n${i}`, `${esc(c.label || DEV_NAME[c.type])}${c.link ? ` · ${esc(c.link)}` : ""}`,
           `maxlength="40" value="${esc(c.name || "")}" placeholder="${esc(suDefaultName(c, i))}"`)}
-        ${c.type === "growatt_spf" ? "" : suField(`su-c${i}`, "Capacitate (Ah)",
+        ${INV_TYPES.has(c.type) ? "" : suField(`su-c${i}`, "Capacitate (Ah)",
           `type="number" inputmode="decimal" min="1" max="2000" step="1" value="${c.capacity_ah || ""}"`)}</div>`).join("")}
       ${packs.length ? "" : `<p class="note">Niciun acumulator ales: nu e nimic de completat.</p>`}`;
   } else if (st.k === "notif") {
@@ -2246,7 +2249,7 @@ function suCheck(c) {
 }
 function suDefaultName(c, i) {
   const same = (su.chosen || []).filter((x) => x.type === c.type);
-  return same.length > 1 || c.type !== "growatt_spf" ? `${DEV_NAME[c.type]} ${same.indexOf(c) + 1}` : DEV_NAME[c.type];
+  return same.length > 1 || !INV_TYPES.has(c.type) ? `${DEV_NAME[c.type]} ${same.indexOf(c) + 1}` : DEV_NAME[c.type];
 }
 const suKey = (f) => f.ble ? `ble:${f.ble}` : `${f.port}|${f.type}|${f.address ?? ""}`;
 function suMerge(found) {                     // rezultatele mai multor căutări se adună (ex. invertorul, apoi bateriile)
@@ -2258,7 +2261,7 @@ function suMerge(found) {                     // rezultatele mai multor căutăr
   }
 }
 // tipul unui dispozitiv găsit (după catalog): invertor sau BMS
-const suKind = (f) => su.cat.catalog.find((e) => e.driver === f.type)?.kind || (f.type === "growatt_spf" ? "inverter" : "bms");
+const suKind = (f) => su.cat.catalog.find((e) => e.driver === f.type)?.kind || (INV_TYPES.has(f.type) ? "inverter" : "bms");
 function suFoundHtml(kind, title) {
   const list = su.found.map((f, i) => [f, i]).filter(([f]) => suKind(f) === kind);
   if (!list.length) return title ? `<h3 class="su-h">${title}</h3><div class="empty">Nimic găsit.</div>` : "";
@@ -2417,14 +2420,14 @@ async function suNext() {
       su.chosen = []; su.i += 2; return suRender();
     }
     // ordinea: Daly, Seplos, invertor
-    const order = { daly: 0, jk: 1, seplos: 2, pace: 3, growatt_spf: 4 };
+    const order = { daly: 0, jk: 1, seplos: 2, pace: 3, growatt_spf: 4, deye: 4, voltronic: 4, srne: 4 };
     su.chosen = sel.sort((a, b) => order[a.type] - order[b.type]);
   } else if (st.k === "capacity") {
     su.chosen.forEach((c, i) => {
       c.name = $(`#su-n${i}`).value.trim() || suDefaultName(c, i);
-      if (c.type !== "growatt_spf") c.capacity_ah = parseFloat(($(`#su-c${i}`).value || "").replace(",", "."));
+      if (!INV_TYPES.has(c.type)) c.capacity_ah = parseFloat(($(`#su-c${i}`).value || "").replace(",", "."));
     });
-    const bad = su.chosen.find((c) => c.type !== "growatt_spf" && !(c.capacity_ah >= 1 && c.capacity_ah <= 2000));
+    const bad = su.chosen.find((c) => !INV_TYPES.has(c.type) && !(c.capacity_ah >= 1 && c.capacity_ah <= 2000));
     if (bad) throw new Error(`Completează capacitatea pentru ${bad.name} (între 1 și 2000 Ah).`);
     await post("/api/setup/devices", { devices: su.chosen });
   } else if (st.k === "notif") {

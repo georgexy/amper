@@ -394,9 +394,20 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `GET /api/setup/catalog`. `POST /api/setup/scan {model, link, address}` → `setup_scan.scan(..., model, link,
   address)`: `__main__.probe(port, only={driver}, addresses)` sau `scan_ble_model` (nume DL-/JK-). Fiecare găsit pe
   cablu are `check` din `live_check` (o citire: BMS → V/SOC/celule; invertor → out_v/bat_v/pv_w/load_w).
-- Invertoare de făcut, în ordine (decis 2026-10-29): Deye (+Sunsynk/Sol-Ark, Modbus RS485), Voltronic/Axpert PI30
-  (Easun ISolar/SMH, MPP Solar, PowMr vechi), SRNE Modbus (Easun SMG/SMG-II, PowMr nou, Anenji). Doar citire la
-  început; setările după confirmarea pe aparat. „Adaugă dispozitiv” (Setări) încă are doar cablu/Bluetooth automat.
+- Invertoare noi (1.0.0-beta.12, DOAR CITIRE, NEVERIFICATE pe aparat; setările după confirmare):
+  - `drivers/modbus.py` (`ModbusDriver.read_regs/read_map`, funcția 03, `s16`) — comun Deye/SRNE.
+  - `drivers/deye.py`: holding 0–7 (tip 2–6 + seria ASCII 3–7 → `looks_like_deye` la căutare), 59 stare, 70–112
+    (energii zilnice ×0,1 kWh, 90/91 temperaturi (v−1000)×0,1, 109–112 PV), 150–193 (150 rețea V, 154 ieșire V,
+    169 putere rețea s16, 178 consum, 183 baterie ×0,01 V, 184 SOC, 186/187 PV W, 190 putere baterie s16 + = descărcare
+    → `battery_power_sign` −1, 193 frecvență). De confirmat semnele 169/190 și 178.
+  - `drivers/voltronic.py`: PI30 la 2400, CRC XMODEM cu 0x28/0x0D/0x0A +1 (verificat cu cadrele publicate QPIGS
+    B7A9, QMOD 49C1, QPIWS B4DA, QPI BEAC); QPIGS (câmpurile 0–20), QMOD, QPIWS (biți → `WARNINGS`). USB HID nesuportat.
+  - `drivers/srne.py`: două hărți, `detect()` (sau `map` în config): „smg” 201–230 (SMG-II/PowMr/Anenji), „srne”
+    0x0100–0x0109 + 0x0210–0x0221 (SRNE HF/HES). `battery_power_sign` +1 implicit — DE VERIFICAT.
+  - `__main__.probe`: după Growatt → Deye → SMG/SRNE → Voltronic. Tipuri în `KNOWN_TYPES`, `REAL`, `setup_scan`
+    (`INVERTERS`, `BASE`), catalog `supported=True`; `app.js` `INV_TYPES`. Fără `read_settings` → ecranul invertorului
+    spune „deocamdată doar citește” (`no_settings`) și ascunde ceasul.
+  - „Adaugă dispozitiv” (Setări) încă are doar cablu/Bluetooth automat.
 
 ## Deconectare BMS, module excluse, egalizatoare (1.0.0-beta.1, în pregătire)
 - Pe Pi-ul utilizatorului, căutarea a legat un EGALIZATOR ACTIV (BLE „DL-B77B020306D3”) ca daly2: răspunde la 0x90 cu

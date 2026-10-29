@@ -320,7 +320,8 @@ def make_app(engine) -> web.Application:
     async def inverter_get(request):
         dev, drv = settings_driver()
         if not drv:
-            return _json({"error": "invertorul nu are setări disponibile"}, 404)
+            return _json({"error": "Pentru acest invertor Amper deocamdată doar citește valorile. Setările vor veni după "
+                                   "ce citirea e verificată pe un aparat real.", "no_settings": True}, 404)
         try:
             regs = await asyncio.to_thread(drv.read_settings)
         except (DriverError, OSError) as e:
@@ -336,7 +337,8 @@ def make_app(engine) -> web.Application:
             return err
         dev, drv = settings_driver()
         if not drv:
-            return _json({"error": "invertorul nu are setări disponibile"}, 404)
+            return _json({"error": "Pentru acest invertor Amper deocamdată doar citește valorile. Setările vor veni după "
+                                   "ce citirea e verificată pe un aparat real.", "no_settings": True}, 404)
         async with write_lock:
             try:
                 res = await asyncio.to_thread(fn, drv)
