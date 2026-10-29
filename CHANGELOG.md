@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.10 — în pregătire
+## 1.0.0-beta.10 — 2026-10-29
 - Comenzi pentru BMS-urile Daly (Pro; Bateriile → ⚙ → Comenzi): pornește/oprește încărcarea și descărcarea,
   setează SOC-ul (cu o sugestie după tensiunea celulelor) și repornește BMS-ul. Fiecare cere confirmare și parola,
   iar rezultatul se citește înapoi din BMS; dacă BMS-ul ține un MOSFET oprit, aplicația spune de ce.
