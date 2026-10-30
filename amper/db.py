@@ -335,6 +335,41 @@ class Database:
                                      (device, start, end)).fetchall()
         return [dict(r) for r in rows]
 
+    def samples(self, kind: str, start: int, end: int) -> list[dict]:
+        """Citirile brute (pack / inverter) dintr-un interval, în ordinea timpului (raportul nopții)."""
+        table = "pack_samples" if kind == "pack" else "inverter_samples"
+        cols = PACK_COLS if kind == "pack" else INV_COLS
+        with self.lock:
+            rows = self.conn.execute(f"SELECT ts, device, {', '.join(cols)} FROM {table} WHERE ts BETWEEN ? AND ? "
+                                     "ORDER BY ts", (start, end)).fetchall()
+        return [dict(r) for r in rows]
+
+    def samples_max_since(self, since: int) -> dict[str, dict]:
+        """SOC-ul și celula maximă atinse de fiecare modul din `since` (a fost o încărcare completă?)."""
+        out: dict[str, dict] = {}
+        with self.lock:
+            for table in ("pack_5m", "pack_samples"):
+                for r in self.conn.execute(f"SELECT device, max(soc) soc, max(cell_max) cell_max FROM {table} "
+                                           "WHERE ts >= ? GROUP BY device", (since,)).fetchall():
+                    o = out.setdefault(r["device"], {"soc": None, "cell_max": None})
+                    for k in ("soc", "cell_max"):
+                        if r[k] is not None:
+                            o[k] = max(o[k] or r[k], r[k])
+        return out
+
+    def alerts_between(self, start: int, end: int) -> list[dict]:
+        """Alertele care au început în interval sau erau deschise în el."""
+        with self.lock:
+            rows = self.conn.execute("SELECT * FROM alerts WHERE ts_start <= ? AND (ts_end IS NULL OR ts_end >= ?) "
+                                     "ORDER BY ts_start", (end, start)).fetchall()
+        return [dict(r) for r in rows]
+
+    def settings_log_between(self, start: int, end: int) -> list[dict]:
+        with self.lock:
+            rows = self.conn.execute("SELECT * FROM settings_log WHERE ts BETWEEN ? AND ? ORDER BY ts",
+                                     (start, end)).fetchall()
+        return [dict(r) for r in rows]
+
     def alerts(self, limit: int = 100) -> list[dict]:
         with self.lock:
             rows = self.conn.execute(

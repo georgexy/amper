@@ -1042,6 +1042,29 @@ def make_app(engine) -> web.Application:
                              if isinstance(st.reading, PackReading) and st.connected)
         return _json(res)
 
+    # ---------------- raportul nopții ----------------
+    from . import night_report
+
+    def pack_names() -> dict[str, str]:
+        return {k: st.cfg.get("name", k) for k, st in engine.devices.items() if st.driver.kind == "pack"}
+
+    async def night_get(request):
+        """`?ago=N` = acum N nopți (0 = ultima)."""
+        try:
+            ago = max(0, min(13, int(request.query.get("ago", 0))))
+        except ValueError:
+            ago = 0
+        now = time.time() - ago * 86400
+        rep = await asyncio.to_thread(night_report.build, engine.db, pack_names(), now)
+        rep["ago"] = ago
+        rep["notify"] = await asyncio.to_thread(engine.db.get_meta, "night_report_off") != "1"
+        return _json(rep)
+
+    async def night_notify(request):
+        body = await request.json()
+        await asyncio.to_thread(engine.db.set_meta, "night_report_off", "0" if body.get("on") else "1")
+        return _json({"ok": True, "notify": bool(body.get("on"))})
+
     # ---------------- alerte proprii (setate de utilizator) ----------------
     from .alerts import METRICS
 
@@ -1119,6 +1142,8 @@ def make_app(engine) -> web.Application:
     app.router.add_post("/api/daly/{device}/actions/retry", daly_actions_retry)
     app.router.add_get("/api/system", system_info)
     app.router.add_get("/api/cells/health", cells_health)
+    app.router.add_get("/api/night-report", night_get)
+    app.router.add_post("/api/night-report/notify", night_notify)
     app.router.add_get("/api/wifi/scan", wifi_scan)
     app.router.add_get("/api/wifi/status", wifi_status)
     app.router.add_post("/api/wifi/connect", wifi_connect)

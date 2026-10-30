@@ -311,6 +311,12 @@ class Engine:
                     await asyncio.to_thread(cell_health.weekly, self.db, self.notifier, self.device_names())
             except Exception:
                 log.exception("eroare la analiza săptămânală a celulelor")
+            try:
+                from . import night_report
+                packs = {k: n for k, n in self.device_names().items() if self.devices[k].driver.kind == "pack"}
+                await asyncio.to_thread(night_report.morning, self.db, self.notifier, packs)
+            except Exception:
+                log.exception("eroare la raportul nopții")
             await asyncio.sleep(3600)
 
     # ---------------- energie ----------------

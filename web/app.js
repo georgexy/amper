@@ -105,7 +105,7 @@ async function boot() {
   const v = new URLSearchParams(location.search).get("v");
   if (v === "alerts") { show("alerts"); history.replaceState(null, "", location.pathname); }
   if (v === "update") { show("settings"); showPanel("update"); history.replaceState(null, "", location.pathname); }
-  if (v === "cells") { show("cells"); history.replaceState(null, "", location.pathname); }
+  if (v === "cells" || v === "night") { show("cells"); history.replaceState(null, "", location.pathname); }
   $("#set-about-sub").textContent = `Amper ${isPro() ? "Pro" : "Lite"} ${state.info.version || ""} · actualizări, Pi-ul`;
   setInterval(tickConn, 1000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -698,7 +698,44 @@ function spark(v, color) {
   const p = pts.map(([i, y]) => `${(i * W / (v.length - 1)).toFixed(1)},${(H - 4 - (y - mn) / ((mx - mn) || 1) * (H - 8)).toFixed(1)}`).join(" ");
   return `<svg viewBox="0 0 ${W} ${H}" width="92" height="30"><polyline points="${p}" fill="none" stroke="${color}" stroke-width="2"/></svg>`;
 }
+/* raportul nopții: text + tabel, calculat pe server din citirile nopții (night_report.py); ‹ › = alte nopți */
+const nr = { ago: 0 };
+const md = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+async function loadNight() {
+  const box = $("#nr-body");
+  let r;
+  try { r = await api(`/api/night-report?ago=${nr.ago}`); } catch (e) { if (e.message !== "auth") box.innerHTML = `<div class="banner">${esc(e.message)}</div>`; return; }
+  const day = new Date(r.end * 1000).toLocaleDateString("ro-RO", { weekday: "long", day: "numeric", month: "long" });
+  $("#nr-when").textContent = r.ongoing ? "în curs" : nr.ago ? day : "azi-noapte";
+  $("#nr-next").disabled = nr.ago === 0;
+  $("#nr-prev").disabled = nr.ago >= 13;
+  $("#nr-notify").checked = r.notify;
+  if (!r.rows.length) { box.innerHTML = `<p class="note">${md(r.headline)}</p>`; return; }
+  const a = (v, d = 1) => (v == null ? "–" : `${num(v, d)} A`);
+  const was = (now, before, far) => (before != null && far ? ` <small>(înainte ${before})</small>` : "");
+  box.innerHTML = `<div class="nr-head-txt ${r.ok ? "ok" : "bad"}">${md(r.headline)}</div>` +
+    (r.commands.length ? `<p class="nr-p"><b>Comenzi și setări de seară:</b></p><ul class="nr-ul">${r.commands.map((c) => `<li>${md(c)}</li>`).join("")}</ul>` : "") +
+    `<p class="nr-p"><b>Ce arată datele din noapte</b> (${esc(r.period)}):</p>
+    <div class="nr-tw"><table class="nr-t"><thead><tr><th></th><th>SOC %</th><th>Scădere</th><th>Curent mediu</th><th>Citiri cu 0 A</th><th>Curent minim</th></tr></thead>
+    <tbody>${r.rows.map((x) => `<tr><th>${esc(x.name)}</th>
+      <td>${x.soc[0] == null ? "–" : `${num(x.soc[0], 1)} → ${num(x.soc[1], 1)}`}</td>
+      <td>${x.drop == null ? "–" : `${x.drop > 0 ? "+" : "−"}${num(Math.abs(x.drop), 1)} %`}</td>
+      <td>${a(x.avg_a)}</td>
+      <td>${x.zero} %${was(x.zero, x.zero_prev == null ? null : `${x.zero_prev} %`, x.zero_prev != null && Math.abs(x.zero - x.zero_prev) >= 15)}</td>
+      <td>${a(x.min_a)}${was(x.min_a, x.min_prev == null ? null : a(x.min_prev), x.min_a != null && x.min_prev != null && Math.abs(x.min_a - x.min_prev) >= 0.5)}</td></tr>`).join("")}</tbody></table></div>` +
+    (r.points.length ? `<ol class="nr-ol">${r.points.map((p) => `<li>${md(p)}</li>`).join("")}</ol>` : "") +
+    `<p class="nr-p">${md(r.bank)}</p>` + (r.watch ? `<p class="nr-p nr-watch">${md(r.watch)}</p>` : "");
+}
+$("#nr-prev").onclick = () => { nr.ago += 1; loadNight(); };
+$("#nr-next").onclick = () => { nr.ago = Math.max(0, nr.ago - 1); loadNight(); };
+$("#nr-notify").onchange = async (e) => {
+  try { await api("/api/night-report/notify", { method: "POST", body: JSON.stringify({ on: e.target.checked }) }); }
+  catch { e.target.checked = !e.target.checked; }
+};
+
 async function loadCells() {
+  nr.ago = 0;
+  loadNight();
   const box = $("#ch-body");
   if (!cellsState.data) box.innerHTML = `<div class="note">Analizez…</div>`;
   let r;
@@ -2619,7 +2656,7 @@ navigator.serviceWorker?.addEventListener("message", (e) => {
   if ($("#app").hidden) return;
   if (u.includes("v=alerts")) show("alerts");
   if (u.includes("v=update")) { show("settings"); showPanel("update"); }
-  if (u.includes("v=cells")) show("cells");
+  if (u.includes("v=cells") || u.includes("v=night")) show("cells");
 });
 
 /* ---------- ecranul „Actualizez Amper”: cercul se umple după pașii serviciului de actualizare; cât Amper

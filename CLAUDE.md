@@ -537,3 +537,18 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   un eșec nu le oprește pe celelalte → 502 cu `partial` și „Scris în … EȘUAT la …”; jurnalul combinat cu prefixul
   invertorului. Editorul: „Acum” = valorile fiecăruia, câmpul pornește de la primul (`preselect`/`initial`), după
   scriere (și după eșec) se recitește. NEVERIFICAT cu două aparate reale.
+
+## Raportul nopții (1.0.0-beta.13, în pregătire, cerut 2026-10-30)
+- Cerut după o analiză făcută de mână a unei nopți (text + tabel). `amper/night_report.py`: `find_night` = ultima
+  perioadă continuă cu PV < 50 W (≥ 3 h, max 15 h; găurile de date nu o rup), fără invertor 21:30 → 07:00;
+  `build(db, names, now)` din `db.samples` (brute) → `rows` (SOC început/final, scădere, curent mediu, % citiri 0 A,
+  curent minim, și aceleași pentru noaptea dinainte), `headline` (protecții `bms_protection`, MOSFET oprit ≥ 1 min,
+  module fără citiri > 120 s, Pi fără date > 5 min), `commands` (`settings_log` cu 3 h înainte), `period`,
+  `points` (numără corect = scăderea SOC ≈ Ah/capacitate, toleranță max(3 %, 30 %); 0 A ≥ 20 % = nu vede curenții
+  mici, iar modulul e scos din celelalte comparații; SOC-uri la final ≤ 6 puncte; împărțirea curentului raportată
+  la capacitate, ≥ 1,3× = verifică bornele/cablurile; diferența celulelor p10–p90 și vârful), `bank`, `watch` (fără
+  încărcare completă în 7 zile, `samples_max_since`). Textul are `**bold**` (aplicația escapează, apoi `md()`).
+- `morning` (din maintenance_loop, la oră): o dată pe zi, după noapte, după 06:00 (fără invertor după 08:00),
+  notificare 🌙 `summary`, url `/?v=night`; meta `night_report_last`, oprită cu meta `night_report_off` = "1".
+- API `GET /api/night-report?ago=N` (ambele ediții), `POST /api/night-report/notify {on}`. UI: `#nr` sus în
+  `view-cells`, `loadNight`, ‹ › (`nr.ago` 0–13), comutatorul `#nr-notify`. NEVERIFICAT pe date reale.

@@ -735,3 +735,25 @@ small.warnc { color: var(--warn); }
 .up-more { margin-top: 18px; }
 .iv-row .v.warn, .note b.warn { color: var(--warn); }
 .iv-row .iv-diff { display: block; font-size: 12px; color: var(--warn); margin-top: 2px; }
+/* raportul nopții */
+.nr { margin-bottom: 18px; }
+.nr-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.nr-nav { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--muted); }
+.nr-nav button { border: 1px solid var(--line); background: var(--panel); color: inherit; border-radius: 99px; width: 32px;
+  height: 32px; font: inherit; font-size: 18px; cursor: pointer; }
+.nr-nav button:disabled { opacity: .35; cursor: default; }
+.nr-head-txt { border-left: 4px solid var(--charge); background: var(--panel); border-radius: 12px; padding: 11px 13px;
+  font-size: 15px; line-height: 1.45; }
+.nr-head-txt.bad { border-left-color: var(--warn); }
+.nr-p { font-size: 15px; line-height: 1.45; margin: 12px 0 6px; }
+.nr-watch { color: var(--muted); }
+.nr-ul, .nr-ol { margin: 6px 0; padding-left: 22px; font-size: 15px; line-height: 1.45; }
+.nr-ol li { margin-bottom: 8px; }
+.nr-tw { overflow-x: auto; margin: 4px -4px; }
+.nr-t { border-collapse: collapse; font-size: 12.5px; width: 100%; }
+.nr-t th, .nr-t td { text-align: left; padding: 7px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.nr-t td { white-space: nowrap; }
+.nr-t thead th { color: var(--muted); font-weight: 500; font-size: 11.5px; line-height: 1.25; }
+.nr-t tbody th { font-weight: 600; white-space: nowrap; }
+.nr-t small { color: var(--muted); }
+.nr .row-check { margin-top: 12px; }
