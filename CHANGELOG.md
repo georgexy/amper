@@ -2,6 +2,16 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.14 — 2026-10-30
+- Tema Cadrane: bateria e acum sub cele patru cadrane, deasupra graficului zilei, și arată ca o baterie (ca în
+  iconiță: se umple de jos în sus, pe segmente), cu procentul scris alb cu contur închis, ca să se citească bine.
+- Teme Cadrane și Carduri: sub Panouri scrie cât s-a produs azi, iar sub Consum cât s-a consumat azi.
+- Setări → **Limbă · Language**: română sau engleză, aceeași pe toate telefoanele legate la Pi. Deocamdată sunt
+  traduse ecranele aplicației și, în engleză, și textele scrise pe Pi: notificările, alertele, Raport baterii și
+  raportul nopții, sănătatea celulelor, stările și defectele BMS-urilor și ale invertoarelor, setările și comenzile
+  BMS, mesajele de eroare, actualizările și schimbarea WiFi. Rămân în română: notele versiunilor și pagina de
+  conectare WiFi a hotspotului „Amper-Setup”.
+
 ## 1.0.0-beta.13 — 2026-10-30
 - **Raport baterii** (Bateriile → „Raport baterii”): la deschidere arată raportul ultimei nopți (cu ‹ › pentru
   nopțile anterioare, până la 14), iar din taburi alegi altă perioadă: 2, 3, 7, 30 de zile sau „Aleg eu” (de la – până

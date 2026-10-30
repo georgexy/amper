@@ -5,7 +5,7 @@ const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-const nf = (d) => new Intl.NumberFormat("ro-RO", { minimumFractionDigits: d, maximumFractionDigits: d });
+const nf = (d) => new Intl.NumberFormat(LOC, { minimumFractionDigits: d, maximumFractionDigits: d });
 const N0 = nf(0), N1 = nf(1), N2 = nf(2), N3 = nf(3);
 const num = (v, d = 1) => (v == null || isNaN(v) ? "–" : [N0, N1, N2, N3][d].format(v));
 function watts(w, html = true) {
@@ -20,8 +20,8 @@ function duration(h) {
   const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
   return hh ? `${hh} h ${mm ? mm + " min" : ""}`.trim() : `${mm} min`;
 }
-const hhmm = (ts) => new Date(ts * 1000).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
-const dayTime = (ts) => new Date(ts * 1000).toLocaleString("ro-RO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const hhmm = (ts) => new Date(ts * 1000).toLocaleTimeString(LOC, { hour: "2-digit", minute: "2-digit" });
+const dayTime = (ts) => new Date(ts * 1000).toLocaleString(LOC, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 function ago(ts) {
   const s = Math.max(0, Date.now() / 1000 - ts);
   if (s < 60) return `acum ${Math.round(s)} s`;
@@ -80,6 +80,7 @@ async function api(path, opts) {
 }
 
 async function boot() {
+  if (!boot.i18n) { boot.i18n = true; I18N.start(); }
   const q = new URLSearchParams(location.search).get("tema");   // ecranul HDMI: ?tema=flux
   if (q && LOOKS[q]) savePref("look", q);
   setLook(q && LOOKS[q] ? q : loadPref("look", "cadrane"));
@@ -91,6 +92,11 @@ async function boot() {
     return;
   }
   bootDown = 0;
+  if ((state.info.lang || "ro") !== LANG) {            // limba Pi-ului s-a schimbat (de pe alt telefon)
+    try { localStorage.setItem("lang", state.info.lang || "ro"); if (localStorage.getItem("lang") === (state.info.lang || "ro")) return location.reload(); } catch {}
+  }
+  $("#set-lang-sub").textContent = LANG === "en" ? "English" : "Română";
+  I18N.setNames(state.info.devices.map((d) => d.name));
   $("#login").hidden = true;
   if (state.info.setup_needed) return openSetup(false);
   if (state.info.password_reset) return openSetup(false, "password", true);
@@ -377,22 +383,23 @@ const ARC = Math.PI * 56, RING = 2 * Math.PI * 62;
 const GAUGES = [["pv", "Panouri", "--sun"], ["load", "Consum", "--load"], ["bat", "Baterie", "--charge"], ["temp", "Invertor", "--cell"]];
 const cadrane = {
   html: () => `
-    <button class="card k-hero" data-open="packs" aria-label="Bateria — vezi pachetele">
-      <div class="k-ring"><svg viewBox="0 0 150 150"><circle class="trk" cx="75" cy="75" r="62"/><circle class="arc" cx="75" cy="75" r="62"/></svg>
-        <div class="c"><b><span data-k="soc">–</span><sup>%</sup></b><span>baterie</span></div></div>
-      <div class="k-ht"><div class="k">Energie rămasă</div><div class="v" data-k="kwh">–</div>
-        <span class="pill" data-k="mode"></span><div class="eta" data-k="eta"></div><div class="health" data-k="health"></div></div>
-    </button>
     <div class="k-gauges">${GAUGES.map(([k, l, c]) => `
       <div class="card k-g" style="--gc:var(${c})"${k === "temp" ? ' data-open="inverter" role="button" tabindex="0"' : ""}><svg viewBox="0 0 140 78"><path class="trk" d="M14 72 A56 56 0 0 1 126 72"/>
         <path class="arc" data-g="${k}" d="M14 72 A56 56 0 0 1 126 72" stroke-dasharray="0 ${ARC}"/></svg>
-        <div class="val num" data-k="g-${k}">–</div><div class="lbl"><span data-k="l-${k}">${l}</span>${k === "pv" ? PV_I : ""}</div></div>`).join("")}</div>
+        <div class="val num" data-k="g-${k}">–</div><div class="lbl"><span data-k="l-${k}">${l}</span>${k === "pv" ? PV_I : ""}</div>${k === "pv" || k === "load"
+          ? `<div class="sub" data-k="s-${k}"></div>` : ""}</div>`).join("")}</div>
+    <button class="card k-hero" data-open="packs" aria-label="Bateria — vezi pachetele">
+      <div class="k-batt"><div class="cap"></div><div class="body"><div class="fill"></div><i></i><i></i><i></i></div>
+        <div class="c"><b><span data-k="soc">–</span><sup>%</sup></b></div></div>
+      <div class="k-ht"><div class="k">Energie rămasă</div><div class="v" data-k="kwh">–</div>
+        <span class="pill" data-k="mode"></span><div class="eta" data-k="eta"></div><div class="health" data-k="health"></div></div>
+    </button>
     <section class="card k-day"><h3><span>Azi</span><span data-k="day"></span></h3><svg data-k="chart" viewBox="0 0 330 92" preserveAspectRatio="none"></svg></section>
     <div class="inv-line" data-k="inv" data-open="inverter" role="button" tabindex="0"></div>`,
   update(root, h) {
     const { b, ir, bp } = h;
     modeClass(root.querySelector(".k-hero"), h, "card k-hero");
-    root.querySelector(".k-ring .arc").setAttribute("stroke-dasharray", `${((b.soc ?? 0) / 100) * RING} ${RING}`);
+    root.querySelector(".k-batt .fill").style.height = `${Math.max(0, Math.min(100, b.soc ?? 0))}%`;
     put(root, "soc", b.soc == null ? "–" : num(b.soc, 0));
     put(root, "kwh", b.kwh == null ? "–" : `${num(b.kwh, 1)} <span class="u">din ${num(h.capKwh, 1)} kWh</span>`);
     put(root, "mode", (h.mode === "charging" ? "▲ " : h.mode === "discharging" ? "▼ " : "") + h.modeText);
@@ -408,6 +415,8 @@ const cadrane = {
     }
     root.querySelector('[data-g="bat"]').style.stroke = h.mode === "discharging" ? "var(--cell)" : "var(--charge)";
     put(root, "l-bat", bp > 20 ? "Baterie, intră" : bp < -20 ? "Baterie, iese" : "Baterie");
+    put(root, "s-pv", h.today.pv_kwh == null ? "" : `produs azi <b>${num(h.today.pv_kwh, 1)} kWh</b>`);
+    put(root, "s-load", h.today.load_kwh == null ? "" : `consumat azi <b>${num(h.today.load_kwh, 1)} kWh</b>`);
     const part = (l, v) => `<span class="nw">${l} <b>${num(v, 1)} kWh</b></span>`;      // rândul se rupe doar între ele
     put(root, "day", h.today.pv_kwh == null ? "" : [part("produs", h.today.pv_kwh), part("consumat", h.today.load_kwh),
       part("din rețea", h.today.ac_in_kwh || 0)].join(" · "));
@@ -552,7 +561,7 @@ const carduri = {
     <section class="card c-list">${[["pv", "Panouri solare", "--sun", "sun"], ["load", "Consum casă", "--load", "home"],
       ["bat", "Baterie", "--charge", "batt"], ["grid", "Rețea", "--muted", "grid"]].map(([k, l, c, i]) => `
       <div class="c-it" style="--ic:var(${c})" data-it="${k}"><div class="c-ico">${icon(i)}</div>
-        <div class="m"><div class="k"><span data-k="l-${k}">${l}</span>${k === "pv" ? PV_I : ""}</div><div class="tr"><i data-bar="${k}"></i></div></div><div class="v" data-k="v-${k}">–</div></div>`).join("")}</section>`,
+        <div class="m"><div class="k"><span data-k="l-${k}">${l}</span>${k === "pv" ? PV_I : ""}</div><div class="tr"><i data-bar="${k}"></i></div>${k === "pv" || k === "load" ? `<div class="s" data-k="s-${k}"></div>` : ""}</div><div class="v" data-k="v-${k}">–</div></div>`).join("")}</section>`,
   update(root, h) {
     const { b, ir, bp } = h;
     put(root, "st", `${h.ir ? esc(ir.status || "") : "Invertor: fără date"}${ir ? ` · ${num(ir.inverter_temp, 0)} °C` : ""} ›`);
@@ -583,6 +592,8 @@ const carduri = {
     root.querySelector('[data-it="bat"]').style.setProperty("--ic", h.mode === "discharging" ? "var(--cell)" : "var(--charge)");
     put(root, "l-bat", bp > 20 ? "Baterie, intră" : bp < -20 ? "Baterie, iese" : "Baterie");
     put(root, "v-grid", kv(ir?.ac_in_voltage, "V"));
+    put(root, "s-pv", h.today.pv_kwh == null ? "" : `produs azi <b>${num(h.today.pv_kwh, 1)} kWh</b>`);
+    put(root, "s-load", h.today.load_kwh == null ? "" : `consumat azi <b>${num(h.today.load_kwh, 1)} kWh</b>`);
     root.querySelector('[data-bar="grid"]').style.width = ir?.ac_in_voltage > 50 ? "100%" : "0";
   },
 };
@@ -708,7 +719,7 @@ async function loadNight() {
   $("#nr-nav").hidden = false;
   let r;
   try { r = await api(`/api/night-report?ago=${nr.ago}`); } catch (e) { if (e.message !== "auth") box.innerHTML = `<div class="banner">${esc(e.message)}</div>`; return; }
-  const day = new Date(r.end * 1000).toLocaleDateString("ro-RO", { weekday: "long", day: "numeric", month: "long" });
+  const day = new Date(r.end * 1000).toLocaleDateString(LOC, { weekday: "long", day: "numeric", month: "long" });
   $("#nr-when").textContent = r.ongoing ? "în curs" : nr.ago ? day : "azi-noapte";
   $("#nr-next").disabled = nr.ago === 0;
   $("#nr-prev").disabled = nr.ago >= 13;
@@ -893,7 +904,7 @@ function renderInverter() {
   $("#iv-sync").textContent = r.common ? "Potrivește ceasul tuturor cu ora Pi-ului" : "Potrivește cu ora Pi-ului";
   $("#iv-sync").disabled = !r.can_write;
   $("#iv-log").innerHTML = r.log.length ? r.log.map((x) => `
-    <div class="row ${x.ok ? "" : "critical"}"><span>${esc(x.setting)}: ${x.ok ? `${esc(x.old)} → <b>${esc(x.new)}</b>` : `EȘUAT — ${esc(x.error)}`}</span>
+    <div class="row ${x.ok ? "" : "critical"}"><span>${esc(x.setting)}: ${x.ok ? `${esc(x.old)} → <b>${esc(x.new)}</b>` : `${t("EȘUAT")} — ${esc(x.error)}`}</span>
     <span class="t">${dayTime(x.ts)}</span></div>`).join("") : `<div class="empty">Nicio modificare până acum.</div>`;
 }
 
@@ -972,7 +983,7 @@ $("#ed-close").onclick = () => $("#edit").close();
 $("#ed-go").onclick = async () => {
   const x = editor.item, e = editValue();
   if (e.error) return;
-  if (!confirm(`Scriu în ${editor.target}?\n\n${x.group ? x.group + ", " : ""}${x.label}: ${x.text} → ${e.text}`)) return;
+  if (!confirm(tf("Scriu în {0}?", t(editor.target)) + `\n\n${x.group ? t(x.group) + ", " : ""}${t(x.label)}: ${t(x.text)} → ${t(e.text)}`)) return;
   try {
     await editor.write(e.value);
     $("#edit").close();
@@ -981,11 +992,11 @@ $("#ed-go").onclick = async () => {
   }
 };
 $("#iv-sync").onclick = async () => {
-  if (!confirm(inv.data?.common ? "Pun ceasul tuturor invertoarelor după ora Pi-ului?" : "Pun ceasul invertorului după ora Pi-ului?")) return;
+  if (!confirm(t(inv.data?.common ? "Pun ceasul tuturor invertoarelor după ora Pi-ului?" : "Pun ceasul invertorului după ora Pi-ului?"))) return;
   try {
     await writeInverter("/api/inverter/clock", { device: inv.data?.device }, $("#iv-sync"));
   } catch (err) {
-    alert(err.message);
+    alert(t(err.message));
   }
   await loadInverter();
 };
@@ -1055,10 +1066,10 @@ function renderCmds(msg = "") {
 }
 async function runCmd(key, value, fromEditor = false) {
   const a = bms.cmds.actions.find((x) => x.key === key);
-  if (!fromEditor && !confirm(`${a.label}?\n\n${a.warn}`)) return;
+  if (!fromEditor && !confirm(`${t(a.label)}?\n\n${t(a.warn)}`)) return;
   // oprire peste avertisment (ex. intervenție la conexiuni): a doua confirmare, cu motivul
   const force = !!(a.refused && a.can_force);
-  if (force && !confirm(`ATENȚIE: ${a.refused}\n\nOprești totuși ${a.mos === "chg" ? "încărcarea" : "descărcarea"} acestui modul?`)) return;
+  if (force && !confirm(`${t("ATENȚIE:")} ${t(a.refused)}\n\n` + t(a.mos === "chg" ? "Oprești totuși încărcarea acestui modul?" : "Oprești totuși descărcarea acestui modul?"))) return;
   if (key === "restart") {
     bms.cmds.restarting = true;
     renderCmds({ ok: true, t: "BMS-ul repornește… poate dura până la un minut." });
@@ -1112,7 +1123,7 @@ function renderBms() {
     });
   }));
   $("#bms-log").innerHTML = r.log?.length ? r.log.map((x) => `
-    <div class="row ${x.ok ? "" : "critical"}"><span>${esc(x.setting)}: ${x.ok ? `${esc(x.old)} → <b>${esc(x.new)}</b>` : `EȘUAT — ${esc(x.error)}`}</span>
+    <div class="row ${x.ok ? "" : "critical"}"><span>${esc(x.setting)}: ${x.ok ? `${esc(x.old)} → <b>${esc(x.new)}</b>` : `${t("EȘUAT")} — ${esc(x.error)}`}</span>
     <span class="t">${dayTime(x.ts)}</span></div>`).join("") : `<div class="empty">Nicio modificare până acum.</div>`;
 }
 
@@ -1340,7 +1351,7 @@ async function devAdd(c) {
       headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device: dev }) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || `eroare ${r.status}`);
-    $("#da-msg").textContent = j.restart ? `${j.device.name} a fost adăugat. Amper repornește câteva secunde…` : `${j.device.name} a fost adăugat.`;
+    $("#da-msg").textContent = tf(j.restart ? "{0} a fost adăugat. Amper repornește câteva secunde…" : "{0} a fost adăugat.", j.device.name);
     if (j.restart) setTimeout(() => location.reload(), 8000);
   } catch (e) { $("#da-msg").textContent = e.message; $("#da-go").disabled = false; }
 }
@@ -1355,11 +1366,11 @@ function toast(msg) {
 let dalyPos = {};                 // pozițiile Daly cu căutare automată: {id: {free, link, state}}
 async function devDisconnect(id) {
   const d = (state.info?.devices || []).find((x) => x.id === id), name = d?.name || id;
-  if (!confirm(`Sigur deconectezi ${name}? Amper nu-l mai citește și nu mai dă alerte pentru el.`)) return false;
+  if (!confirm(tf("Sigur deconectezi {0}? Amper nu-l mai citește și nu mai dă alerte pentru el.", name))) return false;
   try {
     const { r, j } = await securePost(`/api/devices/${encodeURIComponent(id)}/disconnect`);
     if (!r.ok) throw new Error(j.error || "Nu a mers.");
-    toast(`${name} a fost deconectat.${j.action === "freed" ? " Poziția rămâne liberă; căutarea poate găsi alt modul." : ""}`);
+    toast(tf(j.action === "freed" ? "{0} a fost deconectat. Poziția rămâne liberă; căutarea poate găsi alt modul." : "{0} a fost deconectat.", name));
   } catch (e) { if (e.message !== "Anulat.") toast(e.message || "Pi-ul nu răspunde."); return false; }
   try { state.info = await api("/api/info"); } catch {}
   if ($("#sheet").open) $("#sheet").close();
@@ -1404,7 +1415,7 @@ async function loadDalyFound() {
       <span class="row-act"><button class="btn sm danger" data-reject="${i}">Respinge</button></span></div>`).join("");
   $$("[data-reject]").forEach((b) => (b.onclick = async () => {
     const x = f[+b.dataset.reject];
-    if (!confirm(`Respingi ${x.label}? Nu va mai fi legat automat${x.ok ? "; poziția lui devine liberă" : ""}.`)) return;
+    if (!confirm(tf(x.ok ? "Respingi {0}? Nu va mai fi legat automat; poziția lui devine liberă." : "Respingi {0}? Nu va mai fi legat automat.", x.label))) return;
     try {
       const { r, j } = await securePost("/api/daly/reject", { keys: x.keys, binding: x.binding, label: x.label });
       if (!r.ok) throw new Error(j.error || "Nu a mers.");
@@ -1448,9 +1459,10 @@ $("#pro-go").onclick = async () => {
 
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "notif", "daly", "devoff", "devadd", "excl", "info", "update", "uphist", "security", "remote", "auto", "about", "conn", "share", "wifi"])
+  for (const k of ["teme", "lang", "notif", "daly", "devoff", "devadd", "excl", "info", "update", "uphist", "security", "remote", "auto", "about", "conn", "share", "wifi"])
     $("#set-" + k).hidden = k !== name;
   if (name === "about") renderEdition();
+  if (name === "lang") renderLang();
   if (name === "share") loadShare();
   if (name === "wifi") loadWifiNow();
   if (name === "auto") loadUserAlerts();
@@ -1468,6 +1480,20 @@ function showPanel(name) {
   window.scrollTo(0, 0);
 }
 $$(".set-btn[data-panel]").forEach((b) => (b.onclick = () => showPanel(b.dataset.panel)));
+
+/* limba: una pe Pi (/api/language); telefonul o ține și local ca pagina să pornească direct în limba bună */
+function renderLang() {
+  $$(".lang-opt").forEach((b) => b.classList.toggle("on", b.dataset.lang === LANG));
+}
+$$(".lang-opt").forEach((b) => (b.onclick = async () => {
+  if (b.dataset.lang === LANG) return;
+  try {
+    const r = await api("/api/language", { method: "POST", body: JSON.stringify({ lang: b.dataset.lang }) });
+    if (r.error) throw new Error(r.error);
+    try { localStorage.setItem("lang", b.dataset.lang); } catch {}
+    location.reload();
+  } catch (e) { if (e.message !== "auth") $("#lang-msg").textContent = e.message; }
+}));
 $("#set-wizard").onclick = () => openSetup(true);
 $("#dev-add").onclick = () => showPanel("devadd");
 async function loadWifiNow() {
@@ -1571,7 +1597,7 @@ $("#wifi-scan").onclick = async () => {
 $("#wifi-go").onclick = async () => {
   const n = wifi.chosen;
   if (!n) return;
-  if (!confirm(`Trec Pi-ul pe rețeaua „${n.ssid}”?\n\nDacă nu merge, revine singur la rețeaua de acum.`)) return;
+  if (!confirm(tf("Trec Pi-ul pe rețeaua „{0}”?", n.ssid) + "\n\n" + t("Dacă nu merge, revine singur la rețeaua de acum."))) return;
   const b = $("#wifi-go");
   b.disabled = true;
   try {
@@ -1603,7 +1629,7 @@ const UP_STEPS = { verify: "Verificarea semnăturii", space: "Spațiu liber", do
   backup: "Copia de siguranță a datelor", install: "Instalare", restart: "Repornire", health: "Verificare: pornește?" };
 const UP_RESULT = { ok: "reușit", failed: "eșuat", rolled_back: "revenit automat la versiunea veche" };
 const upd = { data: null, timer: 0, busy: false };
-const dateTime = (ts) => new Date(ts * 1000).toLocaleString("ro-RO", { day: "numeric", month: "short", year: "numeric",
+const dateTime = (ts) => new Date(ts * 1000).toLocaleString(LOC, { day: "numeric", month: "short", year: "numeric",
   hour: "2-digit", minute: "2-digit" });
 
 async function loadUpdate() {
@@ -1633,8 +1659,8 @@ function renderUpdate() {
   const last = r.last_check ? `${dateTime(r.last_check)} (${r.last_check_auto ? "automat" : "manual"})` : "niciodată";
   $("#up-now").innerHTML = `
     <div class="row"><span>Versiunea instalată: <b>${esc(r.version || "?")}</b>${r.channel === "beta" ? ' <span class="role">beta</span>' : ""}</span>
-      <span class="t">${inst.at ? "instalată la " + dateTime(inst.at) : ""}</span></div>
-    <div class="row"><span>Ultima căutare: ${esc(last)}</span>
+      <span class="t">${inst.at ? tf("instalată la {0}", dateTime(inst.at)) : ""}</span></div>
+    <div class="row"><span>${esc(tf("Ultima căutare: {0}", last))}</span>
       <span class="t">${r.check_error ? esc(r.check_error) : r.latest && !r.available ? "Ai ultima versiune." : ""}</span></div>`;
   $("#set-update-sub").textContent = r.available ? `Versiune nouă: ${r.latest.version}` : `Versiunea ${r.version || ""}`;
   const job = r.job || {}, running = job.state === "running";
@@ -1673,7 +1699,7 @@ function renderUpdate() {
     $("#up-job-msg").textContent = shown.message || "";
   }
   $("#up-prev").hidden = !r.previous || running;
-  if (r.previous) $("#up-prev-txt").textContent = `Revine la Amper ${r.previous.version || "anterior"}. Istoricul și setările rămân; se face totuși o copie înainte.`;
+  if (r.previous) $("#up-prev-txt").textContent = tf("Revine la Amper {0}. Istoricul și setările rămân; se face totuși o copie înainte.", r.previous.version || t("anterior"));
   const h = r.history || [];
   $("#up-hist-sub").textContent = r.previous?.version ? `Actualizările făcute · poți reveni la ${r.previous.version}` : "Actualizările făcute";
   $("#up-hist").innerHTML = h.length ? h.map((x) => `<div class="row ${x.result === "ok" ? "" : "warning"}">
@@ -1692,8 +1718,8 @@ $("#up-check").onclick = async () => {
   b.disabled = false; b.textContent = "Caută actualizări";
 };
 async function updateAction(action, btn) {
-  const q = action === "install" ? `Instalez acum Amper ${upd.data?.latest?.version}? Amper se oprește un minut.`
-    : `Revin la Amper ${upd.data?.previous?.version}? Amper se oprește un minut.`;
+  const q = action === "install" ? tf("Instalez acum Amper {0}? Amper se oprește un minut.", upd.data?.latest?.version)
+    : tf("Revin la Amper {0}? Amper se oprește un minut.", upd.data?.previous?.version);
   if (!confirm(q)) return;
   btn.disabled = true; $("#up-msg").textContent = "";
   try {
@@ -1827,7 +1853,7 @@ function renderSheet() {
     }).join("");
   } else {
     $("#sh-cellnote").textContent = r.raw?.cells_missing
-      ? `Citire incompletă a celulelor (${r.raw.cells_missing}); se reîncearcă la următoarea citire.`
+      ? tf("Citire incompletă a celulelor ({0}); se reîncearcă la următoarea citire.", r.raw.cells_missing)
       : "BMS-ul nu a trimis tensiunile pe celule.";
     $("#sh-cells").innerHTML = "";
   }
@@ -2018,7 +2044,7 @@ function drawEnergy() {
     { name: "Din rețea", color: "#3FCB7E", data: grid },
   ]);
 }
-const dayTime2 = (d) => new Date(d + "T12:00").toLocaleDateString("ro-RO", { day: "numeric", month: "short", year: "numeric" });
+const dayTime2 = (d) => new Date(d + "T12:00").toLocaleDateString(LOC, { day: "numeric", month: "short", year: "numeric" });
 
 $$("#en-range button").forEach((b) => (b.onclick = () => {
   $$("#en-range button").forEach((x) => x.setAttribute("aria-pressed", x === b));
@@ -2079,7 +2105,7 @@ function lineChart(box, series, opt = {}) {
       ctx.fillText(shortVal(v, opt), L - 6, Y(v) + 4);
     }
     const span = t1 - t0;
-    const lbl = span > 2 * 86400 ? (t) => new Date(t * 1000).toLocaleDateString("ro-RO", { day: "numeric", month: "short" }) : hhmm;
+    const lbl = span > 2 * 86400 ? (t) => new Date(t * 1000).toLocaleDateString(LOC, { day: "numeric", month: "short" }) : hhmm;
     ctx.textAlign = "center";
     for (let i = 0; i <= 4; i++) { const t = t0 + (span * i) / 4; ctx.fillText(lbl(t), Math.min(w - 24, Math.max(L + 16, X(t))), h - 5); }
     ctx.lineWidth = 2; ctx.lineJoin = "round";
@@ -2173,12 +2199,12 @@ function barChart(box, labels, series) {
     const every = Math.ceil(labels.length / 6);
     // etichete: zile (AAAA-LL-ZZ) sau luni (AAAA-LL), când intervalul e lung
     const monthly = labels[0].length === 7;
-    const short = (d) => monthly ? new Date(d + "-01").toLocaleDateString("ro-RO", { month: "short" }) : d.slice(8) + "." + d.slice(5, 7);
+    const short = (d) => monthly ? new Date(d + "-01").toLocaleDateString(LOC, { month: "short" }) : d.slice(8) + "." + d.slice(5, 7);
     labels.forEach((d, i) => { if ((labels.length - 1 - i) % every === 0) ctx.fillText(short(d), L + i * gw + gw / 2, h - 5); });
     legend.innerHTML = series.map((s) => `<span style="--c:${s.color}">${esc(s.name)}<b>${num(s.data[sel], 1)} kWh</b></span>`).join("");
     box.querySelector(".when").textContent = monthly
-      ? new Date(labels[sel] + "-01").toLocaleDateString("ro-RO", { month: "long", year: "numeric" })
-      : new Date(labels[sel]).toLocaleDateString("ro-RO", { weekday: "long", day: "numeric", month: "long" });
+      ? new Date(labels[sel] + "-01").toLocaleDateString(LOC, { month: "long", year: "numeric" })
+      : new Date(labels[sel]).toLocaleDateString(LOC, { weekday: "long", day: "numeric", month: "long" });
   };
   attachCursor(box);
   box._draw(null);
@@ -2311,7 +2337,7 @@ async function loadUserAlerts() {
     loadUserAlerts();
   }));
   $$("[data-del]", $("#ua-list")).forEach((b) => (b.onclick = async () => {
-    if (!confirm("Ștergi această alertă?")) return;
+    if (!confirm(t("Ștergi această alertă?"))) return;
     await api(`/api/user-alerts/${b.dataset.del}`, { method: "DELETE" });
     loadUserAlerts();
   }));
@@ -2602,7 +2628,7 @@ function suRenderDevices() {
   };
   $$(".su-rej", b).forEach((x) => (x.onclick = async () => {
     const f = su.found[+x.dataset.rej];
-    if (!confirm(`Respingi ${f.name}? Nu va mai fi legat automat (se poate permite din nou din Setări).`)) return;
+    if (!confirm(tf("Respingi {0}? Nu va mai fi legat automat (se poate permite din nou din Setări).", f.name))) return;
     try {
       const { r, j } = await securePost("/api/daly/reject", { keys: f.keys, binding: f.binding, label: f.label });
       if (!r.ok) throw new Error(j.error || "Nu a mers.");
@@ -2654,7 +2680,7 @@ async function suNext() {
     if (!sel.length) {
       if (su.d.devices.some((x) => !x.type.startsWith("sim_")))
         throw new Error("Alege dispozitivele găsite sau bifează „Păstrează dispozitivele de acum”.");
-      if (!confirm("N-ai ales niciun dispozitiv. Continui fără? Le poți adăuga mai târziu din Setări → Ghid de configurare.")) return;
+      if (!confirm(t("N-ai ales niciun dispozitiv. Continui fără? Le poți adăuga mai târziu din Setări → Ghid de configurare."))) return;
       su.chosen = []; su.i += 2; return suRender();
     }
     // ordinea: Daly, Seplos, invertor
@@ -2834,13 +2860,13 @@ async function renderRemote(el) {
     try {
       const { r: res, j } = await securePost(url, body);
       if (!res.ok) throw new Error(j.error || `eroare ${res.status}`);
-    } catch (e) { if (e.message !== "Anulat.") alert(e.message); }
+    } catch (e) { if (e.message !== "Anulat.") alert(t(e.message)); }
     renderRemote(el);
   };
   if ($("#rm-login", el)) $("#rm-login", el).onclick = () => act("/api/remote/login", {});
   if ($("#rm-on", el)) $("#rm-on", el).onclick = () => act("/api/remote/funnel", { on: true });
   if ($("#rm-off", el)) $("#rm-off", el).onclick = () =>
-    confirm("Opresc accesul de oriunde? De la distanță, Amper se va deschide doar pe telefoanele conectate la server.") && act("/api/remote/funnel", { on: false });
+    confirm(t("Opresc accesul de oriunde? De la distanță, Amper se va deschide doar pe telefoanele conectate la server.")) && act("/api/remote/funnel", { on: false });
   if (waiting) remote.timer = setTimeout(() => renderRemote(el), 2500);
 }
 

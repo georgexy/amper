@@ -320,6 +320,9 @@ def cmd_notify(args) -> None:
     import aiohttp
     from .notify import Notifier
     cfg = load_config(args.config)
+    from . import i18n
+    i18n.set_lang(cfg.get("language"))
+    i18n.set_names(d.get("name", "") for d in cfg.get("devices") or [])
     n = Notifier(cfg["notify"])
     state_dir = os.path.dirname(os.path.abspath(cfg["database"]))
     if os.path.exists(os.path.join(state_dir, "vapid.json")):      # cheile le creează serviciul amper

@@ -561,3 +561,32 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `night_report.pack_stats`/`counts_right` → în câte nopți numără greșit / 0 A, împărțirea medie, trendul p90;
   energia din `energy_daily` (toate invertoarele); `note` când perioada iese din cele 14 zile brute.
   NEVERIFICAT pe date reale.
+
+## Teme: Cadrane și Carduri (1.0.0-beta.14, în pregătire, cerut 2026-10-30)
+- Cadrane: ordinea = `.k-gauges` (4 cadrane) → `.k-hero` (bateria) → `.k-day` → `inv-line`. Inelul `.k-ring` înlocuit
+  cu `.k-batt` (baterie verticală ca iconița: `.cap`, `.body` cu 3 linii `i`, `.fill` cu înălțimea = SOC %, `--mc`);
+  procentul alb cu contur `-webkit-text-stroke: 2px #0E1A22` (varianta D aleasă din 8 machete; utilizatorul a respins
+  bateria din Flux și scrisul alb cu umbră pe verde: „nu e foarte bine vizibil”).
+- Sub Panouri / Consum: `produs azi` / `consumat azi` (`h.today`) — `.k-g .sub` (`s-pv`, `s-load`) în Cadrane și
+  `.c-it .s` în Carduri.
+
+## Limba aplicației (1.0.0-beta.14, în pregătire, cerut 2026-10-30; etapa 1 = ecranele)
+- Una pe Pi (decizia utilizatorului): overlay `language` (ro | en), `POST /api/language {lang}`, `/api/info.lang`.
+  Telefonul o ține și în localStorage `lang` (ca pagina să pornească direct în limba bună); la boot, dacă diferă de
+  a Pi-ului → o salvează și reîncarcă. Setări → „Limbă · Language” (`#set-lang`, `.lang-opt`, `renderLang`).
+- Mecanism (`web/i18n.js`, încărcat după `web/lang-en.js` și înaintea `app.js`): codul scrie textele în ROMÂNĂ; în
+  engleză un MutationObserver traduce fiecare nod de text și `aria-label`/`title`/`placeholder` după dicționarul `EN`
+  (cheia = textul românesc cu spațiile normalizate). Numerele din text se potrivesc cu „#” (inclusiv cu minus) și se pun
+  la loc în ordine. `LOC` (ro-RO / en-GB) formatează numerele și datele (în engleză cu punct zecimal). Pentru
+  confirm/alert și textele care conțin nume sau date: `t("…")` și `tf("… {0} …", x)` în app.js.
+- REGULĂ: orice text nou din aplicație se adaugă și în `web/lang-en.js` (`tests/test_i18n.py` verifică toate
+  apelurile `t()`/`tf()`; pentru restul textelor: crawl în simulator cu limba en și căutarea cuvintelor românești).
+- Etapa 2 (făcută, beta.14): textele scrise pe Pi rămân în ROMÂNĂ în cod și în DB; `amper/i18n.py` `tr()` le traduce
+  după `amper/lang/en.json` (cheia = textul românesc: „#” număr, „@” nume de dispozitiv din config, „{}” orice text
+  dintr-o frază, „{...}” orice text; ce e prins se traduce și el; emoji-ul din față rămâne; mesajele compuse se
+  traduc pe bucăți la „: ”, „; ”, „ · ”, „ — ”, „. ”, „, ”). Unde: `Notifier.send` (și `amper notify`, pentru
+  amper-update), `web._json` (cheile `error/message/warning/why/detail`, 2 niveluri), `i18n.report` (rapoartele,
+  sănătatea celulelor). Aplicația primește același dicționar (`/lang-en-srv.js`, peste `EN`) și traduce cu el
+  alertele, stările, setările BMS etc. afișate. Netraduse: notele versiunilor (CHANGELOG, de la stabilă), pagina
+  hotspotului (`wifi_setup.py`), mesajele din linia de comandă.
+- REGULĂ (etapa 2): orice text nou scris pe Pi și văzut de utilizator → intrare în `amper/lang/en.json`.

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from aiohttp import WSMsgType, web
 
-from . import __version__
+from . import __version__, i18n
 from .drivers.base import DriverError
 from .models import PackReading
 
@@ -22,8 +22,27 @@ STATIC = Path(__file__).resolve().parent.parent / "web"
 UPDATE_API, UPDATE_TOKEN = "http://127.0.0.1:8092", "/run/amper-update/token"
 
 
+TEXT_KEYS = ("error", "message", "warning", "why", "detail")
+
+
+def _texts(data, depth=0):
+    """Mesajele din răspunsurile API (erori, stările serviciilor root) în limba Pi-ului; restul trece neschimbat."""
+    if isinstance(data, dict) and depth < 2:
+        for k, v in data.items():
+            if k in TEXT_KEYS and isinstance(v, str):
+                data[k] = i18n.tr(v)
+            elif isinstance(v, dict):
+                _texts(v, depth + 1)
+    return data
+
+
 def _json(data, status=200):
+    if i18n.lang() != "ro":
+        _texts(data)
     return web.json_response(data, status=status, dumps=lambda o: json.dumps(o, ensure_ascii=False, default=str))
+
+
+LANGS = ("ro", "en")
 
 
 def sum_energy(parts: list[list[dict]]) -> list[dict]:
@@ -215,6 +234,7 @@ def make_app(engine) -> web.Application:
         return _json(dict(devices=devs, auth=auth_.enabled, poll_interval=cfg["poll_interval"], version=__version__,
                           port=int((cfg.get("web") or {}).get("port") or 8080),
                           site_name=cfg.get("site_name") or "", setup_needed=setup_needed(cfg),
+                          lang=cfg.get("language") if cfg.get("language") in LANGS else "ro",
                           password_reset=reset_pending(), edition=ed["v"], pi_id=pid,
                           public_url=wp.subject if wp else None,
                           notifications=engine.notifier.enabled,
@@ -614,6 +634,23 @@ def make_app(engine) -> web.Application:
                           devices=[{k: d.get(k) for k in ("id", "name", "type", "port", "ble", "capacity_ah",
                                                           "baudrate", "address")} for d in cfg["devices"]],
                           scan=scan_job))
+
+    async def lang_srv(request):
+        """Dicționarul textelor de pe Pi, pentru aplicație (se adaugă la cel al ecranelor)."""
+        d = await asyncio.to_thread(i18n.load)
+        return web.Response(text="Object.assign(EN, " + json.dumps(d, ensure_ascii=False) + ");\n",
+                            content_type="application/javascript", headers={"Cache-Control": "no-cache"})
+
+    async def set_language(request):
+        """Limba aplicației, una pentru tot Pi-ul (ecranele; mai târziu și notificările și rapoartele)."""
+        body = await request.json()
+        lang = body.get("lang")
+        if lang not in LANGS:
+            return _json({"error": "limbă necunoscută"}, 400)
+        await asyncio.to_thread(save_overlay, cfg, {"language": lang})
+        cfg["language"] = lang
+        i18n.set_lang(lang)
+        return _json({"ok": True, "lang": lang})
 
     async def setup_name(request):
         body = await request.json()
@@ -1040,7 +1077,7 @@ def make_app(engine) -> web.Application:
         res["last_weekly"] = int(float(last)) if last else None
         res["tracked"] = sum(len(st.reading.cells or []) for st in engine.devices.values()
                              if isinstance(st.reading, PackReading) and st.connected)
-        return _json(res)
+        return _json(i18n.report(res))
 
     # ---------------- raportul nopții ----------------
     from . import night_report
@@ -1058,7 +1095,7 @@ def make_app(engine) -> web.Application:
         rep = await asyncio.to_thread(night_report.build, engine.db, pack_names(), now)
         rep["ago"] = ago
         rep["notify"] = await asyncio.to_thread(engine.db.get_meta, "night_report_off") != "1"
-        return _json(rep)
+        return _json(i18n.report(rep))
 
     async def battery_report_get(request):
         """`?start=&end=` (secunde): raportul bateriilor pe perioada aleasă."""
@@ -1071,7 +1108,7 @@ def make_app(engine) -> web.Application:
             return _json({"error": "Alege o perioadă de cel puțin o oră."}, 400)
         invs = [k for k, st in engine.devices.items() if st.driver.kind == "inverter"]
         rep = await asyncio.to_thread(battery_report.build, engine.db, pack_names(), start, end, invs)
-        return _json(rep)
+        return _json(i18n.report(rep))
 
     async def night_notify(request):
         body = await request.json()
@@ -1128,8 +1165,10 @@ def make_app(engine) -> web.Application:
                           reading=r.__dict__ if r else None))
 
     app.router.add_get("/", index)
+    app.router.add_get("/lang-en-srv.js", lang_srv)
     app.router.add_post("/api/login", login)
     app.router.add_get("/api/info", info)
+    app.router.add_post("/api/language", set_language)
     app.router.add_get("/api/health", health)
     app.router.add_post("/api/pro/activate", pro_activate)
     app.router.add_get("/api/live", live)
