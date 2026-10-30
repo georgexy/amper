@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.14 — în pregătire
+## 1.0.0-beta.14 — 2026-10-30
 - Tema Cadrane: bateria e acum sub cele patru cadrane, deasupra graficului zilei, și arată ca o baterie (ca în
   iconiță: se umple de jos în sus, pe segmente), cu procentul scris alb cu contur închis, ca să se citească bine.
 - Teme Cadrane și Carduri: sub Panouri scrie cât s-a produs azi, iar sub Consum cât s-a consumat azi.
