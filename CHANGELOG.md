@@ -5,7 +5,7 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 ## 1.0.0-beta.13 — în pregătire
 - Două (sau mai multe) invertoare în paralel, de ex. două Growatt SPF 5000 pe aceeași casă și aceeași baterie, fiecare
   cu stringul lui: ecranul principal adună panourile, consumul și rețeaua, energia zilei și graficele din Istoric
-  sunt sumele lor, iar butonul ⓘ de la Panouri arată tensiunea și curentul fiecărui string.
+  sunt sumele lor, iar butonul ⓘ de la Panouri arată tensiunea și curentul fiecărui string (String 1, String 2…).
 - Ecranul invertorului are taburi: „Toate” (sumele și starea fiecăruia) și câte unul pe invertor, cu setările lui.
 
 ## 1.0.0-beta.12 — 2026-10-29
