@@ -561,3 +561,11 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `night_report.pack_stats`/`counts_right` → în câte nopți numără greșit / 0 A, împărțirea medie, trendul p90;
   energia din `energy_daily` (toate invertoarele); `note` când perioada iese din cele 14 zile brute.
   NEVERIFICAT pe date reale.
+
+## Teme: Cadrane și Carduri (1.0.0-beta.14, în pregătire, cerut 2026-10-30)
+- Cadrane: ordinea = `.k-gauges` (4 cadrane) → `.k-hero` (bateria) → `.k-day` → `inv-line`. Inelul `.k-ring` înlocuit
+  cu `.k-batt` (baterie verticală ca iconița: `.cap`, `.body` cu 3 linii `i`, `.fill` cu înălțimea = SOC %, `--mc`);
+  procentul alb cu contur `-webkit-text-stroke: 2px #0E1A22` (varianta D aleasă din 8 machete; utilizatorul a respins
+  bateria din Flux și scrisul alb cu umbră pe verde: „nu e foarte bine vizibil”).
+- Sub Panouri / Consum: `produs azi` / `consumat azi` (`h.today`) — `.k-g .sub` (`s-pv`, `s-load`) în Cadrane și
+  `.c-it .s` în Carduri.

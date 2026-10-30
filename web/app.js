@@ -377,22 +377,23 @@ const ARC = Math.PI * 56, RING = 2 * Math.PI * 62;
 const GAUGES = [["pv", "Panouri", "--sun"], ["load", "Consum", "--load"], ["bat", "Baterie", "--charge"], ["temp", "Invertor", "--cell"]];
 const cadrane = {
   html: () => `
-    <button class="card k-hero" data-open="packs" aria-label="Bateria — vezi pachetele">
-      <div class="k-ring"><svg viewBox="0 0 150 150"><circle class="trk" cx="75" cy="75" r="62"/><circle class="arc" cx="75" cy="75" r="62"/></svg>
-        <div class="c"><b><span data-k="soc">–</span><sup>%</sup></b><span>baterie</span></div></div>
-      <div class="k-ht"><div class="k">Energie rămasă</div><div class="v" data-k="kwh">–</div>
-        <span class="pill" data-k="mode"></span><div class="eta" data-k="eta"></div><div class="health" data-k="health"></div></div>
-    </button>
     <div class="k-gauges">${GAUGES.map(([k, l, c]) => `
       <div class="card k-g" style="--gc:var(${c})"${k === "temp" ? ' data-open="inverter" role="button" tabindex="0"' : ""}><svg viewBox="0 0 140 78"><path class="trk" d="M14 72 A56 56 0 0 1 126 72"/>
         <path class="arc" data-g="${k}" d="M14 72 A56 56 0 0 1 126 72" stroke-dasharray="0 ${ARC}"/></svg>
-        <div class="val num" data-k="g-${k}">–</div><div class="lbl"><span data-k="l-${k}">${l}</span>${k === "pv" ? PV_I : ""}</div></div>`).join("")}</div>
+        <div class="val num" data-k="g-${k}">–</div><div class="lbl"><span data-k="l-${k}">${l}</span>${k === "pv" ? PV_I : ""}</div>${k === "pv" || k === "load"
+          ? `<div class="sub" data-k="s-${k}"></div>` : ""}</div>`).join("")}</div>
+    <button class="card k-hero" data-open="packs" aria-label="Bateria — vezi pachetele">
+      <div class="k-batt"><div class="cap"></div><div class="body"><div class="fill"></div><i></i><i></i><i></i></div>
+        <div class="c"><b><span data-k="soc">–</span><sup>%</sup></b></div></div>
+      <div class="k-ht"><div class="k">Energie rămasă</div><div class="v" data-k="kwh">–</div>
+        <span class="pill" data-k="mode"></span><div class="eta" data-k="eta"></div><div class="health" data-k="health"></div></div>
+    </button>
     <section class="card k-day"><h3><span>Azi</span><span data-k="day"></span></h3><svg data-k="chart" viewBox="0 0 330 92" preserveAspectRatio="none"></svg></section>
     <div class="inv-line" data-k="inv" data-open="inverter" role="button" tabindex="0"></div>`,
   update(root, h) {
     const { b, ir, bp } = h;
     modeClass(root.querySelector(".k-hero"), h, "card k-hero");
-    root.querySelector(".k-ring .arc").setAttribute("stroke-dasharray", `${((b.soc ?? 0) / 100) * RING} ${RING}`);
+    root.querySelector(".k-batt .fill").style.height = `${Math.max(0, Math.min(100, b.soc ?? 0))}%`;
     put(root, "soc", b.soc == null ? "–" : num(b.soc, 0));
     put(root, "kwh", b.kwh == null ? "–" : `${num(b.kwh, 1)} <span class="u">din ${num(h.capKwh, 1)} kWh</span>`);
     put(root, "mode", (h.mode === "charging" ? "▲ " : h.mode === "discharging" ? "▼ " : "") + h.modeText);
@@ -408,6 +409,8 @@ const cadrane = {
     }
     root.querySelector('[data-g="bat"]').style.stroke = h.mode === "discharging" ? "var(--cell)" : "var(--charge)";
     put(root, "l-bat", bp > 20 ? "Baterie, intră" : bp < -20 ? "Baterie, iese" : "Baterie");
+    put(root, "s-pv", h.today.pv_kwh == null ? "" : `produs azi <b>${num(h.today.pv_kwh, 1)} kWh</b>`);
+    put(root, "s-load", h.today.load_kwh == null ? "" : `consumat azi <b>${num(h.today.load_kwh, 1)} kWh</b>`);
     const part = (l, v) => `<span class="nw">${l} <b>${num(v, 1)} kWh</b></span>`;      // rândul se rupe doar între ele
     put(root, "day", h.today.pv_kwh == null ? "" : [part("produs", h.today.pv_kwh), part("consumat", h.today.load_kwh),
       part("din rețea", h.today.ac_in_kwh || 0)].join(" · "));
@@ -552,7 +555,7 @@ const carduri = {
     <section class="card c-list">${[["pv", "Panouri solare", "--sun", "sun"], ["load", "Consum casă", "--load", "home"],
       ["bat", "Baterie", "--charge", "batt"], ["grid", "Rețea", "--muted", "grid"]].map(([k, l, c, i]) => `
       <div class="c-it" style="--ic:var(${c})" data-it="${k}"><div class="c-ico">${icon(i)}</div>
-        <div class="m"><div class="k"><span data-k="l-${k}">${l}</span>${k === "pv" ? PV_I : ""}</div><div class="tr"><i data-bar="${k}"></i></div></div><div class="v" data-k="v-${k}">–</div></div>`).join("")}</section>`,
+        <div class="m"><div class="k"><span data-k="l-${k}">${l}</span>${k === "pv" ? PV_I : ""}</div><div class="tr"><i data-bar="${k}"></i></div>${k === "pv" || k === "load" ? `<div class="s" data-k="s-${k}"></div>` : ""}</div><div class="v" data-k="v-${k}">–</div></div>`).join("")}</section>`,
   update(root, h) {
     const { b, ir, bp } = h;
     put(root, "st", `${h.ir ? esc(ir.status || "") : "Invertor: fără date"}${ir ? ` · ${num(ir.inverter_temp, 0)} °C` : ""} ›`);
@@ -583,6 +586,8 @@ const carduri = {
     root.querySelector('[data-it="bat"]').style.setProperty("--ic", h.mode === "discharging" ? "var(--cell)" : "var(--charge)");
     put(root, "l-bat", bp > 20 ? "Baterie, intră" : bp < -20 ? "Baterie, iese" : "Baterie");
     put(root, "v-grid", kv(ir?.ac_in_voltage, "V"));
+    put(root, "s-pv", h.today.pv_kwh == null ? "" : `produs azi <b>${num(h.today.pv_kwh, 1)} kWh</b>`);
+    put(root, "s-load", h.today.load_kwh == null ? "" : `consumat azi <b>${num(h.today.load_kwh, 1)} kWh</b>`);
     root.querySelector('[data-bar="grid"]').style.width = ir?.ac_in_voltage > 50 ? "100%" : "0";
   },
 };
