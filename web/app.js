@@ -250,8 +250,10 @@ function combineInverters(list) {
     fault_code: faulty.length ? faulty[0].reading.fault_code : 0,
     fault_text: faulty.map((d) => `${d.name}: ${d.reading.fault_text || "defect " + d.reading.fault_code}`).join("; ") || null,
     warnings: named("warnings"), notices: named("notices"),
-    strings: live.flatMap((d) => [[d.name + (d.reading.pv2_voltage >= 10 ? " · PV1" : ""), d.reading.pv_voltage, d.reading.pv_current],
-      ...(d.reading.pv2_voltage >= 10 ? [[d.name + " · PV2", d.reading.pv2_voltage, d.reading.pv2_current]] : [])]),
+    // fiecare intrare PV = un string, numerotate la rând: String 1, String 2…
+    strings: live.flatMap((d) => [[d.reading.pv_voltage, d.reading.pv_current],
+      ...(d.reading.pv2_voltage >= 10 ? [[d.reading.pv2_voltage, d.reading.pv2_current]] : [])])
+      .map(([v, a], i) => [`String ${i + 1}`, v, a]),
   } : null;
   return { id: "_all", name: `${list.length} invertoare`, kind: "inverter", stale: !live.length, reading, parts: list,
     connected: true, error: list.filter((d) => d.stale).map((d) => `${d.name} nu comunică`).join("; ") || null };
