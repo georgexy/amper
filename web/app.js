@@ -225,8 +225,39 @@ const connected = (d) => d.connected !== false;
 function packs() {
   return Object.values(state.snap?.devices || {}).filter((d) => d.kind === "pack" && connected(d) && !d.stale);
 }
+function inverters() {
+  return Object.values(state.snap?.devices || {}).filter((d) => d.kind === "inverter" && connected(d));
+}
+/* Mai multe invertoare în paralel (ex. două Growatt SPF pe aceeași casă și aceeași baterie): un „invertor” comun
+   cu puterile adunate (panouri, consum, rețea, baterie), tensiunile medii și temperatura cea mai mare; `parts` = fiecare. */
+function combineInverters(list) {
+  if (list.length < 2) return list[0];
+  const live = list.filter((d) => !d.stale && d.reading), rs = live.map((d) => d.reading);
+  const vals = (k) => rs.map((r) => r[k]).filter((v) => v != null);
+  const sum = (k) => (vals(k).length ? vals(k).reduce((a, b) => a + b, 0) : null);
+  const avg = (k) => (vals(k).length ? sum(k) / vals(k).length : null);
+  const max = (k) => (vals(k).length ? Math.max(...vals(k)) : null);
+  const first = (k) => (vals(k).length ? vals(k)[0] : null);
+  const statuses = [...new Set(rs.map((r) => r.status))];
+  const named = (k) => live.flatMap((d) => (d.reading[k] || []).map((w) => `${d.name}: ${w}`));
+  const faulty = live.filter((d) => d.reading.fault_code);
+  const reading = rs.length ? {
+    ...rs[0],
+    pv_power: sum("pv_power"), load_power: sum("load_power"), ac_in_power: sum("ac_in_power"), battery_power: sum("battery_power"),
+    load_percent: avg("load_percent"), battery_voltage: avg("battery_voltage"), output_voltage: first("output_voltage"),
+    ac_in_voltage: first("ac_in_voltage"), inverter_temp: max("inverter_temp"), dcdc_temp: max("dcdc_temp"),
+    status: statuses.length === 1 ? statuses[0] : live.map((d) => `${d.name}: ${d.reading.status || "–"}`).join(" · "),
+    fault_code: faulty.length ? faulty[0].reading.fault_code : 0,
+    fault_text: faulty.map((d) => `${d.name}: ${d.reading.fault_text || "defect " + d.reading.fault_code}`).join("; ") || null,
+    warnings: named("warnings"), notices: named("notices"),
+    strings: live.flatMap((d) => [[d.name + (d.reading.pv2_voltage >= 10 ? " · PV1" : ""), d.reading.pv_voltage, d.reading.pv_current],
+      ...(d.reading.pv2_voltage >= 10 ? [[d.name + " · PV2", d.reading.pv2_voltage, d.reading.pv2_current]] : [])]),
+  } : null;
+  return { id: "_all", name: `${list.length} invertoare`, kind: "inverter", stale: !live.length, reading, parts: list,
+    connected: true, error: list.filter((d) => d.stale).map((d) => `${d.name} nu comunică`).join("; ") || null };
+}
 function inverter() {
-  return Object.values(state.snap?.devices || {}).find((d) => d.kind === "inverter" && connected(d));
+  return combineInverters(inverters());
 }
 function alertsFor(id) {
   return (state.snap?.alerts || []).filter((a) => a.device === id);
@@ -309,6 +340,8 @@ function pvInfoHtml() {
   const ir = homeData().ir;
   if (!ir) return "Invertorul nu trimite date acum.";
   const row = (name, v, a) => `<div><span>${name}</span><b>${v == null ? "–" : num(v, 1) + " V"}</b><b>${a == null ? "–" : num(a, 1) + " A"}</b></div>`;
+  if (ir.strings) return `<div class="pvp-h"><span></span><span>Tensiune</span><span>Curent</span></div>
+    ${ir.strings.map(([n, v, a]) => row(esc(n), v, a)).join("")}`;          // mai multe invertoare: fiecare string
   const two = ir.pv2_voltage >= 10;
   return `<div class="pvp-h"><span></span><span>Tensiune</span><span>Curent</span></div>
     ${row(two ? "PV1" : "Panouri", ir.pv_voltage, ir.pv_current)}${two ? row("PV2", ir.pv2_voltage, ir.pv2_current) : ""}`;
@@ -384,14 +417,25 @@ function invLine({ inv, ir }) {
 }
 
 /* graficul zilei (producție și consum), din istoricul invertorului */
+// rândurile mai multor invertoare, adunate pe același moment (puterile); fiecare invertor are aceleași intervale
+function sumRows(lists, keys = ["pv_power", "load_power", "ac_in_power"]) {
+  if (lists.length < 2) return lists[0] || [];
+  const by = new Map();
+  for (const rows of lists) for (const r of rows) {
+    const k = Math.round(r.t), o = by.get(k) || { t: r.t };
+    for (const key of keys) if (r[key] != null) o[key] = (o[key] || 0) + r[key];
+    by.set(k, o);
+  }
+  return [...by.values()].sort((a, b) => a.t - b.t);
+}
 async function loadDay() {
-  const inv = state.info?.devices.find((d) => d.kind === "inverter");
-  if (!inv) return;
+  const invs = (state.info?.devices || []).filter((d) => d.kind === "inverter");
+  if (!invs.length) return;
   const mid = new Date(); mid.setHours(0, 0, 0, 0);
   const hours = (Date.now() - mid) / 3600000;
   try {
-    const r = await api(`/api/history?device=${encodeURIComponent(inv.id)}&hours=${Math.max(0.1, hours)}&points=144`);
-    state.day = { t0: mid / 1000, rows: r.rows };
+    const all = await Promise.all(invs.map((inv) => api(`/api/history?device=${encodeURIComponent(inv.id)}&hours=${Math.max(0.1, hours)}&points=144`)));
+    state.day = { t0: mid / 1000, rows: sumRows(all.map((r) => r.rows || [])) };
     state.dayDrawn = null;
     if (state.snap) renderNow();
   } catch {}
@@ -679,29 +723,51 @@ async function loadCells() {
 }
 
 /* ------------------------------------------------------------------ ecranul INVERTOR */
-const inv = { data: null, edit: null };
+const inv = { data: null, edit: null, sel: null };       // sel = invertorul ales în taburi (null = toate)
 $("#iv-back").onclick = () => show("now");
 
 function renderInverterLive() {
-  const d = inverter();
+  const list = inverters();
+  if (inv.sel && !list.some((x) => x.id === inv.sel)) inv.sel = null;
+  const d = inv.sel ? list.find((x) => x.id === inv.sel) : inverter();
   if (!d) return;
   const r = d.stale ? null : d.reading;
-  $("#iv-title").textContent = d.name;
+  $("#iv-title").textContent = list.length > 1 ? "Invertoarele" : d.name;
+  $("#iv-tabs").hidden = list.length < 2;
+  $("#iv-tabs").innerHTML = list.length < 2 ? "" : [["", "Toate"], ...list.map((x) => [x.id, x.name])].map(([id, n]) =>
+    `<button data-iv="${esc(id)}" class="${(inv.sel || "") === id ? "on" : ""}">${esc(n)}</button>`).join("");
+  $$("[data-iv]", $("#iv-tabs")).forEach((b) => (b.onclick = () => {
+    inv.sel = b.dataset.iv || null; inv.data = null; renderInverterLive(); loadInverterPro();
+  }));
   $("#iv-state").innerHTML = r ? `Stare: <b>${esc(r.status || "–")}</b>` +
     (r.fault_code ? `<br><b style="color:var(--alarm)">Defect ${r.fault_code}: ${esc(r.fault_text || "")}</b>` : "") +
     (r.warnings?.length ? `<br><b style="color:var(--warn)">Avertisment: ${esc(r.warnings.join("; "))}</b>` : "") +
     (r.notices?.length ? `<br>${esc(r.notices.join("; "))}` : "") :
     `Fără date${d.error ? ": " + esc(d.error) : ""}`;
+  if (d.parts) $("#iv-state").innerHTML += d.parts.map((x) => `<br>${esc(x.name)}: ${x.stale ? "nu comunică"
+    : `${esc(x.reading.status || "–")} · panouri ${watts(x.reading.pv_power, false)} · consum ${watts(x.reading.load_power, false)}`}`).join("");
   $("#iv-sum").innerHTML = [["Panouri", watts(r?.pv_power)], ["Consum", watts(r?.load_power)],
     ["Baterie", kv(r?.battery_voltage, "V", 1)], ["Temp.", kv(r?.inverter_temp, "°C")]]
     .map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join("");
 }
 
+// setările se citesc dintr-un singur invertor: cu mai multe, întâi alegi tabul lui
+function loadInverterPro() {
+  if (!isPro()) return;
+  if (!inv.sel && inverters().length > 1) {
+    $("#iv-more").hidden = true;
+    $("#iv-list").innerHTML = `<div class="note">Alege un invertor din taburile de sus ca să-i vezi și să-i schimbi setările
+      (fiecare are setările lui).</div>`;
+    $("#iv-log").innerHTML = "";
+    return;
+  }
+  loadInverter();
+}
 async function loadInverter() {
   if (!inv.data) $("#iv-list").innerHTML = `<div class="note">Citesc setările din invertor…</div>`;
   try {
-    const r = await api("/api/inverter/settings");
-    $(".iv-clock").hidden = !!r.no_settings;               // invertor fără setări (Deye, Easun…): nici ceas
+    const r = await api("/api/inverter/settings" + (inv.sel ? `?device=${encodeURIComponent(inv.sel)}` : ""));
+    $("#iv-more").hidden = !!r.no_settings;                // invertor fără setări (Deye, Easun…): nici ceas, nici jurnal
     if (r.error) throw new Error(r.error);
     inv.data = r;
     renderInverter();
@@ -732,7 +798,7 @@ const decimals = (step) => (step < 0.01 ? 3 : step < 1 ? 1 : 0);
 function openEdit(key) {
   const x = inv.data.settings.find((s) => s.key === key);
   openEditor(x, "invertor", async (v) => {
-    await writeInverter("/api/inverter/settings", { key: x.key, value: v }, $("#ed-go"));
+    await writeInverter("/api/inverter/settings", { key: x.key, value: v, device: inv.data?.device }, $("#ed-go"));
     await loadInverter();
   });
 }
@@ -805,7 +871,7 @@ $("#ed-go").onclick = async () => {
 $("#iv-sync").onclick = async () => {
   if (!confirm("Pun ceasul invertorului după ora Pi-ului?")) return;
   try {
-    await writeInverter("/api/inverter/clock", null, $("#iv-sync"));
+    await writeInverter("/api/inverter/clock", { device: inv.data?.device }, $("#iv-sync"));
     await loadInverter();
   } catch (err) {
     alert(err.message);
@@ -1677,7 +1743,7 @@ function show(v) {
     renderInverterLive();
     $("#iv-pro").hidden = !isPro();                 // Lite: doar starea invertorului, fără setări
     $("#iv-lite").hidden = isPro();
-    if (isPro()) loadInverter();
+    if (isPro()) loadInverterPro();
   }
   if (v === "settings") { showPanel(null); renderSettingsMenu(); }
   window.scrollTo(0, 0);
@@ -1695,11 +1761,11 @@ $$("#range button").forEach((b) => (b.onclick = () => {
 async function loadHistory() {
   const devs = state.info.devices.filter((d) => connected(state.snap?.devices?.[d.id] || {}));
   const pk = devs.filter((d) => d.kind === "pack");
-  const inv = devs.find((d) => d.kind === "inverter");
+  const inv = devs.filter((d) => d.kind === "inverter");
   const pts = Math.min(400, Math.round(innerWidth * 1.2));
   // toate graficele într-o singură cerere; până vin datele, „Se încarcă…”; o eroare nu lasă ecranul gol
   const req = ++state.histReq;
-  const ids = [...pk, ...(inv ? [inv] : [])].map((d) => encodeURIComponent(d.id)).join(",");
+  const ids = [...pk, ...inv].map((d) => encodeURIComponent(d.id)).join(",");
   const key = `${state.hours}|${ids}`;
   // ultima încărcare a aceluiași interval se desenează imediat (din memorie sau de pe telefon); cea nouă vine după
   const cached = histCache.get(key);
@@ -1737,7 +1803,7 @@ const histCache = {
 
 function drawHistory(data, pk, inv) {
   const S = data.series || {}, rowsOf = (d) => S[d.id]?.rows || [];
-  const ph = pk.map((d) => ({ rows: rowsOf(d) })), ih = inv ? { rows: rowsOf(inv) } : null;
+  const ph = pk.map((d) => ({ rows: rowsOf(d) })), ih = inv.length ? { rows: sumRows(inv.map(rowsOf)) } : null;
   const ser = (rows, key) => rows.map((r) => [r.t, r[key]]).filter((p) => p[1] != null);
   lineChart($("#ch-soc"), pk.map((d, i) => ({ name: d.name, color: SERIES[i % SERIES.length], data: ser(ph[i].rows, "soc") })),
     { min: 0, max: 100, fmt: (v) => num(v, 0) + "%" });

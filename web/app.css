@@ -665,6 +665,12 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .su-h { margin: 14px 0 6px; font-size: 15px; color: var(--muted); }
 #su-scan { margin: 4px 0; }
 
+/* mai multe invertoare în paralel: taburi pe ecranul invertorului */
+.iv-tabs { display: flex; gap: 6px; margin: 6px 0 4px; flex-wrap: wrap; }
+.iv-tabs button { border: 1px solid var(--line); background: var(--panel); color: inherit; border-radius: 99px;
+  padding: 7px 14px; font: inherit; font-size: 14px; cursor: pointer; }
+.iv-tabs button.on { border-color: var(--acc); color: var(--acc); }
+
 /* partajează Amper */
 .list .row.share-row { grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; }
 .share-row small { display: block; color: var(--muted); font-size: 13px; }

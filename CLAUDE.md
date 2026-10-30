@@ -522,3 +522,11 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `.f-batt` flex none, `.f-link` = clamp(14px, 100dvh − 660px, 70px). Verificat 390×664, 320×568, 393×759.
   Puterea din stânga (`bw`): clasa `chg` verde / `dis` roșu. Eticheta de pe linie (`.f-blabel`) SCOASĂ definitiv
   (cerut 2026-10-29: „scrisul de pe linie îl eliminăm, rămâne doar cel din stânga”).
+
+## Invertoare în paralel (1.0.0-beta.13, în pregătire, cerut 2026-10-30)
+- Caz: două Growatt SPF 5000 cu cablu de paralel, aceeași casă și aceeași baterie, fiecare cu stringul lui; fiecare pe
+  cablul lui USB (id-uri `inverter`, `inverter2`…). `app.js`: `inverters()` + `combineInverters` → `inverter()` dă
+  obiectul `_all` (sume PV/consum/rețea/baterie, media tensiunii, temperatura maximă, `strings`, `parts`); `sumRows`
+  adună zilele/istoricul. `web.py`: energia = `sum_energy(parts)`; `settings_driver(dev_id)`, `?device=` / `device`
+  la setări și scriere; notificarea poartă numele invertorului. Ecranul invertorului: `#iv-tabs` (`inv.sel`),
+  „Toate” ascunde `#iv-more` (ceas + jurnal) și cere alegerea unui tab pentru setări. NEVERIFICAT cu două aparate reale.

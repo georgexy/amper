@@ -174,3 +174,23 @@ def test_new_types_in_config_and_setup():
                        "port": "/dev/ttyUSB0", "baudrate": 2400, "address": 1}
     smg = setup_scan.build_devices([{"type": "srne", "port": "/dev/ttyUSB1", "map": "smg"}])[0]
     assert smg["map"] == "smg" and smg["baudrate"] == 9600
+
+
+def test_parallel_inverters_energy_is_summed():
+    from amper.web import sum_energy
+    a = [{"day": "2026-10-29", "device": "inverter1", "pv_kwh": 6.5, "load_kwh": 4.0, "ac_in_kwh": 0.0},
+         {"day": "2026-10-28", "device": "inverter1", "pv_kwh": 5.0, "load_kwh": 3.5, "ac_in_kwh": 1.0}]
+    b = [{"day": "2026-10-29", "device": "inverter2", "pv_kwh": 6.1, "load_kwh": 3.0, "ac_in_kwh": 0.5}]
+    rows = sum_energy([a, b])
+    assert [r["day"] for r in rows] == ["2026-10-29", "2026-10-28"]
+    assert rows[0]["pv_kwh"] == 12.6 and rows[0]["load_kwh"] == 7.0 and rows[0]["ac_in_kwh"] == 0.5
+    assert rows[1]["pv_kwh"] == 5.0
+    assert sum_energy([a]) is a
+
+
+def test_two_inverters_get_numbered_ids():
+    from amper import setup_scan
+    devs = setup_scan.build_devices([{"type": "growatt_spf", "port": "/dev/ttyUSB0"},
+                                     {"type": "growatt_spf", "port": "/dev/ttyUSB1"}])
+    assert [(d["id"], d["name"]) for d in devs] == [("inverter1", "Invertor Growatt SPF 1"),
+                                                    ("inverter2", "Invertor Growatt SPF 2")]

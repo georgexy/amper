@@ -26,6 +26,22 @@ def _json(data, status=200):
     return web.json_response(data, status=status, dumps=lambda o: json.dumps(o, ensure_ascii=False, default=str))
 
 
+def sum_energy(parts: list[list[dict]]) -> list[dict]:
+    """Energia pe zi a mai multor invertoare în paralel, adunată pe aceeași zi (ordinea primului invertor)."""
+    if len(parts) == 1:
+        return parts[0]
+    out: dict[str, dict] = {}
+    for rows in parts:
+        for r in rows:
+            o = out.setdefault(r["day"], {"day": r["day"], "device": "toate"})
+            for k, v in r.items():
+                if k not in ("day", "device") and isinstance(v, (int, float)):
+                    o[k] = round(o.get(k, 0) + v, 3)
+    days = [r["day"] for r in parts[0]]
+    desc = len(days) > 1 and days[0] > days[-1]           # aceeași ordine ca la un singur invertor
+    return [out[d] for d in sorted(out, reverse=desc)]
+
+
 def make_app(engine) -> web.Application:
     cfg = engine.cfg
     from .auth import Auth
@@ -266,10 +282,10 @@ def make_app(engine) -> web.Application:
         if start and end:                     # interval ales în aplicație (AAAA-LL-ZZ)
             if not (re.fullmatch(r"\d{4}-\d{2}-\d{2}", start) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", end)):
                 return _json({"error": "date invalide"}, 400)
-            rows = await asyncio.to_thread(engine.db.energy_range, inv[0], min(start, end), max(start, end))
+            parts = [await asyncio.to_thread(engine.db.energy_range, k, min(start, end), max(start, end)) for k in inv]
         else:
-            rows = await asyncio.to_thread(engine.db.energy, inv[0], int(request.query.get("days", 30)))
-        return _json(dict(rows=rows))
+            parts = [await asyncio.to_thread(engine.db.energy, k, int(request.query.get("days", 30))) for k in inv]
+        return _json(dict(rows=sum_energy(parts)))
 
     async def alerts(request):
         rows = await asyncio.to_thread(engine.db.alerts, int(request.query.get("limit", 100)))
@@ -311,14 +327,15 @@ def make_app(engine) -> web.Application:
     from . import inverter_settings as invset
     write_lock = asyncio.Lock()
 
-    def settings_driver():
+    def settings_driver(dev_id: str | None = None):
+        """Invertorul cu setări: cel cerut (mai multe în paralel: fiecare cu setările lui) sau primul."""
         for k, st in engine.devices.items():
-            if st.driver.kind == "inverter" and hasattr(st.driver, "read_settings"):
+            if st.driver.kind == "inverter" and hasattr(st.driver, "read_settings") and (not dev_id or k == dev_id):
                 return k, st.driver
         return None, None
 
     async def inverter_get(request):
-        dev, drv = settings_driver()
+        dev, drv = settings_driver(request.query.get("device") or None)
         if not drv:
             return _json({"error": "Pentru acest invertor Amper deocamdată doar citește valorile. Setările vor veni după "
                                    "ce citirea e verificată pe un aparat real.", "no_settings": True}, 404)
@@ -335,7 +352,7 @@ def make_app(engine) -> web.Application:
         # scrierea cere ÎNTOTDEAUNA parola din nou, și de pe ecranul HDMI (localhost)
         if (err := await confirm(request, body, "setare invertor")) is not None:
             return err
-        dev, drv = settings_driver()
+        dev, drv = settings_driver(body.get("device") or None)
         if not drv:
             return _json({"error": "Pentru acest invertor Amper deocamdată doar citește valorile. Setările vor veni după "
                                    "ce citirea e verificată pe un aparat real.", "no_settings": True}, 404)
@@ -354,7 +371,9 @@ def make_app(engine) -> web.Application:
                                     res["new"], True, None, request.remote)
             log.warning("setare invertor schimbată: %s: %s → %s (de la %s)", res["label"], res["old"], res["new"],
                         request.remote)
-            engine.notifier.send(f"⚙️ Invertor: {res['label']}: {res['old']} → {res['new']}",
+            many = sum(1 for s_ in engine.devices.values() if s_.driver.kind == "inverter") > 1
+            who = engine.devices[dev].cfg.get("name", dev) if many else "Invertor"
+            engine.notifier.send(f"⚙️ {who}: {res['label']}: {res['old']} → {res['new']}",
                                  title="Amper: setare schimbată", priority="default")
         return _json(dict(ok=True, changed=res["changed"], label=res["label"], old=res["old"], new=res["new"],
                           settings=invset.describe(res["regs"]), clock=invset.clock(res["regs"])))

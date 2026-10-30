@@ -2,6 +2,12 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.13 — în pregătire
+- Două (sau mai multe) invertoare în paralel, de ex. două Growatt SPF 5000 pe aceeași casă și aceeași baterie, fiecare
+  cu stringul lui: ecranul principal adună panourile, consumul și rețeaua, energia zilei și graficele din Istoric
+  sunt sumele lor, iar butonul ⓘ de la Panouri arată tensiunea și curentul fiecărui string.
+- Ecranul invertorului are taburi: „Toate” (sumele și starea fiecăruia) și câte unul pe invertor, cu setările lui.
+
 ## 1.0.0-beta.12 — 2026-10-29
 - Setări → Dispozitive conectate → „+” (Adaugă dispozitiv): la fel ca ghidul — „Configurare automată” (cablu și
   Bluetooth, rezultatele pe Invertor / BMS) sau „Configurare manuală” (ce adaugi → modelul → conexiunea), cu „‹ Înapoi”.
