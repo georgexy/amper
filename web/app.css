@@ -733,3 +733,5 @@ small.warnc { color: var(--warn); }
 .ed-row b { letter-spacing: .04em; font-weight: 600; }
 .ed-card .ed-in, .ed-card .ed-go { margin-top: 8px; }
 .up-more { margin-top: 18px; }
+.iv-row .v.warn, .note b.warn { color: var(--warn); }
+.iv-row .iv-diff { display: block; font-size: 12px; color: var(--warn); margin-top: 2px; }

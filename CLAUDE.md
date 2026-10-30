@@ -529,4 +529,11 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   obiectul `_all` (sume PV/consum/rețea/baterie, media tensiunii, temperatura maximă, `strings`, `parts`); `sumRows`
   adună zilele/istoricul. `web.py`: energia = `sum_energy(parts)`; `settings_driver(dev_id)`, `?device=` / `device`
   la setări și scriere; notificarea poartă numele invertorului. Ecranul invertorului: `#iv-tabs` (`inv.sel`),
-  „Toate” ascunde `#iv-more` (ceas + jurnal) și cere alegerea unui tab pentru setări. NEVERIFICAT cu două aparate reale.
+  „Toate” = doar vizualizare (ascunde `#iv-more`). Nume: „Invertor N” după ordinea din config (`invLabel` în app.js,
+  `inv_label` în web.py, și în notificări), cerut 2026-10-30 (nu numele mărcii).
+- Tabul „Setări comune” (`inv.sel = "_common"`, doar Pro): `device=_common` la GET/POST setări și ceas; `common_drivers`
+  (≥ 2, toate cu `read_settings`, aceeași clasă de driver, altfel 404 `no_settings`); `combine_settings` = descrierea
+  primului + `values` [{name, text, raw}] și `same` (altfel `text` „diferite”); scrierea (`write_one`) pe rând în toate,
+  un eșec nu le oprește pe celelalte → 502 cu `partial` și „Scris în … EȘUAT la …”; jurnalul combinat cu prefixul
+  invertorului. Editorul: „Acum” = valorile fiecăruia, câmpul pornește de la primul (`preselect`/`initial`), după
+  scriere (și după eșec) se recitește. NEVERIFICAT cu două aparate reale.

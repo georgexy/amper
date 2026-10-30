@@ -141,7 +141,7 @@ def test_clock_sync():
 
 
 # ---------------- API ----------------
-def run_api(password, steps):
+def run_api(password, steps, devices=None):
     from aiohttp.test_utils import TestClient, TestServer
 
     from amper.config import DEFAULTS, _merge
@@ -153,7 +153,7 @@ def run_api(password, steps):
 
     SimWorld._instance = None
     cfg = _merge(DEFAULTS, {"database": ":memory:", "web": {"password": password},
-                            "devices": [{"id": "inv", "name": "Growatt", "type": "sim_growatt"}]})
+                            "devices": devices or [{"id": "inv", "name": "Growatt", "type": "sim_growatt"}]})
     eng = Engine(cfg, Database(":memory:"), Notifier({}))
 
     async def go():
@@ -184,3 +184,52 @@ def test_api_write_requires_password_again_even_from_localhost():
     assert j["changed"] and j["old"] == "Pornit" and j["new"] == "Oprit"
     assert log[0]["ok"] == 1 and log[0]["new"] == "Oprit"
     assert any("Buzzer" in n["message"] for n in notifier.sent)
+
+
+TWO = [{"id": "inv", "name": "Growatt", "type": "sim_growatt"}, {"id": "inv2", "name": "Growatt", "type": "sim_growatt"}]
+
+
+def test_common_settings_show_differences_and_write_to_all():
+    async def steps(c, eng):
+        eng.devices["inv2"].driver.holding[35] = 540              # bulk diferit în al doilea invertor
+        before = await (await c.get("/api/inverter/settings?device=_common")).json()
+        w = await c.post("/api/inverter/settings", json={"key": "bulk_voltage", "value": 55.0, "device": "_common",
+                                                          "app_password": "pw"})
+        j = await w.json()
+        one = await c.post("/api/inverter/settings", json={"key": "buzzer", "value": 0, "device": "inv2",
+                                                            "app_password": "pw"})
+        return before, w.status, j, one.status, eng
+    before, st, j, one, eng = run_api("pw", steps, TWO)
+    bulk = next(x for x in before["settings"] if x["key"] == "bulk_voltage")
+    assert before["common"] and not bulk["same"] and bulk["text"] == "diferite"
+    assert [v["name"] for v in bulk["values"]] == ["Invertor 1", "Invertor 2"]
+    assert next(x for x in before["settings"] if x["key"] == "buzzer")["same"]
+    assert st == 200 and j["ok"] and len(j["results"]) == 2
+    assert eng.devices["inv"].driver.holding[35] == eng.devices["inv2"].driver.holding[35] == 550
+    assert next(x for x in j["settings"] if x["key"] == "bulk_voltage")["same"]
+    assert one == 200 and eng.devices["inv"].driver.holding[22] == 1 and eng.devices["inv2"].driver.holding[22] == 0
+    msgs = [n["message"] for n in eng.notifier.sent]
+    assert any(m.startswith("⚙️ Invertor 1:") for m in msgs) and any(m.startswith("⚙️ Invertor 2:") for m in msgs)
+
+
+def test_common_write_reports_partial_failure():
+    from amper.drivers.base import DriverError
+
+    async def steps(c, eng):
+        def broken(reg, value):
+            raise DriverError("fără răspuns")
+        eng.devices["inv2"].driver.write_register = broken
+        w = await c.post("/api/inverter/settings", json={"key": "bulk_voltage", "value": 55.0, "device": "_common",
+                                                          "app_password": "pw"})
+        return w.status, await w.json(), eng
+    st, j, eng = run_api("pw", steps, TWO)
+    assert st == 502 and j["partial"]
+    assert "Scris în Invertor 1" in j["error"] and "EȘUAT la Invertor 2" in j["error"]
+    assert eng.devices["inv"].driver.holding[35] == 550
+    assert eng.db.settings_log("inv2")[0]["ok"] == 0
+
+
+def test_common_settings_need_same_type():
+    async def steps(c, eng):
+        return (await c.get("/api/inverter/settings?device=_common")).status
+    assert run_api("pw", steps, [TWO[0]]) == 404

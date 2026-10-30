@@ -327,6 +327,19 @@ def make_app(engine) -> web.Application:
     from . import inverter_settings as invset
     write_lock = asyncio.Lock()
 
+    NO_SETTINGS = ("Pentru acest invertor Amper deocamdată doar citește valorile. Setările vor veni după ce citirea e "
+                   "verificată pe un aparat real.")
+
+    def inverter_ids() -> list[str]:
+        return [k for k, st in engine.devices.items() if st.driver.kind == "inverter"]
+
+    def inv_label(dev: str) -> str:
+        """Cu mai multe invertoare: „Invertor 1”, „Invertor 2”… (ordinea din config, ca taburile din aplicație)."""
+        ids = inverter_ids()
+        if len(ids) > 1 and dev in ids:
+            return f"Invertor {ids.index(dev) + 1}"
+        return engine.devices[dev].cfg.get("name", dev) if dev in engine.devices else "Invertor"
+
     def settings_driver(dev_id: str | None = None):
         """Invertorul cu setări: cel cerut (mai multe în paralel: fiecare cu setările lui) sau primul."""
         for k, st in engine.devices.items():
@@ -334,11 +347,54 @@ def make_app(engine) -> web.Application:
                 return k, st.driver
         return None, None
 
+    def common_drivers():
+        """„Setări comune”: toate invertoarele, doar dacă au toate setări și sunt de același tip (ex. două Growatt SPF)."""
+        devs = [(k, engine.devices[k].driver) for k in inverter_ids()]
+        if len(devs) < 2:
+            return None, "Setările comune apar doar cu cel puțin două invertoare."
+        if not all(hasattr(d, "read_settings") for _, d in devs) or len({type(d) for _, d in devs}) > 1:
+            return None, ("Setările comune se pot schimba doar când toate invertoarele sunt de același tip și Amper le "
+                          "știe setările (ex. Growatt SPF). Schimbă setările din tabul fiecărui invertor.")
+        return devs, None
+
+    def combine_settings(per: list[tuple[str, dict]]) -> list[dict]:
+        """Setările primului invertor + valorile fiecăruia; unde diferă, `same` = False și textul „diferite”."""
+        lists = [(dev, invset.describe(regs)) for dev, regs in per]
+        out = []
+        for i, item in enumerate(lists[0][1]):
+            vals = [dict(device=dev, name=inv_label(dev), text=lst[i]["text"], raw=lst[i]["raw"]) for dev, lst in lists]
+            same = len({v["raw"] for v in vals}) == 1
+            x = dict(item, values=vals, same=same)
+            if not same:
+                x.update(text="diferite", raw=None, value=None)
+            out.append(x)
+        return out
+
+    def combine_clock(per: list[tuple[str, dict]]) -> str:
+        return " · ".join(f"{inv_label(dev)}: {invset.clock(regs) or '–'}" for dev, regs in per)
+
     async def inverter_get(request):
-        dev, drv = settings_driver(request.query.get("device") or None)
+        want = request.query.get("device") or None
+        if want == "_common":
+            devs, why = common_drivers()
+            if not devs:
+                return _json({"error": why, "no_settings": True}, 404)
+            per = []
+            for dev, drv in devs:
+                try:
+                    per.append((dev, await asyncio.to_thread(drv.read_settings)))
+                except (DriverError, OSError) as e:
+                    return _json({"error": f"{inv_label(dev)}: nu am putut citi setările: {e}"}, 502)
+            logs = []
+            for dev, _ in devs:
+                logs += [dict(r, setting=f"{inv_label(dev)} · {r['setting']}")
+                         for r in await asyncio.to_thread(engine.db.settings_log, dev, 20)]
+            logs.sort(key=lambda r: r["ts"], reverse=True)
+            return _json(dict(device="_common", common=True, settings=combine_settings(per), clock=combine_clock(per),
+                              pi_clock=time.strftime("%Y-%m-%d %H:%M:%S"), log=logs[:20], can_write=auth_.enabled))
+        dev, drv = settings_driver(want)
         if not drv:
-            return _json({"error": "Pentru acest invertor Amper deocamdată doar citește valorile. Setările vor veni după "
-                                   "ce citirea e verificată pe un aparat real.", "no_settings": True}, 404)
+            return _json({"error": NO_SETTINGS, "no_settings": True}, 404)
         try:
             regs = await asyncio.to_thread(drv.read_settings)
         except (DriverError, OSError) as e:
@@ -348,35 +404,62 @@ def make_app(engine) -> web.Application:
                           pi_clock=time.strftime("%Y-%m-%d %H:%M:%S"), log=log_rows,
                           can_write=auth_.enabled))
 
+    async def write_one(request, dev, drv, fn, what) -> dict:
+        """O scriere într-un invertor: jurnal + notificare. Întoarce rezultatul sau {error} (ValueError trece mai departe)."""
+        try:
+            res = await asyncio.to_thread(fn, drv)
+        except (DriverError, OSError) as e:
+            await asyncio.to_thread(engine.db.log_setting, int(time.time()), dev, what, None, None, False,
+                                    str(e), request.remote)
+            log.warning("setare invertor %s (%s): EȘUAT: %s", what, dev, e)
+            return {"error": str(e)}
+        if res["changed"]:
+            await asyncio.to_thread(engine.db.log_setting, int(time.time()), dev, res["label"], res["old"],
+                                    res["new"], True, None, request.remote)
+            log.warning("setare invertor schimbată (%s): %s: %s → %s (de la %s)", dev, res["label"], res["old"],
+                        res["new"], request.remote)
+            engine.notifier.send(f"⚙️ {inv_label(dev)}: {res['label']}: {res['old']} → {res['new']}",
+                                 title="Amper: setare schimbată", priority="default")
+        return res
+
     async def inverter_write(request, body, fn, what):
         # scrierea cere ÎNTOTDEAUNA parola din nou, și de pe ecranul HDMI (localhost)
         if (err := await confirm(request, body, "setare invertor")) is not None:
             return err
-        dev, drv = settings_driver(body.get("device") or None)
-        if not drv:
-            return _json({"error": "Pentru acest invertor Amper deocamdată doar citește valorile. Setările vor veni după "
-                                   "ce citirea e verificată pe un aparat real.", "no_settings": True}, 404)
+        if body.get("device") == "_common":
+            devs, why = common_drivers()
+            if not devs:
+                return _json({"error": why, "no_settings": True}, 404)
+        else:
+            dev, drv = settings_driver(body.get("device") or None)
+            if not drv:
+                return _json({"error": NO_SETTINGS, "no_settings": True}, 404)
+            devs = [(dev, drv)]
+        results = []
         async with write_lock:
-            try:
-                res = await asyncio.to_thread(fn, drv)
-            except ValueError as e:
-                return _json({"error": str(e)}, 400)
-            except (DriverError, OSError) as e:
-                await asyncio.to_thread(engine.db.log_setting, int(time.time()), dev, what, None, None, False,
-                                        str(e), request.remote)
-                log.warning("setare invertor %s: EȘUAT: %s", what, e)
-                return _json({"error": str(e)}, 502)
-        if res["changed"]:
-            await asyncio.to_thread(engine.db.log_setting, int(time.time()), dev, res["label"], res["old"],
-                                    res["new"], True, None, request.remote)
-            log.warning("setare invertor schimbată: %s: %s → %s (de la %s)", res["label"], res["old"], res["new"],
-                        request.remote)
-            many = sum(1 for s_ in engine.devices.values() if s_.driver.kind == "inverter") > 1
-            who = engine.devices[dev].cfg.get("name", dev) if many else "Invertor"
-            engine.notifier.send(f"⚙️ {who}: {res['label']}: {res['old']} → {res['new']}",
-                                 title="Amper: setare schimbată", priority="default")
-        return _json(dict(ok=True, changed=res["changed"], label=res["label"], old=res["old"], new=res["new"],
-                          settings=invset.describe(res["regs"]), clock=invset.clock(res["regs"])))
+            for dev, drv in devs:                         # pe rând, în fiecare; un eșec nu le oprește pe celelalte
+                try:
+                    results.append((dev, await write_one(request, dev, drv, fn, what)))
+                except ValueError as e:
+                    return _json({"error": str(e)}, 400)
+        bad = [(dev, r) for dev, r in results if "error" in r]
+        good = [(dev, r) for dev, r in results if "error" not in r]
+        if len(devs) == 1:
+            res = results[0][1]
+            if bad:
+                return _json({"error": res["error"]}, 502)
+            return _json(dict(ok=True, changed=res["changed"], label=res["label"], old=res["old"], new=res["new"],
+                              settings=invset.describe(res["regs"]), clock=invset.clock(res["regs"])))
+        if bad:
+            msg = "; ".join(f"EȘUAT la {inv_label(dev)}: {r['error']}" for dev, r in bad)
+            if good:
+                msg = f"Scris în {', '.join(inv_label(d) for d, _ in good)}. {msg}. Invertoarele pot avea acum valori diferite."
+            return _json({"error": msg, "partial": bool(good)}, 502)
+        per = [(dev, r["regs"]) for dev, r in good]
+        first = good[0][1]
+        return _json(dict(ok=True, changed=any(r["changed"] for _, r in good), label=first["label"],
+                          settings=combine_settings(per), clock=combine_clock(per),
+                          results=[dict(name=inv_label(d), old=r["old"], new=r["new"]) for d, r in good]))
 
     async def inverter_set(request):
         body = await request.json()

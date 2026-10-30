@@ -6,7 +6,11 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Două (sau mai multe) invertoare în paralel, de ex. două Growatt SPF 5000 pe aceeași casă și aceeași baterie, fiecare
   cu stringul lui: ecranul principal adună panourile, consumul și rețeaua, energia zilei și graficele din Istoric
   sunt sumele lor, iar butonul ⓘ de la Panouri arată tensiunea și curentul fiecărui string (String 1, String 2…).
-- Ecranul invertorului are taburi: „Toate” (sumele și starea fiecăruia) și câte unul pe invertor, cu setările lui.
+- Ecranul invertorului are taburi: „Toate” (doar vizualizare: sumele și starea fiecăruia), „Invertor 1”, „Invertor 2”…
+  (fiecare cu setările lui; numele nu mai depind de marcă) și „Setări comune”.
+- „Setări comune” (când toate invertoarele sunt de același tip, ex. două Growatt SPF): fiecare setare cu valoarea din
+  fiecare invertor; cele care nu sunt la fel apar „diferite”, cu valorile alături. „Modifică” scrie în toate, pe rând,
+  verificând fiecare; dacă la unul nu reușește, aplicația spune exact unde. Ceasul se potrivește la toate deodată.
 
 ## 1.0.0-beta.12 — 2026-10-29
 - Setări → Dispozitive conectate → „+” (Adaugă dispozitiv): la fel ca ghidul — „Configurare automată” (cablu și

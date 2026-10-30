@@ -228,6 +228,11 @@ function packs() {
 function inverters() {
   return Object.values(state.snap?.devices || {}).filter((d) => d.kind === "inverter" && connected(d));
 }
+// cu mai multe invertoare: „Invertor 1”, „Invertor 2”… după ordinea din config (ca pe server), oricare ar fi marca
+function invLabel(d) {
+  const all = Object.values(state.snap?.devices || {}).filter((x) => x.kind === "inverter");
+  return all.length > 1 ? `Invertor ${all.findIndex((x) => x.id === d.id) + 1}` : d.name;
+}
 /* Mai multe invertoare în paralel (ex. două Growatt SPF pe aceeași casă și aceeași baterie): un „invertor” comun
    cu puterile adunate (panouri, consum, rețea, baterie), tensiunile medii și temperatura cea mai mare; `parts` = fiecare. */
 function combineInverters(list) {
@@ -239,16 +244,16 @@ function combineInverters(list) {
   const max = (k) => (vals(k).length ? Math.max(...vals(k)) : null);
   const first = (k) => (vals(k).length ? vals(k)[0] : null);
   const statuses = [...new Set(rs.map((r) => r.status))];
-  const named = (k) => live.flatMap((d) => (d.reading[k] || []).map((w) => `${d.name}: ${w}`));
+  const named = (k) => live.flatMap((d) => (d.reading[k] || []).map((w) => `${invLabel(d)}: ${w}`));
   const faulty = live.filter((d) => d.reading.fault_code);
   const reading = rs.length ? {
     ...rs[0],
     pv_power: sum("pv_power"), load_power: sum("load_power"), ac_in_power: sum("ac_in_power"), battery_power: sum("battery_power"),
     load_percent: avg("load_percent"), battery_voltage: avg("battery_voltage"), output_voltage: first("output_voltage"),
     ac_in_voltage: first("ac_in_voltage"), inverter_temp: max("inverter_temp"), dcdc_temp: max("dcdc_temp"),
-    status: statuses.length === 1 ? statuses[0] : live.map((d) => `${d.name}: ${d.reading.status || "–"}`).join(" · "),
+    status: statuses.length === 1 ? statuses[0] : live.map((d) => `${invLabel(d)}: ${d.reading.status || "–"}`).join(" · "),
     fault_code: faulty.length ? faulty[0].reading.fault_code : 0,
-    fault_text: faulty.map((d) => `${d.name}: ${d.reading.fault_text || "defect " + d.reading.fault_code}`).join("; ") || null,
+    fault_text: faulty.map((d) => `${invLabel(d)}: ${d.reading.fault_text || "defect " + d.reading.fault_code}`).join("; ") || null,
     warnings: named("warnings"), notices: named("notices"),
     // fiecare intrare PV = un string, numerotate la rând: String 1, String 2…
     strings: live.flatMap((d) => [[d.reading.pv_voltage, d.reading.pv_current],
@@ -256,7 +261,7 @@ function combineInverters(list) {
       .map(([v, a], i) => [`String ${i + 1}`, v, a]),
   } : null;
   return { id: "_all", name: `${list.length} invertoare`, kind: "inverter", stale: !live.length, reading, parts: list,
-    connected: true, error: list.filter((d) => d.stale).map((d) => `${d.name} nu comunică`).join("; ") || null };
+    connected: true, error: list.filter((d) => d.stale).map((d) => `${invLabel(d)} nu comunică`).join("; ") || null };
 }
 function inverter() {
   return combineInverters(inverters());
@@ -725,18 +730,19 @@ async function loadCells() {
 }
 
 /* ------------------------------------------------------------------ ecranul INVERTOR */
-const inv = { data: null, edit: null, sel: null };       // sel = invertorul ales în taburi (null = toate)
+const inv = { data: null, edit: null, sel: null };       // sel = invertorul ales în taburi (null = toate, „_common” = setări comune)
 $("#iv-back").onclick = () => show("now");
 
 function renderInverterLive() {
   const list = inverters();
-  if (inv.sel && !list.some((x) => x.id === inv.sel)) inv.sel = null;
-  const d = inv.sel ? list.find((x) => x.id === inv.sel) : inverter();
+  if (inv.sel && inv.sel !== "_common" && !list.some((x) => x.id === inv.sel)) inv.sel = null;
+  if (inv.sel === "_common" && list.length < 2) inv.sel = null;
+  const d = inv.sel && inv.sel !== "_common" ? list.find((x) => x.id === inv.sel) : inverter();
   if (!d) return;
   const r = d.stale ? null : d.reading;
   $("#iv-title").textContent = list.length > 1 ? "Invertoarele" : d.name;
   $("#iv-tabs").hidden = list.length < 2;
-  $("#iv-tabs").innerHTML = list.length < 2 ? "" : [["", "Toate"], ...list.map((x) => [x.id, x.name])].map(([id, n]) =>
+  $("#iv-tabs").innerHTML = list.length < 2 ? "" : [["", "Toate"], ...list.map((x) => [x.id, invLabel(x)]), ...(isPro() ? [["_common", "Setări comune"]] : [])].map(([id, n]) =>
     `<button data-iv="${esc(id)}" class="${(inv.sel || "") === id ? "on" : ""}">${esc(n)}</button>`).join("");
   $$("[data-iv]", $("#iv-tabs")).forEach((b) => (b.onclick = () => {
     inv.sel = b.dataset.iv || null; inv.data = null; renderInverterLive(); loadInverterPro();
@@ -746,20 +752,20 @@ function renderInverterLive() {
     (r.warnings?.length ? `<br><b style="color:var(--warn)">Avertisment: ${esc(r.warnings.join("; "))}</b>` : "") +
     (r.notices?.length ? `<br>${esc(r.notices.join("; "))}` : "") :
     `Fără date${d.error ? ": " + esc(d.error) : ""}`;
-  if (d.parts) $("#iv-state").innerHTML += d.parts.map((x) => `<br>${esc(x.name)}: ${x.stale ? "nu comunică"
+  if (d.parts) $("#iv-state").innerHTML += d.parts.map((x) => `<br>${esc(invLabel(x))}: ${x.stale ? "nu comunică"
     : `${esc(x.reading.status || "–")} · panouri ${watts(x.reading.pv_power, false)} · consum ${watts(x.reading.load_power, false)}`}`).join("");
   $("#iv-sum").innerHTML = [["Panouri", watts(r?.pv_power)], ["Consum", watts(r?.load_power)],
     ["Baterie", kv(r?.battery_voltage, "V", 1)], ["Temp.", kv(r?.inverter_temp, "°C")]]
     .map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join("");
 }
 
-// setările se citesc dintr-un singur invertor: cu mai multe, întâi alegi tabul lui
+// setările: din tabul unui invertor (doar ale lui) sau din „Setări comune” (scrise în toate); „Toate” doar arată
 function loadInverterPro() {
   if (!isPro()) return;
   if (!inv.sel && inverters().length > 1) {
     $("#iv-more").hidden = true;
-    $("#iv-list").innerHTML = `<div class="note">Alege un invertor din taburile de sus ca să-i vezi și să-i schimbi setările
-      (fiecare are setările lui).</div>`;
+    $("#iv-list").innerHTML = `<div class="note">Setările unui invertor se schimbă din tabul lui; cele care trebuie să fie
+      la fel în toate (ex. tensiunile bateriei), din <b>Setări comune</b>.</div>`;
     $("#iv-log").innerHTML = "";
     return;
   }
@@ -783,12 +789,17 @@ function renderInverter() {
   const groups = [...new Set(r.settings.map((x) => x.group))];
   $("#iv-list").innerHTML = (r.can_write ? "" : `<div class="banner warning"><b>Modificarea e dezactivată</b>
       <small>Setați o parolă pentru aplicație (web.password în config) ca să poată fi schimbate setările.</small></div>`) +
+    (r.common ? `<div class="note">Aici o modificare se scrie în <b>toate invertoarele</b>, pe rând, și se verifică în
+      fiecare.${r.settings.some((x) => !x.same) ? ` Setările marcate <b class="warn">diferite</b> nu au aceeași valoare.` : ""}</div>` : "") +
     groups.map((g) => `<h2>${esc(g)}</h2><div class="list iv-set">${r.settings.filter((x) => x.group === g).map((x) => `
       <button class="row iv-row" data-key="${esc(x.key)}" ${r.can_write ? "" : "disabled"}>
-        <span class="k">${esc(x.label)}${x.risky ? ' <i class="risk" title="Setare cu risc">!</i>' : ""}</span>
-        <span class="v">${esc(x.text)}</span>${r.can_write ? '<span class="ed">Modifică ›</span>' : ""}</button>`).join("")}</div>`).join("");
+        <span class="k">${esc(x.label)}${x.risky ? ' <i class="risk" title="Setare cu risc">!</i>' : ""}${x.same === false
+          ? `<small class="iv-diff">${x.values.map((v) => `${esc(v.name)}: ${esc(v.text)}`).join(" · ")}</small>` : ""}</span>
+        <span class="v${x.same === false ? " warn" : ""}">${esc(x.text)}</span>${r.can_write ? '<span class="ed">Modifică ›</span>' : ""}</button>`).join("")}</div>`).join("");
   $$(".iv-row", $("#iv-list")).forEach((el) => (el.onclick = () => openEdit(el.dataset.key)));
-  $("#iv-clock").innerHTML = `Invertor: <b>${esc(r.clock || "–")}</b><br>Pi: <b>${esc(r.pi_clock)}</b>`;
+  $("#iv-clock").innerHTML = (r.common ? r.clock.split(" · ").map((c) => `${esc(c.split(": ")[0])}: <b>${esc(c.split(": ").slice(1).join(": "))}</b>`).join("<br>")
+    : `Invertor: <b>${esc(r.clock || "–")}</b>`) + `<br>Pi: <b>${esc(r.pi_clock)}</b>`;
+  $("#iv-sync").textContent = r.common ? "Potrivește ceasul tuturor cu ora Pi-ului" : "Potrivește cu ora Pi-ului";
   $("#iv-sync").disabled = !r.can_write;
   $("#iv-log").innerHTML = r.log.length ? r.log.map((x) => `
     <div class="row ${x.ok ? "" : "critical"}"><span>${esc(x.setting)}: ${x.ok ? `${esc(x.old)} → <b>${esc(x.new)}</b>` : `EȘUAT — ${esc(x.error)}`}</span>
@@ -799,10 +810,18 @@ const editor = { item: null, target: "", write: null };
 const decimals = (step) => (step < 0.01 ? 3 : step < 1 ? 1 : 0);
 function openEdit(key) {
   const x = inv.data.settings.find((s) => s.key === key);
-  openEditor(x, "invertor", async (v) => {
-    await writeInverter("/api/inverter/settings", { key: x.key, value: v, device: inv.data?.device }, $("#ed-go"));
-    await loadInverter();
-  });
+  const common = !!inv.data.common;
+  // valori diferite: „Acum” le arată pe toate, câmpul pornește de la cea din primul invertor
+  const first = common && !x.same ? x.values[0].raw : null;
+  openEditor(common && !x.same ? { ...x, text: x.values.map((v) => `${v.name}: ${v.text}`).join(" · "), preselect: first,
+    initial: first == null || x.kind === "enum" ? null : +(first * x.step).toFixed(3) } : x,
+    common ? "toate invertoarele" : "invertor", async (v) => {
+      try {
+        await writeInverter("/api/inverter/settings", { key: x.key, value: v, device: inv.data?.device }, $("#ed-go"));
+      } finally {
+        await loadInverter();                  // și după un eșec: arată ce e acum în fiecare invertor
+      }
+    });
 }
 function openEditor(x, target, write) {
   Object.assign(editor, { item: x, target, write });
@@ -810,7 +829,7 @@ function openEditor(x, target, write) {
   $("#ed-title").textContent = (x.group ? `${x.group}: ${x.label}` : x.label) + (x.role_text ? ` — ${x.role_text}` : "");
   $("#ed-now").innerHTML = `Acum: <b>${esc(x.text)}</b>`;
   $("#ed-field").innerHTML = x.kind === "enum"
-    ? `<select id="ed-val" class="ed-in">${x.options.map(([v, t]) => `<option value="${v}" ${v === x.raw ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>`
+    ? `<select id="ed-val" class="ed-in">${x.options.map(([v, t]) => `<option value="${v}" ${v === (x.preselect ?? x.raw) ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>`
     : `<div class="ed-num"><input id="ed-val" class="ed-in" type="number" inputmode="decimal" min="${x.min}" max="${x.max}" step="${x.step}" value="${x.initial ?? x.value ?? ""}">
        <span>${esc(x.unit)}</span></div><p class="note">Între ${num(x.min, decimals(x.step))} și ${num(x.max, decimals(x.step))} ${esc(x.unit)}.${x.role ? ` Acest prag e <b>${esc(x.role_text || x.role)}</b>.` : ""}${x.alert ? `<br><b class="bad">${esc(x.alert)}</b>` : ""}</p>`;
   $("#ed-warn").hidden = !(x.risky || x.note);
@@ -871,13 +890,13 @@ $("#ed-go").onclick = async () => {
   }
 };
 $("#iv-sync").onclick = async () => {
-  if (!confirm("Pun ceasul invertorului după ora Pi-ului?")) return;
+  if (!confirm(inv.data?.common ? "Pun ceasul tuturor invertoarelor după ora Pi-ului?" : "Pun ceasul invertorului după ora Pi-ului?")) return;
   try {
     await writeInverter("/api/inverter/clock", { device: inv.data?.device }, $("#iv-sync"));
-    await loadInverter();
   } catch (err) {
     alert(err.message);
   }
+  await loadInverter();
 };
 
 /* ------------------------------------------------------------------ SETĂRI BMS (Daly) */
