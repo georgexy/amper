@@ -1060,6 +1060,19 @@ def make_app(engine) -> web.Application:
         rep["notify"] = await asyncio.to_thread(engine.db.get_meta, "night_report_off") != "1"
         return _json(rep)
 
+    async def battery_report_get(request):
+        """`?start=&end=` (secunde): raportul bateriilor pe perioada aleasă."""
+        from . import battery_report
+        try:
+            start, end = float(request.query["start"]), float(request.query.get("end") or time.time())
+        except (KeyError, ValueError):
+            return _json({"error": "perioadă invalidă"}, 400)
+        if end - start < 3600:
+            return _json({"error": "Alege o perioadă de cel puțin o oră."}, 400)
+        invs = [k for k, st in engine.devices.items() if st.driver.kind == "inverter"]
+        rep = await asyncio.to_thread(battery_report.build, engine.db, pack_names(), start, end, invs)
+        return _json(rep)
+
     async def night_notify(request):
         body = await request.json()
         await asyncio.to_thread(engine.db.set_meta, "night_report_off", "0" if body.get("on") else "1")
@@ -1144,6 +1157,7 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/api/cells/health", cells_health)
     app.router.add_get("/api/night-report", night_get)
     app.router.add_post("/api/night-report/notify", night_notify)
+    app.router.add_get("/api/battery-report", battery_report_get)
     app.router.add_get("/api/wifi/scan", wifi_scan)
     app.router.add_get("/api/wifi/status", wifi_status)
     app.router.add_post("/api/wifi/connect", wifi_connect)

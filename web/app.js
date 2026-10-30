@@ -105,7 +105,8 @@ async function boot() {
   const v = new URLSearchParams(location.search).get("v");
   if (v === "alerts") { show("alerts"); history.replaceState(null, "", location.pathname); }
   if (v === "update") { show("settings"); showPanel("update"); history.replaceState(null, "", location.pathname); }
-  if (v === "cells" || v === "night") { show("cells"); history.replaceState(null, "", location.pathname); }
+  if (v === "cells") { show("cells"); history.replaceState(null, "", location.pathname); }
+  if (v === "night") { show("report"); history.replaceState(null, "", location.pathname); }
   $("#set-about-sub").textContent = `Amper ${isPro() ? "Pro" : "Lite"} ${state.info.version || ""} · actualizări, Pi-ul`;
   setInterval(tickConn, 1000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -703,6 +704,8 @@ const nr = { ago: 0 };
 const md = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
 async function loadNight() {
   const box = $("#nr-body");
+  $("#nr-title").textContent = "Raportul nopții";
+  $("#nr-nav").hidden = false;
   let r;
   try { r = await api(`/api/night-report?ago=${nr.ago}`); } catch (e) { if (e.message !== "auth") box.innerHTML = `<div class="banner">${esc(e.message)}</div>`; return; }
   const day = new Date(r.end * 1000).toLocaleDateString("ro-RO", { weekday: "long", day: "numeric", month: "long" });
@@ -726,6 +729,59 @@ async function loadNight() {
     (r.points.length ? `<ol class="nr-ol">${r.points.map((p) => `<li>${md(p)}</li>`).join("")}</ol>` : "") +
     `<p class="nr-p">${md(r.bank)}</p>` + (r.watch ? `<p class="nr-p nr-watch">${md(r.watch)}</p>` : "");
 }
+/* Raport baterii: la deschidere ultima noapte; taburile aleg altă perioadă (battery_report.py pe server) */
+$("#rep-row").onclick = () => show("report");
+$("#rep-back").onclick = () => show("packs");
+function openReport() {
+  nr.ago = 0;
+  setRange("night");
+}
+function setRange(r) {
+  $$("#rep-range button").forEach((b) => b.classList.toggle("on", b.dataset.r === r));
+  $("#rep-pick").hidden = r !== "pick";
+  if (r === "night") return loadNight();
+  if (r === "pick") {
+    const iso = (t) => new Date(t - new Date(t).getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    if (!$("#rep-from").value) { $("#rep-from").value = iso(Date.now() - 7 * 86400000); $("#rep-to").value = iso(Date.now()); }
+    $("#nr-nav").hidden = true;
+    $("#nr-title").textContent = "Perioada aleasă";
+    $("#nr-body").innerHTML = `<p class="note">Alege zilele și apasă „Fă raportul”.</p>`;
+    return;
+  }
+  loadRange(Date.now() / 1000 - +r * 86400, Date.now() / 1000);
+}
+$$("#rep-range button").forEach((b) => (b.onclick = () => setRange(b.dataset.r)));
+$("#rep-go").onclick = () => {
+  const a = $("#rep-from").value, z = $("#rep-to").value;
+  if (!a || !z) return;
+  const from = new Date(a + "T00:00:00").getTime() / 1000, to = new Date(z + "T23:59:59").getTime() / 1000;
+  if (to <= from) { $("#nr-body").innerHTML = `<div class="banner">„Până la” trebuie să fie după „De la”.</div>`; return; }
+  loadRange(from, to);
+};
+async function loadRange(from, to) {
+  const box = $("#nr-body");
+  $("#nr-nav").hidden = true;
+  $("#nr-title").textContent = "Raport";
+  box.innerHTML = `<p class="note">Analizez perioada…</p>`;
+  let r;
+  try { r = await api(`/api/battery-report?start=${Math.round(from)}&end=${Math.round(to)}`); }
+  catch (e) { if (e.message !== "auth") box.innerHTML = `<div class="banner">${esc(e.message)}</div>`; return; }
+  if (r.error) { box.innerHTML = `<div class="banner">${esc(r.error)}</div>`; return; }
+  $("#nr-title").textContent = `Raport ${r.title}`;
+  if (!r.rows.length) { box.innerHTML = `<p class="note">${md(r.headline)}</p>`; return; }
+  const ah = (v) => (v == null ? "–" : `${num(v, v >= 100 ? 0 : 1)} Ah`);
+  box.innerHTML = `<div class="nr-head-txt ${r.ok ? "ok" : "bad"}">${md(r.headline)}</div>` +
+    (r.commands.length ? `<p class="nr-p"><b>Comenzi și setări:</b></p><ul class="nr-ul">${r.commands.map((c) => `<li>${md(c)}</li>`).join("")}</ul>` : "") +
+    (r.period ? `<p class="nr-p">${md(r.period)}</p>` : "") +
+    `<div class="nr-tw"><table class="nr-t"><thead><tr><th></th><th>SOC min–max</th><th>Descărcat</th><th>Încărcat</th><th>Cicluri</th><th>Δ celule max</th><th>Temp. max</th></tr></thead>
+    <tbody>${r.rows.map((x) => `<tr><th>${esc(x.name)}</th>
+      <td>${x.soc_min == null ? "–" : `${num(x.soc_min, 0)}–${num(x.soc_max, 0)} %`}</td>
+      <td>${ah(x.dis_ah)}</td><td>${ah(x.chg_ah)}</td><td>${x.cycles == null ? "–" : num(x.cycles, 1)}</td>
+      <td>${x.dmax == null ? "–" : `${x.dmax} mV`}</td><td>${x.temp == null ? "–" : `${x.temp} °C`}</td></tr>`).join("")}</tbody></table></div>` +
+    (r.points.length ? `<ol class="nr-ol">${r.points.map((p) => `<li>${md(p)}</li>`).join("")}</ol>` : "") +
+    (r.nights ? `<p class="nr-p nr-watch">Nopți analizate: ${r.nights}.</p>` : "") +
+    (r.watch ? `<p class="nr-p nr-watch">${md(r.watch)}</p>` : "") + (r.note ? `<p class="note">${esc(r.note)}</p>` : "");
+}
 $("#nr-prev").onclick = () => { nr.ago += 1; loadNight(); };
 $("#nr-next").onclick = () => { nr.ago = Math.max(0, nr.ago - 1); loadNight(); };
 $("#nr-notify").onchange = async (e) => {
@@ -734,8 +790,6 @@ $("#nr-notify").onchange = async (e) => {
 };
 
 async function loadCells() {
-  nr.ago = 0;
-  loadNight();
   const box = $("#ch-body");
   if (!cellsState.data) box.innerHTML = `<div class="note">Analizez…</div>`;
   let r;
@@ -1790,13 +1844,14 @@ function renderSheet() {
 $$("nav.tabs button").forEach((b) => (b.onclick = () => show(b.dataset.view)));
 function show(v) {
   state.view = v;
-  const tab = ["packs", "inverter", "bms", "cells"].includes(v) ? "now" : v;      // se deschid din „Acum”
+  const tab = ["packs", "inverter", "bms", "cells", "report"].includes(v) ? "now" : v;      // se deschid din „Acum”
   $$("nav.tabs button").forEach((b) => b.dataset.view === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
-  for (const k of ["now", "hist", "alerts", "packs", "inverter", "bms", "cells", "settings"]) $("#view-" + k).hidden = v !== k;
+  for (const k of ["now", "hist", "alerts", "packs", "inverter", "bms", "cells", "report", "settings"]) $("#view-" + k).hidden = v !== k;
   $("#pvpop").hidden = true;
   if (v === "bms") loadBms();
   if (v === "packs") { renderPacks(); loadCellsRow(); }
   if (v === "cells") loadCells();
+  if (v === "report") openReport();
   if (v === "inverter") {
     renderInverterLive();
     $("#iv-pro").hidden = !isPro();                 // Lite: doar starea invertorului, fără setări
@@ -2656,7 +2711,8 @@ navigator.serviceWorker?.addEventListener("message", (e) => {
   if ($("#app").hidden) return;
   if (u.includes("v=alerts")) show("alerts");
   if (u.includes("v=update")) { show("settings"); showPanel("update"); }
-  if (u.includes("v=cells") || u.includes("v=night")) show("cells");
+  if (u.includes("v=cells")) show("cells");
+  if (u.includes("v=night")) show("report");
 });
 
 /* ---------- ecranul „Actualizez Amper”: cercul se umple după pașii serviciului de actualizare; cât Amper

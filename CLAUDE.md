@@ -550,5 +550,14 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   încărcare completă în 7 zile, `samples_max_since`). Textul are `**bold**` (aplicația escapează, apoi `md()`).
 - `morning` (din maintenance_loop, la oră): o dată pe zi, după noapte, după 06:00 (fără invertor după 08:00),
   notificare 🌙 `summary`, url `/?v=night`; meta `night_report_last`, oprită cu meta `night_report_off` = "1".
-- API `GET /api/night-report?ago=N` (ambele ediții), `POST /api/night-report/notify {on}`. UI: `#nr` sus în
-  `view-cells`, `loadNight`, ‹ › (`nr.ago` 0–13), comutatorul `#nr-notify`. NEVERIFICAT pe date reale.
+- API `GET /api/night-report?ago=N` (ambele ediții), `POST /api/night-report/notify {on}`.
+- „Raport baterii” (cerut 2026-10-30: „la baterii, la deschidere ultimul raport al nopții, de acolo altă perioadă”):
+  rândul `#rep-row` în Bateriile (înaintea `#ch-row`, care rămâne ultimul) → `view-report`: taburi `#rep-range`
+  (night | 2 | 3 | 7 | 30 | pick cu `#rep-from/#rep-to`), `openReport/setRange/loadNight/loadRange`, `#nr-notify`;
+  `/?v=night` deschide ecranul. `amper/battery_report.py` → `GET /api/battery-report?start=&end=` (≥ 1 h, max 400
+  zile): totaluri din `db.pack_series` (medii 5 min + coada brută; Ah încărcați/descărcați, SOC min/max, cicluri =
+  Ah descărcați / capacitate, temp, zile cu SOC ≥ 99 la toate), detalii din brute `db.pack_detail` (Δ celule max +
+  ora, MOSFET oprit, pauze per modul, pene = goluri > 5 min), nopțile din perioadă (`nights_in`, max 31) cu
+  `night_report.pack_stats`/`counts_right` → în câte nopți numără greșit / 0 A, împărțirea medie, trendul p90;
+  energia din `energy_daily` (toate invertoarele); `note` când perioada iese din cele 14 zile brute.
+  NEVERIFICAT pe date reale.

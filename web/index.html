@@ -66,10 +66,38 @@
       <div class="pk-sum" id="pk-sum"></div>
       <div id="pk-list"></div>
       <p class="note">Atinge un pachet pentru celule, temperaturi și MOSFET-uri.</p>
+      <button class="ch-row" id="rep-row">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10A.5.5 0 0 1 7 20z"/><path d="M14 3.5V8h4M10 12h5M10 15.5h5"/></svg></span>
+        <span class="tx"><b>Raport baterii</b><small id="rep-sub">Ultima noapte sau perioada pe care o alegi</small></span><span class="ar">›</span>
+      </button>
       <button class="ch-row" id="ch-row" hidden>
         <span class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="13" rx="2.5"/><path d="M9 3.5h6M8 10v5M12 10v5M16 10v5"/></svg></span>
         <span class="tx"><b>Sănătatea celulelor</b><small id="ch-sub"></small></span><span class="chip" id="ch-chip"></span><span class="ar">›</span>
       </button>
+    </main>
+
+    <!-- ====================== RAPORT BATERII ====================== -->
+    <main id="view-report" class="wrap" hidden>
+      <div class="pk-top">
+        <button class="back" id="rep-back" aria-label="Înapoi la baterii">‹</button>
+        <h2>Raport baterii</h2>
+      </div>
+      <div class="iv-tabs" id="rep-range">
+        <button data-r="night" class="on">Ultima noapte</button><button data-r="2">2 zile</button><button data-r="3">3 zile</button>
+        <button data-r="7">7 zile</button><button data-r="30">30 zile</button><button data-r="pick">Aleg eu</button>
+      </div>
+      <div class="rep-pick" id="rep-pick" hidden>
+        <label>De la<input type="date" id="rep-from"></label><label>Până la<input type="date" id="rep-to"></label>
+        <button class="btn" id="rep-go">Fă raportul</button>
+      </div>
+      <section class="nr" id="nr">
+        <div class="nr-head"><h2 id="nr-title">Raportul nopții</h2>
+          <div class="nr-nav" id="nr-nav"><button id="nr-prev" aria-label="Noaptea anterioară">‹</button><span id="nr-when"></span>
+            <button id="nr-next" aria-label="Noaptea următoare">›</button></div></div>
+        <div id="nr-body"></div>
+      </section>
+      <label class="row-check"><span><b>Raportul nopții pe telefon</b><small>O notificare scurtă dimineața, după ce se
+        termină noaptea</small></span><input type="checkbox" id="nr-notify"></label>
     </main>
 
     <!-- ====================== SĂNĂTATEA CELULELOR ====================== -->
@@ -78,15 +106,6 @@
         <button class="back" id="ch-back" aria-label="Înapoi la baterii">‹</button>
         <h2>Sănătatea celulelor</h2>
       </div>
-      <section class="nr" id="nr">
-        <div class="nr-head"><h2>Raportul nopții</h2>
-          <div class="nr-nav"><button id="nr-prev" aria-label="Noaptea anterioară">‹</button><span id="nr-when"></span>
-            <button id="nr-next" aria-label="Noaptea următoare">›</button></div></div>
-        <div id="nr-body"></div>
-        <label class="row-check"><span><b>Raportul dimineața pe telefon</b><small>O notificare scurtă după ce se
-          termină noaptea</small></span><input type="checkbox" id="nr-notify"></label>
-      </section>
-      <h2>Celulele</h2>
       <p class="note">Celulele care se abat cel mai mult de la celelalte din modul, cele mai slabe primele.</p>
       <div id="ch-body"></div>
     </main>

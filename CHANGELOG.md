@@ -3,12 +3,16 @@
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
 ## 1.0.0-beta.13 — în pregătire
-- **Raportul nopții** (Bateriile → Sănătatea celulelor, sus): în fiecare dimineață, un text despre noapte și un
-  tabel pe module (SOC la început și la final, scădere, curent mediu, citiri cu 0 A, cel mai mic curent văzut).
-  Textul spune dacă au fost protecții, MOSFET-uri oprite sau pene, dacă fiecare BMS numără corect (SOC-ul scade cât
-  arată curentul), dacă vreunul nu vede curenții mici, cât de apropiate sunt SOC-urile, cum își împart modulele
-  consumul și cât de echilibrate sunt celulele, apoi starea băncii dimineața și ce rămâne de urmărit. Cu ‹ › se văd
-  nopțile anterioare (până la 14). Dimineața vine o notificare scurtă; se poate opri chiar de acolo.
+- **Raport baterii** (Bateriile → „Raport baterii”): la deschidere arată raportul ultimei nopți (cu ‹ › pentru
+  nopțile anterioare, până la 14), iar din taburi alegi altă perioadă: 2, 3, 7, 30 de zile sau „Aleg eu” (de la – până
+  la). Raportul nopții: un text despre noapte și un tabel pe module (SOC la început și la final, scădere, curent mediu,
+  citiri cu 0 A, cel mai mic curent văzut) — protecții, MOSFET-uri oprite, pene, dacă fiecare BMS numără corect, dacă
+  vreunul nu vede curenții mici, cum își împart modulele consumul, echilibrul celulelor, starea băncii dimineața.
+  Raportul pe perioadă: tabel cu SOC minim–maxim, Ah descărcați și încărcați, cicluri, diferența maximă a celulelor și
+  temperatura maximă; în text: ce probleme au fost (de câte ori, ultima dată), în câte nopți a numărat greșit sau n-a
+  văzut curenții mici fiecare BMS, cum își împart consumul, de câte ori s-a încărcat banca complet și cât de jos a
+  coborât, cum a evoluat diferența dintre celule, energia produsă și consumată.
+- Dimineața vine o notificare scurtă cu raportul nopții; se poate opri din ecranul raportului.
 - Două (sau mai multe) invertoare în paralel, de ex. două Growatt SPF 5000 pe aceeași casă și aceeași baterie, fiecare
   cu stringul lui: ecranul principal adună panourile, consumul și rețeaua, energia zilei și graficele din Istoric
   sunt sumele lor, iar butonul ⓘ de la Panouri arată tensiunea și curentul fiecărui string (String 1, String 2…).

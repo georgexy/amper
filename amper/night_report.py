@@ -123,14 +123,29 @@ def _off(rows, col) -> float:
     return off
 
 
+def night_rows(db, names: dict[str, str], s: int, e: int) -> dict[str, list[dict]]:
+    out: dict[str, list[dict]] = {}
+    for r in db.samples("pack", s, e):
+        if r["device"] in names:
+            out.setdefault(r["device"], []).append(r)
+    return out
+
+
+def counts_right(x: dict) -> bool | None:
+    """Scăderea SOC-ului se potrivește cu Ah măsurați / capacitate? None = nu se poate spune (prea puțin, fără date)."""
+    if x["cap"] is None or x["drop"] is None or x["zero"] >= ZERO_BAD:
+        return None
+    expect = x["ah"] / x["cap"] * 100
+    if abs(expect) < 2 and abs(x["drop"]) < 2:
+        return None
+    return abs(x["drop"] - expect) <= max(3.0, 0.3 * abs(expect))
+
+
 def build(db, names: dict[str, str], now: float | None = None, night: dict | None = None) -> dict:
     now = now or time.time()
     night = night or find_night(db, now)
     s, e = int(night["start"]), int(night["end"])
-    packs_rows: dict[str, list[dict]] = {}
-    for r in db.samples("pack", s, e):
-        if r["device"] in names:
-            packs_rows.setdefault(r["device"], []).append(r)
+    packs_rows = night_rows(db, names, s, e)
     st = {d: x for d, rows in packs_rows.items() if (x := pack_stats(rows))}
     prev = {}
     for r in db.samples("pack", s - 86400, e - 86400):
