@@ -26,6 +26,22 @@ def _json(data, status=200):
     return web.json_response(data, status=status, dumps=lambda o: json.dumps(o, ensure_ascii=False, default=str))
 
 
+def sum_energy(parts: list[list[dict]]) -> list[dict]:
+    """Energia pe zi a mai multor invertoare în paralel, adunată pe aceeași zi (ordinea primului invertor)."""
+    if len(parts) == 1:
+        return parts[0]
+    out: dict[str, dict] = {}
+    for rows in parts:
+        for r in rows:
+            o = out.setdefault(r["day"], {"day": r["day"], "device": "toate"})
+            for k, v in r.items():
+                if k not in ("day", "device") and isinstance(v, (int, float)):
+                    o[k] = round(o.get(k, 0) + v, 3)
+    days = [r["day"] for r in parts[0]]
+    desc = len(days) > 1 and days[0] > days[-1]           # aceeași ordine ca la un singur invertor
+    return [out[d] for d in sorted(out, reverse=desc)]
+
+
 def make_app(engine) -> web.Application:
     cfg = engine.cfg
     from .auth import Auth
@@ -266,10 +282,10 @@ def make_app(engine) -> web.Application:
         if start and end:                     # interval ales în aplicație (AAAA-LL-ZZ)
             if not (re.fullmatch(r"\d{4}-\d{2}-\d{2}", start) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", end)):
                 return _json({"error": "date invalide"}, 400)
-            rows = await asyncio.to_thread(engine.db.energy_range, inv[0], min(start, end), max(start, end))
+            parts = [await asyncio.to_thread(engine.db.energy_range, k, min(start, end), max(start, end)) for k in inv]
         else:
-            rows = await asyncio.to_thread(engine.db.energy, inv[0], int(request.query.get("days", 30)))
-        return _json(dict(rows=rows))
+            parts = [await asyncio.to_thread(engine.db.energy, k, int(request.query.get("days", 30))) for k in inv]
+        return _json(dict(rows=sum_energy(parts)))
 
     async def alerts(request):
         rows = await asyncio.to_thread(engine.db.alerts, int(request.query.get("limit", 100)))
@@ -311,17 +327,74 @@ def make_app(engine) -> web.Application:
     from . import inverter_settings as invset
     write_lock = asyncio.Lock()
 
-    def settings_driver():
+    NO_SETTINGS = ("Pentru acest invertor Amper deocamdată doar citește valorile. Setările vor veni după ce citirea e "
+                   "verificată pe un aparat real.")
+
+    def inverter_ids() -> list[str]:
+        return [k for k, st in engine.devices.items() if st.driver.kind == "inverter"]
+
+    def inv_label(dev: str) -> str:
+        """Cu mai multe invertoare: „Invertor 1”, „Invertor 2”… (ordinea din config, ca taburile din aplicație)."""
+        ids = inverter_ids()
+        if len(ids) > 1 and dev in ids:
+            return f"Invertor {ids.index(dev) + 1}"
+        return engine.devices[dev].cfg.get("name", dev) if dev in engine.devices else "Invertor"
+
+    def settings_driver(dev_id: str | None = None):
+        """Invertorul cu setări: cel cerut (mai multe în paralel: fiecare cu setările lui) sau primul."""
         for k, st in engine.devices.items():
-            if st.driver.kind == "inverter" and hasattr(st.driver, "read_settings"):
+            if st.driver.kind == "inverter" and hasattr(st.driver, "read_settings") and (not dev_id or k == dev_id):
                 return k, st.driver
         return None, None
 
+    def common_drivers():
+        """„Setări comune”: toate invertoarele, doar dacă au toate setări și sunt de același tip (ex. două Growatt SPF)."""
+        devs = [(k, engine.devices[k].driver) for k in inverter_ids()]
+        if len(devs) < 2:
+            return None, "Setările comune apar doar cu cel puțin două invertoare."
+        if not all(hasattr(d, "read_settings") for _, d in devs) or len({type(d) for _, d in devs}) > 1:
+            return None, ("Setările comune se pot schimba doar când toate invertoarele sunt de același tip și Amper le "
+                          "știe setările (ex. Growatt SPF). Schimbă setările din tabul fiecărui invertor.")
+        return devs, None
+
+    def combine_settings(per: list[tuple[str, dict]]) -> list[dict]:
+        """Setările primului invertor + valorile fiecăruia; unde diferă, `same` = False și textul „diferite”."""
+        lists = [(dev, invset.describe(regs)) for dev, regs in per]
+        out = []
+        for i, item in enumerate(lists[0][1]):
+            vals = [dict(device=dev, name=inv_label(dev), text=lst[i]["text"], raw=lst[i]["raw"]) for dev, lst in lists]
+            same = len({v["raw"] for v in vals}) == 1
+            x = dict(item, values=vals, same=same)
+            if not same:
+                x.update(text="diferite", raw=None, value=None)
+            out.append(x)
+        return out
+
+    def combine_clock(per: list[tuple[str, dict]]) -> str:
+        return " · ".join(f"{inv_label(dev)}: {invset.clock(regs) or '–'}" for dev, regs in per)
+
     async def inverter_get(request):
-        dev, drv = settings_driver()
+        want = request.query.get("device") or None
+        if want == "_common":
+            devs, why = common_drivers()
+            if not devs:
+                return _json({"error": why, "no_settings": True}, 404)
+            per = []
+            for dev, drv in devs:
+                try:
+                    per.append((dev, await asyncio.to_thread(drv.read_settings)))
+                except (DriverError, OSError) as e:
+                    return _json({"error": f"{inv_label(dev)}: nu am putut citi setările: {e}"}, 502)
+            logs = []
+            for dev, _ in devs:
+                logs += [dict(r, setting=f"{inv_label(dev)} · {r['setting']}")
+                         for r in await asyncio.to_thread(engine.db.settings_log, dev, 20)]
+            logs.sort(key=lambda r: r["ts"], reverse=True)
+            return _json(dict(device="_common", common=True, settings=combine_settings(per), clock=combine_clock(per),
+                              pi_clock=time.strftime("%Y-%m-%d %H:%M:%S"), log=logs[:20], can_write=auth_.enabled))
+        dev, drv = settings_driver(want)
         if not drv:
-            return _json({"error": "Pentru acest invertor Amper deocamdată doar citește valorile. Setările vor veni după "
-                                   "ce citirea e verificată pe un aparat real.", "no_settings": True}, 404)
+            return _json({"error": NO_SETTINGS, "no_settings": True}, 404)
         try:
             regs = await asyncio.to_thread(drv.read_settings)
         except (DriverError, OSError) as e:
@@ -331,33 +404,62 @@ def make_app(engine) -> web.Application:
                           pi_clock=time.strftime("%Y-%m-%d %H:%M:%S"), log=log_rows,
                           can_write=auth_.enabled))
 
+    async def write_one(request, dev, drv, fn, what) -> dict:
+        """O scriere într-un invertor: jurnal + notificare. Întoarce rezultatul sau {error} (ValueError trece mai departe)."""
+        try:
+            res = await asyncio.to_thread(fn, drv)
+        except (DriverError, OSError) as e:
+            await asyncio.to_thread(engine.db.log_setting, int(time.time()), dev, what, None, None, False,
+                                    str(e), request.remote)
+            log.warning("setare invertor %s (%s): EȘUAT: %s", what, dev, e)
+            return {"error": str(e)}
+        if res["changed"]:
+            await asyncio.to_thread(engine.db.log_setting, int(time.time()), dev, res["label"], res["old"],
+                                    res["new"], True, None, request.remote)
+            log.warning("setare invertor schimbată (%s): %s: %s → %s (de la %s)", dev, res["label"], res["old"],
+                        res["new"], request.remote)
+            engine.notifier.send(f"⚙️ {inv_label(dev)}: {res['label']}: {res['old']} → {res['new']}",
+                                 title="Amper: setare schimbată", priority="default")
+        return res
+
     async def inverter_write(request, body, fn, what):
         # scrierea cere ÎNTOTDEAUNA parola din nou, și de pe ecranul HDMI (localhost)
         if (err := await confirm(request, body, "setare invertor")) is not None:
             return err
-        dev, drv = settings_driver()
-        if not drv:
-            return _json({"error": "Pentru acest invertor Amper deocamdată doar citește valorile. Setările vor veni după "
-                                   "ce citirea e verificată pe un aparat real.", "no_settings": True}, 404)
+        if body.get("device") == "_common":
+            devs, why = common_drivers()
+            if not devs:
+                return _json({"error": why, "no_settings": True}, 404)
+        else:
+            dev, drv = settings_driver(body.get("device") or None)
+            if not drv:
+                return _json({"error": NO_SETTINGS, "no_settings": True}, 404)
+            devs = [(dev, drv)]
+        results = []
         async with write_lock:
-            try:
-                res = await asyncio.to_thread(fn, drv)
-            except ValueError as e:
-                return _json({"error": str(e)}, 400)
-            except (DriverError, OSError) as e:
-                await asyncio.to_thread(engine.db.log_setting, int(time.time()), dev, what, None, None, False,
-                                        str(e), request.remote)
-                log.warning("setare invertor %s: EȘUAT: %s", what, e)
-                return _json({"error": str(e)}, 502)
-        if res["changed"]:
-            await asyncio.to_thread(engine.db.log_setting, int(time.time()), dev, res["label"], res["old"],
-                                    res["new"], True, None, request.remote)
-            log.warning("setare invertor schimbată: %s: %s → %s (de la %s)", res["label"], res["old"], res["new"],
-                        request.remote)
-            engine.notifier.send(f"⚙️ Invertor: {res['label']}: {res['old']} → {res['new']}",
-                                 title="Amper: setare schimbată", priority="default")
-        return _json(dict(ok=True, changed=res["changed"], label=res["label"], old=res["old"], new=res["new"],
-                          settings=invset.describe(res["regs"]), clock=invset.clock(res["regs"])))
+            for dev, drv in devs:                         # pe rând, în fiecare; un eșec nu le oprește pe celelalte
+                try:
+                    results.append((dev, await write_one(request, dev, drv, fn, what)))
+                except ValueError as e:
+                    return _json({"error": str(e)}, 400)
+        bad = [(dev, r) for dev, r in results if "error" in r]
+        good = [(dev, r) for dev, r in results if "error" not in r]
+        if len(devs) == 1:
+            res = results[0][1]
+            if bad:
+                return _json({"error": res["error"]}, 502)
+            return _json(dict(ok=True, changed=res["changed"], label=res["label"], old=res["old"], new=res["new"],
+                              settings=invset.describe(res["regs"]), clock=invset.clock(res["regs"])))
+        if bad:
+            msg = "; ".join(f"EȘUAT la {inv_label(dev)}: {r['error']}" for dev, r in bad)
+            if good:
+                msg = f"Scris în {', '.join(inv_label(d) for d, _ in good)}. {msg}. Invertoarele pot avea acum valori diferite."
+            return _json({"error": msg, "partial": bool(good)}, 502)
+        per = [(dev, r["regs"]) for dev, r in good]
+        first = good[0][1]
+        return _json(dict(ok=True, changed=any(r["changed"] for _, r in good), label=first["label"],
+                          settings=combine_settings(per), clock=combine_clock(per),
+                          results=[dict(name=inv_label(d), old=r["old"], new=r["new"]) for d, r in good]))
 
     async def inverter_set(request):
         body = await request.json()
@@ -940,6 +1042,42 @@ def make_app(engine) -> web.Application:
                              if isinstance(st.reading, PackReading) and st.connected)
         return _json(res)
 
+    # ---------------- raportul nopții ----------------
+    from . import night_report
+
+    def pack_names() -> dict[str, str]:
+        return {k: st.cfg.get("name", k) for k, st in engine.devices.items() if st.driver.kind == "pack"}
+
+    async def night_get(request):
+        """`?ago=N` = acum N nopți (0 = ultima)."""
+        try:
+            ago = max(0, min(13, int(request.query.get("ago", 0))))
+        except ValueError:
+            ago = 0
+        now = time.time() - ago * 86400
+        rep = await asyncio.to_thread(night_report.build, engine.db, pack_names(), now)
+        rep["ago"] = ago
+        rep["notify"] = await asyncio.to_thread(engine.db.get_meta, "night_report_off") != "1"
+        return _json(rep)
+
+    async def battery_report_get(request):
+        """`?start=&end=` (secunde): raportul bateriilor pe perioada aleasă."""
+        from . import battery_report
+        try:
+            start, end = float(request.query["start"]), float(request.query.get("end") or time.time())
+        except (KeyError, ValueError):
+            return _json({"error": "perioadă invalidă"}, 400)
+        if end - start < 3600:
+            return _json({"error": "Alege o perioadă de cel puțin o oră."}, 400)
+        invs = [k for k, st in engine.devices.items() if st.driver.kind == "inverter"]
+        rep = await asyncio.to_thread(battery_report.build, engine.db, pack_names(), start, end, invs)
+        return _json(rep)
+
+    async def night_notify(request):
+        body = await request.json()
+        await asyncio.to_thread(engine.db.set_meta, "night_report_off", "0" if body.get("on") else "1")
+        return _json({"ok": True, "notify": bool(body.get("on"))})
+
     # ---------------- alerte proprii (setate de utilizator) ----------------
     from .alerts import METRICS
 
@@ -1017,6 +1155,9 @@ def make_app(engine) -> web.Application:
     app.router.add_post("/api/daly/{device}/actions/retry", daly_actions_retry)
     app.router.add_get("/api/system", system_info)
     app.router.add_get("/api/cells/health", cells_health)
+    app.router.add_get("/api/night-report", night_get)
+    app.router.add_post("/api/night-report/notify", night_notify)
+    app.router.add_get("/api/battery-report", battery_report_get)
     app.router.add_get("/api/wifi/scan", wifi_scan)
     app.router.add_get("/api/wifi/status", wifi_status)
     app.router.add_post("/api/wifi/connect", wifi_connect)

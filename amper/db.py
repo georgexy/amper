@@ -335,6 +335,90 @@ class Database:
                                      (device, start, end)).fetchall()
         return [dict(r) for r in rows]
 
+    def samples(self, kind: str, start: int, end: int) -> list[dict]:
+        """Citirile brute (pack / inverter) dintr-un interval, în ordinea timpului (raportul nopții)."""
+        table = "pack_samples" if kind == "pack" else "inverter_samples"
+        cols = PACK_COLS if kind == "pack" else INV_COLS
+        with self.lock:
+            rows = self.conn.execute(f"SELECT ts, device, {', '.join(cols)} FROM {table} WHERE ts BETWEEN ? AND ? "
+                                     "ORDER BY ts", (start, end)).fetchall()
+        return [dict(r) for r in rows]
+
+    def samples_max_since(self, since: int) -> dict[str, dict]:
+        """SOC-ul și celula maximă atinse de fiecare modul din `since` (a fost o încărcare completă?)."""
+        out: dict[str, dict] = {}
+        with self.lock:
+            for table in ("pack_5m", "pack_samples"):
+                for r in self.conn.execute(f"SELECT device, max(soc) soc, max(cell_max) cell_max FROM {table} "
+                                           "WHERE ts >= ? GROUP BY device", (since,)).fetchall():
+                    o = out.setdefault(r["device"], {"soc": None, "cell_max": None})
+                    for k in ("soc", "cell_max"):
+                        if r[k] is not None:
+                            o[k] = max(o[k] or r[k], r[k])
+        return out
+
+    def pack_series(self, start: int, end: int) -> list[dict]:
+        """Bateriile pe o perioadă oricât de lungă: mediile la 5 minute (`dt` 300 s), plus citirile brute de după
+        ultima medie (ultima oră). Pentru raportul pe perioadă (Ah, SOC min/max, cicluri)."""
+        cols = "ts, device, current, soc, remaining_ah, cell_delta, temp_max"
+        with self.lock:
+            last = self.conn.execute("SELECT MAX(ts) FROM pack_5m").fetchone()[0]
+            rows = [dict(r, dt=AGG_SECONDS) for r in self.conn.execute(
+                f"SELECT {cols} FROM pack_5m WHERE ts BETWEEN ? AND ? ORDER BY ts", (start, end)).fetchall()]
+            tail_from = max(start, (last + AGG_SECONDS) if last is not None else start)
+            tail = [dict(r) for r in self.conn.execute(
+                f"SELECT {cols} FROM pack_samples WHERE ts BETWEEN ? AND ? ORDER BY ts", (tail_from, end)).fetchall()]
+        prev: dict[str, int] = {}
+        for r in tail:
+            r["dt"] = min(60, r["ts"] - prev.get(r["device"], r["ts"] - 10))
+            prev[r["device"]] = r["ts"]
+        return rows + tail
+
+    def pack_detail(self, start: int, end: int) -> dict:
+        """Din citirile brute (ultimele 14 zile): diferența maximă a celulelor, MOSFET-urile oprite, pauzele de
+        comunicație pe modul și pauzele în care Pi-ul n-a salvat nimic (pene)."""
+        out: dict = {"devices": {}, "holes": [], "from": None}
+        with self.lock:
+            first = self.conn.execute("SELECT MIN(ts) FROM pack_samples").fetchone()[0]
+            if first is None or first > end:
+                return out
+            out["from"] = max(start, first)
+            for r in self.conn.execute(
+                    "WITH r AS (SELECT device, ts, cell_delta, charge_mos, discharge_mos, "
+                    "ts - LAG(ts) OVER (PARTITION BY device ORDER BY ts) dt FROM pack_samples WHERE ts BETWEEN ? AND ?) "
+                    "SELECT device, MAX(cell_delta) dmax, "
+                    "SUM(CASE WHEN charge_mos = 0 THEN MIN(dt, 60) ELSE 0 END) chg_off, "
+                    "SUM(CASE WHEN discharge_mos = 0 THEN MIN(dt, 60) ELSE 0 END) dsg_off, "
+                    "SUM(dt > 120) gaps, MAX(dt) gap_max FROM r GROUP BY device", (start, end)).fetchall():
+                d = dict(r)
+                at = self.conn.execute("SELECT ts FROM pack_samples WHERE device = ? AND ts BETWEEN ? AND ? "
+                                       "AND cell_delta = ? LIMIT 1", (d["device"], start, end, d["dmax"])).fetchone()
+                d["dmax_ts"] = at[0] if at else None
+                g = self.conn.execute(
+                    "WITH r AS (SELECT ts, ts - LAG(ts) OVER (ORDER BY ts) dt FROM pack_samples "
+                    "WHERE device = ? AND ts BETWEEN ? AND ?) SELECT ts - dt, ts FROM r WHERE dt > 120 "
+                    "ORDER BY dt DESC LIMIT 1", (d["device"], start, end)).fetchone()
+                d["gap_at"] = tuple(g) if g else None
+                out["devices"][d["device"]] = d
+            out["holes"] = [tuple(h) for h in self.conn.execute(
+                "WITH t AS (SELECT DISTINCT ts FROM pack_samples WHERE ts BETWEEN ? AND ?), "
+                "g AS (SELECT ts, ts - LAG(ts) OVER (ORDER BY ts) dt FROM t) "
+                "SELECT ts - dt, ts FROM g WHERE dt > 300 ORDER BY ts", (start, end)).fetchall()]
+        return out
+
+    def alerts_between(self, start: int, end: int) -> list[dict]:
+        """Alertele care au început în interval sau erau deschise în el."""
+        with self.lock:
+            rows = self.conn.execute("SELECT * FROM alerts WHERE ts_start <= ? AND (ts_end IS NULL OR ts_end >= ?) "
+                                     "ORDER BY ts_start", (end, start)).fetchall()
+        return [dict(r) for r in rows]
+
+    def settings_log_between(self, start: int, end: int) -> list[dict]:
+        with self.lock:
+            rows = self.conn.execute("SELECT * FROM settings_log WHERE ts BETWEEN ? AND ? ORDER BY ts",
+                                     (start, end)).fetchall()
+        return [dict(r) for r in rows]
+
     def alerts(self, limit: int = 100) -> list[dict]:
         with self.lock:
             rows = self.conn.execute(

@@ -2,6 +2,26 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.13 — 2026-10-30
+- **Raport baterii** (Bateriile → „Raport baterii”): la deschidere arată raportul ultimei nopți (cu ‹ › pentru
+  nopțile anterioare, până la 14), iar din taburi alegi altă perioadă: 2, 3, 7, 30 de zile sau „Aleg eu” (de la – până
+  la). Raportul nopții: un text despre noapte și un tabel pe module (SOC la început și la final, scădere, curent mediu,
+  citiri cu 0 A, cel mai mic curent văzut) — protecții, MOSFET-uri oprite, pene, dacă fiecare BMS numără corect, dacă
+  vreunul nu vede curenții mici, cum își împart modulele consumul, echilibrul celulelor, starea băncii dimineața.
+  Raportul pe perioadă: tabel cu SOC minim–maxim, Ah descărcați și încărcați, cicluri, diferența maximă a celulelor și
+  temperatura maximă; în text: ce probleme au fost (de câte ori, ultima dată), în câte nopți a numărat greșit sau n-a
+  văzut curenții mici fiecare BMS, cum își împart consumul, de câte ori s-a încărcat banca complet și cât de jos a
+  coborât, cum a evoluat diferența dintre celule, energia produsă și consumată.
+- Dimineața vine o notificare scurtă cu raportul nopții; se poate opri din ecranul raportului.
+- Două (sau mai multe) invertoare în paralel, de ex. două Growatt SPF 5000 pe aceeași casă și aceeași baterie, fiecare
+  cu stringul lui: ecranul principal adună panourile, consumul și rețeaua, energia zilei și graficele din Istoric
+  sunt sumele lor, iar butonul ⓘ de la Panouri arată tensiunea și curentul fiecărui string (String 1, String 2…).
+- Ecranul invertorului are taburi: „Toate” (doar vizualizare: sumele și starea fiecăruia), „Invertor 1”, „Invertor 2”…
+  (fiecare cu setările lui; numele nu mai depind de marcă) și „Setări comune”.
+- „Setări comune” (când toate invertoarele sunt de același tip, ex. două Growatt SPF): fiecare setare cu valoarea din
+  fiecare invertor; cele care nu sunt la fel apar „diferite”, cu valorile alături. „Modifică” scrie în toate, pe rând,
+  verificând fiecare; dacă la unul nu reușește, aplicația spune exact unde. Ceasul se potrivește la toate deodată.
+
 ## 1.0.0-beta.12 — 2026-10-29
 - Setări → Dispozitive conectate → „+” (Adaugă dispozitiv): la fel ca ghidul — „Configurare automată” (cablu și
   Bluetooth, rezultatele pe Invertor / BMS) sau „Configurare manuală” (ce adaugi → modelul → conexiunea), cu „‹ Înapoi”.

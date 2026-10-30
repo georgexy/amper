@@ -522,3 +522,42 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `.f-batt` flex none, `.f-link` = clamp(14px, 100dvh − 660px, 70px). Verificat 390×664, 320×568, 393×759.
   Puterea din stânga (`bw`): clasa `chg` verde / `dis` roșu. Eticheta de pe linie (`.f-blabel`) SCOASĂ definitiv
   (cerut 2026-10-29: „scrisul de pe linie îl eliminăm, rămâne doar cel din stânga”).
+
+## Invertoare în paralel (1.0.0-beta.13, cerut 2026-10-30)
+- Caz: două Growatt SPF 5000 cu cablu de paralel, aceeași casă și aceeași baterie, fiecare cu stringul lui; fiecare pe
+  cablul lui USB (id-uri `inverter`, `inverter2`…). `app.js`: `inverters()` + `combineInverters` → `inverter()` dă
+  obiectul `_all` (sume PV/consum/rețea/baterie, media tensiunii, temperatura maximă, `strings`, `parts`); `sumRows`
+  adună zilele/istoricul. `web.py`: energia = `sum_energy(parts)`; `settings_driver(dev_id)`, `?device=` / `device`
+  la setări și scriere; notificarea poartă numele invertorului. Ecranul invertorului: `#iv-tabs` (`inv.sel`),
+  „Toate” = doar vizualizare (ascunde `#iv-more`). Nume: „Invertor N” după ordinea din config (`invLabel` în app.js,
+  `inv_label` în web.py, și în notificări), cerut 2026-10-30 (nu numele mărcii).
+- Tabul „Setări comune” (`inv.sel = "_common"`, doar Pro): `device=_common` la GET/POST setări și ceas; `common_drivers`
+  (≥ 2, toate cu `read_settings`, aceeași clasă de driver, altfel 404 `no_settings`); `combine_settings` = descrierea
+  primului + `values` [{name, text, raw}] și `same` (altfel `text` „diferite”); scrierea (`write_one`) pe rând în toate,
+  un eșec nu le oprește pe celelalte → 502 cu `partial` și „Scris în … EȘUAT la …”; jurnalul combinat cu prefixul
+  invertorului. Editorul: „Acum” = valorile fiecăruia, câmpul pornește de la primul (`preselect`/`initial`), după
+  scriere (și după eșec) se recitește. NEVERIFICAT cu două aparate reale.
+
+## Raportul nopții (1.0.0-beta.13, cerut 2026-10-30)
+- Cerut după o analiză făcută de mână a unei nopți (text + tabel). `amper/night_report.py`: `find_night` = ultima
+  perioadă continuă cu PV < 50 W (≥ 3 h, max 15 h; găurile de date nu o rup), fără invertor 21:30 → 07:00;
+  `build(db, names, now)` din `db.samples` (brute) → `rows` (SOC început/final, scădere, curent mediu, % citiri 0 A,
+  curent minim, și aceleași pentru noaptea dinainte), `headline` (protecții `bms_protection`, MOSFET oprit ≥ 1 min,
+  module fără citiri > 120 s, Pi fără date > 5 min), `commands` (`settings_log` cu 3 h înainte), `period`,
+  `points` (numără corect = scăderea SOC ≈ Ah/capacitate, toleranță max(3 %, 30 %); 0 A ≥ 20 % = nu vede curenții
+  mici, iar modulul e scos din celelalte comparații; SOC-uri la final ≤ 6 puncte; împărțirea curentului raportată
+  la capacitate, ≥ 1,3× = verifică bornele/cablurile; diferența celulelor p10–p90 și vârful), `bank`, `watch` (fără
+  încărcare completă în 7 zile, `samples_max_since`). Textul are `**bold**` (aplicația escapează, apoi `md()`).
+- `morning` (din maintenance_loop, la oră): o dată pe zi, după noapte, după 06:00 (fără invertor după 08:00),
+  notificare 🌙 `summary`, url `/?v=night`; meta `night_report_last`, oprită cu meta `night_report_off` = "1".
+- API `GET /api/night-report?ago=N` (ambele ediții), `POST /api/night-report/notify {on}`.
+- „Raport baterii” (cerut 2026-10-30: „la baterii, la deschidere ultimul raport al nopții, de acolo altă perioadă”):
+  rândul `#rep-row` în Bateriile (înaintea `#ch-row`, care rămâne ultimul) → `view-report`: taburi `#rep-range`
+  (night | 2 | 3 | 7 | 30 | pick cu `#rep-from/#rep-to`), `openReport/setRange/loadNight/loadRange`, `#nr-notify`;
+  `/?v=night` deschide ecranul. `amper/battery_report.py` → `GET /api/battery-report?start=&end=` (≥ 1 h, max 400
+  zile): totaluri din `db.pack_series` (medii 5 min + coada brută; Ah încărcați/descărcați, SOC min/max, cicluri =
+  Ah descărcați / capacitate, temp, zile cu SOC ≥ 99 la toate), detalii din brute `db.pack_detail` (Δ celule max +
+  ora, MOSFET oprit, pauze per modul, pene = goluri > 5 min), nopțile din perioadă (`nights_in`, max 31) cu
+  `night_report.pack_stats`/`counts_right` → în câte nopți numără greșit / 0 A, împărțirea medie, trendul p90;
+  energia din `energy_daily` (toate invertoarele); `note` când perioada iese din cele 14 zile brute.
+  NEVERIFICAT pe date reale.
