@@ -6,6 +6,9 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Tema Cadrane: bateria e acum sub cele patru cadrane, deasupra graficului zilei, și arată ca o baterie (ca în
   iconiță: se umple de jos în sus, pe segmente), cu procentul scris alb cu contur închis, ca să se citească bine.
 - Teme Cadrane și Carduri: sub Panouri scrie cât s-a produs azi, iar sub Consum cât s-a consumat azi.
+- Setări → **Limbă · Language**: română sau engleză, aceeași pe toate telefoanele legate la Pi. Deocamdată sunt
+  traduse ecranele aplicației; notificările, alertele, rapoartele și mesajele de la BMS / invertor (scrise pe Pi)
+  rămân în română până la etapa următoare.
 
 ## 1.0.0-beta.13 — 2026-10-30
 - **Raport baterii** (Bateriile → „Raport baterii”): la deschidere arată raportul ultimei nopți (cu ‹ › pentru

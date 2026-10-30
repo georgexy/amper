@@ -569,3 +569,17 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   bateria din Flux și scrisul alb cu umbră pe verde: „nu e foarte bine vizibil”).
 - Sub Panouri / Consum: `produs azi` / `consumat azi` (`h.today`) — `.k-g .sub` (`s-pv`, `s-load`) în Cadrane și
   `.c-it .s` în Carduri.
+
+## Limba aplicației (1.0.0-beta.14, în pregătire, cerut 2026-10-30; etapa 1 = ecranele)
+- Una pe Pi (decizia utilizatorului): overlay `language` (ro | en), `POST /api/language {lang}`, `/api/info.lang`.
+  Telefonul o ține și în localStorage `lang` (ca pagina să pornească direct în limba bună); la boot, dacă diferă de
+  a Pi-ului → o salvează și reîncarcă. Setări → „Limbă · Language” (`#set-lang`, `.lang-opt`, `renderLang`).
+- Mecanism (`web/i18n.js`, încărcat după `web/lang-en.js` și înaintea `app.js`): codul scrie textele în ROMÂNĂ; în
+  engleză un MutationObserver traduce fiecare nod de text și `aria-label`/`title`/`placeholder` după dicționarul `EN`
+  (cheia = textul românesc cu spațiile normalizate). Numerele din text se potrivesc cu „#” (inclusiv cu minus) și se pun
+  la loc în ordine. `LOC` (ro-RO / en-GB) formatează numerele și datele (în engleză cu punct zecimal). Pentru
+  confirm/alert și textele care conțin nume sau date: `t("…")` și `tf("… {0} …", x)` în app.js.
+- REGULĂ: orice text nou din aplicație se adaugă și în `web/lang-en.js` (`tests/test_i18n.py` verifică toate
+  apelurile `t()`/`tf()`; pentru restul textelor: crawl în simulator cu limba en și căutarea cuvintelor românești).
+- Etapa 2 (următoarea): textele scrise pe Pi — notificări, alerte (`alerts.py`), Raport baterii / raportul nopții,
+  sănătatea celulelor, stările și erorile driverelor, catalogul, mesajele de eroare din API, CHANGELOG (de la stabilă).

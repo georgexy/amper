@@ -160,6 +160,9 @@
           <button class="card set-btn" data-panel="teme"><span class="ic" style="--ic:var(--acc)">
             <svg viewBox="0 0 24 24" class="ai ai-teme"><circle cx="12" cy="12" r="9"/><path class="a-spin" d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg></span>
             <span><b>Teme</b><span id="set-teme-sub">Cum arată ecranul principal</span></span><i>›</i></button>
+          <button class="card set-btn" data-panel="lang"><span class="ic" style="--ic:var(--cell)">
+            <svg viewBox="0 0 24 24" class="ai ai-lang"><path d="M4 5h9M8.5 3v2M6 5c.6 3.5 2.8 6 6 7.5M11 5c-.8 3.6-3.2 6.4-6.5 8"/><path d="M12.5 20l4-9 4 9M14 17h5"/></svg></span>
+            <span><b>Limbă · Language</b><span id="set-lang-sub">Română</span></span><i>›</i></button>
           <button class="card set-btn" data-panel="notif"><span class="ic" style="--ic:var(--warn)">
             <svg viewBox="0 0 24 24" class="ai ai-notif"><g class="a-swing"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15z"/><path class="a-clap" d="M10 21h4"/></g></svg></span>
             <span><b>Notificări</b><span id="set-notif-sub">Alertele pe telefon</span></span><i>›</i></button>
@@ -208,6 +211,16 @@
             <p class="note" id="ed-msg"></p>
           </div>
         </div>
+      </section>
+
+      <section class="set-panel" id="set-lang" hidden>
+        <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Limbă · Language</h2></div>
+        <div class="list lang-list">
+          <button class="row lang-opt" data-lang="ro"><span>Română</span><b class="ck">✓</b></button>
+          <button class="row lang-opt" data-lang="en"><span>English</span><b class="ck">✓</b></button>
+        </div>
+        <p class="note">Limba aplicației, aceeași pe toate telefoanele legate la acest Pi.</p>
+        <p class="note" id="lang-msg"></p>
       </section>
 
       <section class="set-panel" id="set-teme" hidden>
@@ -511,6 +524,8 @@
     </div>
   </dialog>
 
+  <script src="lang-en.js"></script>
+  <script src="i18n.js"></script>
   <script src="app.js"></script>
   <div id="pvpop" class="pvpop" role="dialog" aria-label="Panouri" hidden></div>
 </body>

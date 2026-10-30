@@ -26,6 +26,9 @@ def _json(data, status=200):
     return web.json_response(data, status=status, dumps=lambda o: json.dumps(o, ensure_ascii=False, default=str))
 
 
+LANGS = ("ro", "en")
+
+
 def sum_energy(parts: list[list[dict]]) -> list[dict]:
     """Energia pe zi a mai multor invertoare în paralel, adunată pe aceeași zi (ordinea primului invertor)."""
     if len(parts) == 1:
@@ -215,6 +218,7 @@ def make_app(engine) -> web.Application:
         return _json(dict(devices=devs, auth=auth_.enabled, poll_interval=cfg["poll_interval"], version=__version__,
                           port=int((cfg.get("web") or {}).get("port") or 8080),
                           site_name=cfg.get("site_name") or "", setup_needed=setup_needed(cfg),
+                          lang=cfg.get("language") if cfg.get("language") in LANGS else "ro",
                           password_reset=reset_pending(), edition=ed["v"], pi_id=pid,
                           public_url=wp.subject if wp else None,
                           notifications=engine.notifier.enabled,
@@ -614,6 +618,16 @@ def make_app(engine) -> web.Application:
                           devices=[{k: d.get(k) for k in ("id", "name", "type", "port", "ble", "capacity_ah",
                                                           "baudrate", "address")} for d in cfg["devices"]],
                           scan=scan_job))
+
+    async def set_language(request):
+        """Limba aplicației, una pentru tot Pi-ul (ecranele; mai târziu și notificările și rapoartele)."""
+        body = await request.json()
+        lang = body.get("lang")
+        if lang not in LANGS:
+            return _json({"error": "limbă necunoscută"}, 400)
+        await asyncio.to_thread(save_overlay, cfg, {"language": lang})
+        cfg["language"] = lang
+        return _json({"ok": True, "lang": lang})
 
     async def setup_name(request):
         body = await request.json()
@@ -1130,6 +1144,7 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/", index)
     app.router.add_post("/api/login", login)
     app.router.add_get("/api/info", info)
+    app.router.add_post("/api/language", set_language)
     app.router.add_get("/api/health", health)
     app.router.add_post("/api/pro/activate", pro_activate)
     app.router.add_get("/api/live", live)
