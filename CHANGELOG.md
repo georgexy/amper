@@ -7,8 +7,10 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
   iconiță: se umple de jos în sus, pe segmente), cu procentul scris alb cu contur închis, ca să se citească bine.
 - Teme Cadrane și Carduri: sub Panouri scrie cât s-a produs azi, iar sub Consum cât s-a consumat azi.
 - Setări → **Limbă · Language**: română sau engleză, aceeași pe toate telefoanele legate la Pi. Deocamdată sunt
-  traduse ecranele aplicației; notificările, alertele, rapoartele și mesajele de la BMS / invertor (scrise pe Pi)
-  rămân în română până la etapa următoare.
+  traduse ecranele aplicației și, în engleză, și textele scrise pe Pi: notificările, alertele, Raport baterii și
+  raportul nopții, sănătatea celulelor, stările și defectele BMS-urilor și ale invertoarelor, setările și comenzile
+  BMS, mesajele de eroare, actualizările și schimbarea WiFi. Rămân în română: notele versiunilor și pagina de
+  conectare WiFi a hotspotului „Amper-Setup”.
 
 ## 1.0.0-beta.13 — 2026-10-30
 - **Raport baterii** (Bateriile → „Raport baterii”): la deschidere arată raportul ultimei nopți (cu ‹ › pentru

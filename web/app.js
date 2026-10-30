@@ -96,6 +96,7 @@ async function boot() {
     try { localStorage.setItem("lang", state.info.lang || "ro"); if (localStorage.getItem("lang") === (state.info.lang || "ro")) return location.reload(); } catch {}
   }
   $("#set-lang-sub").textContent = LANG === "en" ? "English" : "Română";
+  I18N.setNames(state.info.devices.map((d) => d.name));
   $("#login").hidden = true;
   if (state.info.setup_needed) return openSetup(false);
   if (state.info.password_reset) return openSetup(false, "password", true);

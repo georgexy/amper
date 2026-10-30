@@ -84,6 +84,9 @@ class Engine:
         self._energy_t: dict[str, float] = {}
         self._energy_acc: dict[tuple, dict] = {}
         self._clock_offset = time.time() - time.monotonic()
+        from . import i18n                         # limba notificărilor, alertelor și rapoartelor
+        i18n.set_lang(cfg.get("language"))
+        i18n.set_names(self.device_names().values())
 
     # ---------------- MOSFET-uri oprite din Amper (comenzile Daly) ----------------
     FORCED_META = "daly_forced"

@@ -1,6 +1,6 @@
 /* Service worker: aplicația se deschide instant și arată ultima versiune salvată dacă Pi-ul nu răspunde. */
-const CACHE = "amper-v18";
-const SHELL = ["/", "/app.css", "/app.js", "/i18n.js", "/lang-en.js", "/manifest.webmanifest", "/icon.svg", "/icon-192.png",
+const CACHE = "amper-v19";
+const SHELL = ["/", "/app.css", "/app.js", "/i18n.js", "/lang-en.js", "/lang-en-srv.js", "/manifest.webmanifest", "/icon.svg", "/icon-192.png",
   "/fonts/barlow-latin-400-normal.woff2", "/fonts/barlow-latin-600-normal.woff2",
   "/fonts/barlow-condensed-latin-600-normal.woff2", "/fonts/barlow-condensed-latin-700-normal.woff2"];
 

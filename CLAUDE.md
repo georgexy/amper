@@ -581,5 +581,12 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   confirm/alert și textele care conțin nume sau date: `t("…")` și `tf("… {0} …", x)` în app.js.
 - REGULĂ: orice text nou din aplicație se adaugă și în `web/lang-en.js` (`tests/test_i18n.py` verifică toate
   apelurile `t()`/`tf()`; pentru restul textelor: crawl în simulator cu limba en și căutarea cuvintelor românești).
-- Etapa 2 (următoarea): textele scrise pe Pi — notificări, alerte (`alerts.py`), Raport baterii / raportul nopții,
-  sănătatea celulelor, stările și erorile driverelor, catalogul, mesajele de eroare din API, CHANGELOG (de la stabilă).
+- Etapa 2 (făcută, beta.14): textele scrise pe Pi rămân în ROMÂNĂ în cod și în DB; `amper/i18n.py` `tr()` le traduce
+  după `amper/lang/en.json` (cheia = textul românesc: „#” număr, „@” nume de dispozitiv din config, „{}” orice text
+  dintr-o frază, „{...}” orice text; ce e prins se traduce și el; emoji-ul din față rămâne; mesajele compuse se
+  traduc pe bucăți la „: ”, „; ”, „ · ”, „ — ”, „. ”, „, ”). Unde: `Notifier.send` (și `amper notify`, pentru
+  amper-update), `web._json` (cheile `error/message/warning/why/detail`, 2 niveluri), `i18n.report` (rapoartele,
+  sănătatea celulelor). Aplicația primește același dicționar (`/lang-en-srv.js`, peste `EN`) și traduce cu el
+  alertele, stările, setările BMS etc. afișate. Netraduse: notele versiunilor (CHANGELOG, de la stabilă), pagina
+  hotspotului (`wifi_setup.py`), mesajele din linia de comandă.
+- REGULĂ (etapa 2): orice text nou scris pe Pi și văzut de utilizator → intrare în `amper/lang/en.json`.
