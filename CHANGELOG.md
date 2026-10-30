@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.13 — în pregătire
+## 1.0.0-beta.13 — 2026-10-30
 - **Raport baterii** (Bateriile → „Raport baterii”): la deschidere arată raportul ultimei nopți (cu ‹ › pentru
   nopțile anterioare, până la 14), iar din taburi alegi altă perioadă: 2, 3, 7, 30 de zile sau „Aleg eu” (de la – până
   la). Raportul nopții: un text despre noapte și un tabel pe module (SOC la început și la final, scădere, curent mediu,

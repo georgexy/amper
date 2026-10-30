@@ -523,7 +523,7 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   Puterea din stânga (`bw`): clasa `chg` verde / `dis` roșu. Eticheta de pe linie (`.f-blabel`) SCOASĂ definitiv
   (cerut 2026-10-29: „scrisul de pe linie îl eliminăm, rămâne doar cel din stânga”).
 
-## Invertoare în paralel (1.0.0-beta.13, în pregătire, cerut 2026-10-30)
+## Invertoare în paralel (1.0.0-beta.13, cerut 2026-10-30)
 - Caz: două Growatt SPF 5000 cu cablu de paralel, aceeași casă și aceeași baterie, fiecare cu stringul lui; fiecare pe
   cablul lui USB (id-uri `inverter`, `inverter2`…). `app.js`: `inverters()` + `combineInverters` → `inverter()` dă
   obiectul `_all` (sume PV/consum/rețea/baterie, media tensiunii, temperatura maximă, `strings`, `parts`); `sumRows`
@@ -538,7 +538,7 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   invertorului. Editorul: „Acum” = valorile fiecăruia, câmpul pornește de la primul (`preselect`/`initial`), după
   scriere (și după eșec) se recitește. NEVERIFICAT cu două aparate reale.
 
-## Raportul nopții (1.0.0-beta.13, în pregătire, cerut 2026-10-30)
+## Raportul nopții (1.0.0-beta.13, cerut 2026-10-30)
 - Cerut după o analiză făcută de mână a unei nopți (text + tabel). `amper/night_report.py`: `find_night` = ultima
   perioadă continuă cu PV < 50 W (≥ 3 h, max 15 h; găurile de date nu o rup), fără invertor 21:30 → 07:00;
   `build(db, names, now)` din `db.samples` (brute) → `rows` (SOC început/final, scădere, curent mediu, % citiri 0 A,
