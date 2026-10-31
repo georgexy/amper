@@ -226,7 +226,8 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   urmărit, <90 ușor diferită, `trend` 8 săptămâni, `describe` (text). `weekly` luni ≥ 9:00 (meta `cell_health_last`,
   din maintenance_loop): notificare doar pentru nivel 2 sau ușor diferită dar mereu la capăt (≥ 70%), url `/?v=cells`.
   API `GET /api/cells/health` (ambele ediții). UI: `#ch-row` (după lista din Bateriile), `view-cells`, `loadCells`.
-  `loadCells`: un cartonaș `.rk-grp` pe modul (titlul `.rk-h`), cu rândurile `.rk` „Celula N” (cerut 2026-10-31).
+  `loadCells`: un cartonaș `.rk-grp` pe modul (titlul `.rk-h`), cu rândurile `.rk` pe o linie: „Celula N” · valorile · starea, scorul în dreapta; fără graficul pe 8
+  săptămâni (cerut 2026-10-31).
   NEVERIFICAT pe date reale: pragurile (3,40/3,10 V, 15 A, scorul) se pot ajusta după primele săptămâni.
 - 2026-10-28 (1.0.0-beta.7): la 0x5F octeții 4..7 se schimbă singuri între citiri (Daly 1: `…00014b32` →
   `…700c7232`); `write_field` compară acum doar octeții câmpului (restul → doar avertisment în jurnal). Scrierea

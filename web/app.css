@@ -634,7 +634,11 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
   grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
 .rk-grp { background: var(--panel); border-radius: 16px; padding: 11px 13px 3px; margin-bottom: 8px; }
 .rk-h { font: 700 19px "Barlow Condensed", sans-serif; padding-bottom: 6px; }
-.rk-grp .rk { background: none; border-radius: 0; padding: 9px 0 8px; margin: 0; border-top: 1px solid var(--line); }
+.rk-grp .rk { background: none; border-radius: 0; padding: 8px 0; margin: 0; border-top: 1px solid var(--line); }
+.rk .ln { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; min-width: 0; }
+.rk .ln .n { margin: 0; }
+.rk .ln .v { font-size: 13px; color: var(--muted); } .rk .ln .v b { color: var(--text); }
+.rk .ln .chip { font-size: 12px; padding: 3px 8px; }
 .rk .n { font: 700 17px "Barlow Condensed", sans-serif; margin-bottom: 3px; }
 .rk .m { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
 .rk .m span { font-size: 11.5px; background: var(--panel-2); border-radius: 8px; padding: 3px 7px; color: var(--muted); }

@@ -703,13 +703,6 @@ async function loadCellsRow() {
 }
 $("#ch-row").onclick = () => show("cells");
 $("#ch-back").onclick = () => show("packs");
-function spark(v, color) {
-  const pts = v.map((y, i) => [i, y]).filter(([, y]) => y != null);
-  if (pts.length < 2) return "";
-  const ys = pts.map(([, y]) => y), mn = Math.min(...ys), mx = Math.max(...ys), W = 92, H = 30;
-  const p = pts.map(([i, y]) => `${(i * W / (v.length - 1)).toFixed(1)},${(H - 4 - (y - mn) / ((mx - mn) || 1) * (H - 8)).toFixed(1)}`).join(" ");
-  return `<svg viewBox="0 0 ${W} ${H}" width="92" height="30"><polyline points="${p}" fill="none" stroke="${color}" stroke-width="2"/></svg>`;
-}
 /* raportul nopții: text + tabel, calculat pe server din citirile nopții (night_report.py); ‹ › = alte nopți */
 const nr = { ago: 0 };
 const md = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
@@ -823,10 +816,10 @@ async function loadCells() {
       const m = [c.dis != null ? `la descărcare <b>${mv(c.dis)}</b>${c.dis_low && c.dis_low[0] ? ` (${c.dis_low[0]} din ${c.dis_low[1]})` : ""}` : null,
         c.chg != null ? `la încărcare <b>${mv(c.chg)}</b>${c.chg_top && c.chg_top[0] ? ` (${c.chg_top[0]} din ${c.chg_top[1]})` : ""}` : null,
         c.ir_rel != null ? `rezistență <b>${c.ir_rel > 0 ? "+" : ""}${c.ir_rel}%</b>` : null].filter(Boolean);
-      return `<div class="rk"><div><div class="n">Celula ${c.cell}</div><span class="chip ${CH_LV[c.level][0]}">${CH_LV[c.level][1]}</span></div>
-        <div class="score" style="color:${color}">${c.score}<small>scor / 100</small></div>
-        <div class="m">${m.map((x) => `<span>${x}</span>`).join("")}</div>
-        <div class="tr">abatere în ultimele 8 săptămâni ${spark(c.trend, color)}</div></div>`;
+      // un rând (cerut 2026-10-31): celula · valorile · starea, iar scorul în dreapta
+      return `<div class="rk"><div class="ln"><span class="n">Celula ${c.cell}</span>${m.map((x) => `<span class="v">${x}</span>`).join("")}
+        <span class="chip ${CH_LV[c.level][0]}">${CH_LV[c.level][1]}</span></div>
+        <div class="score" style="color:${color}">${c.score}<small>scor / 100</small></div></div>`;
     }).join("") + "</div>").join("") +
     `<h2>${r.cells.length ? `Celelalte ${r.ok_count} de celule` : `Toate cele ${r.ok_count} de celule`}</h2>
     <div class="mod ch-ok"><span>${r.ok_range ? `Toate în regulă · scor ${r.ok_range[0] === r.ok_range[1] ? r.ok_range[0] : r.ok_range.join("–")}` : "Toate în regulă"}</span><span class="chip ok">În regulă</span></div>
