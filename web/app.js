@@ -816,16 +816,18 @@ async function loadCells() {
   const mv = (v) => `${v > 0 ? "+" : ""}${num(v, 0)} mV`;
   const worst = r.cells[0];
   box.innerHTML = (worst && worst.level ? `<div class="ch-alert ${worst.level === 2 ? "al" : ""}"><b>${esc(worst.text.split(":")[0])}</b>${esc(worst.text.split(":").slice(1).join(":").trim())}</div>` : "") +
-    r.cells.map((c) => {
+    // un cartonaș pe modul (cerut 2026-10-31): titlul = modulul, dedesubt celulele lui, cele mai slabe primele
+    [...new Set(r.cells.map((c) => c.name))].map((name) => `<div class="rk-grp"><div class="rk-h">${esc(name)}</div>` +
+    r.cells.filter((c) => c.name === name).map((c) => {
       const color = c.level === 2 ? "var(--alarm)" : "var(--warn)";
       const m = [c.dis != null ? `la descărcare <b>${mv(c.dis)}</b>${c.dis_low && c.dis_low[0] ? ` (${c.dis_low[0]} din ${c.dis_low[1]})` : ""}` : null,
         c.chg != null ? `la încărcare <b>${mv(c.chg)}</b>${c.chg_top && c.chg_top[0] ? ` (${c.chg_top[0]} din ${c.chg_top[1]})` : ""}` : null,
         c.ir_rel != null ? `rezistență <b>${c.ir_rel > 0 ? "+" : ""}${c.ir_rel}%</b>` : null].filter(Boolean);
-      return `<div class="rk"><div><div class="n">${esc(c.name)} · celula ${c.cell}</div><span class="chip ${CH_LV[c.level][0]}">${CH_LV[c.level][1]}</span></div>
+      return `<div class="rk"><div><div class="n">Celula ${c.cell}</div><span class="chip ${CH_LV[c.level][0]}">${CH_LV[c.level][1]}</span></div>
         <div class="score" style="color:${color}">${c.score}<small>scor / 100</small></div>
         <div class="m">${m.map((x) => `<span>${x}</span>`).join("")}</div>
         <div class="tr">abatere în ultimele 8 săptămâni ${spark(c.trend, color)}</div></div>`;
-    }).join("") +
+    }).join("") + "</div>").join("") +
     `<h2>${r.cells.length ? `Celelalte ${r.ok_count} de celule` : `Toate cele ${r.ok_count} de celule`}</h2>
     <div class="mod ch-ok"><span>${r.ok_range ? `Toate în regulă · scor ${r.ok_range[0] === r.ok_range[1] ? r.ok_range[0] : r.ok_range.join("–")}` : "Toate în regulă"}</span><span class="chip ok">În regulă</span></div>
     <p class="note">${data}</p>`;

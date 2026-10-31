@@ -396,7 +396,7 @@ const EN = {
   ". Actualizările din aplicație merg doar pe Pi-ul instalat cu install.sh.": ". Updates from the app only work on a Pi installed with install.sh.",
   "{}. Accesul de oriunde se pornește doar pe Pi-ul instalat cu install.sh.": "{}. Remote access can only be turned on on a Pi installed with install.sh.",
   "{}. Actualizările din aplicație merg doar pe Pi-ul instalat cu install.sh.": "{}. Updates from the app only work on a Pi installed with install.sh.",
-  "# de celule urmărite": "# cells tracked",
+  "# de celule urmărite": "# cells tracked", "Celula #": "Cell #",
   "Procesor": "Processor", "Memorie": "Memory", "Alimentare": "Power supply", "Porturi USB": "USB ports", "Temperatură": "Temperature",
   "# / # GB": "# / # GB", "# / # MB": "# / # MB",
 

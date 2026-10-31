@@ -2,6 +2,10 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.15 — în pregătire
+- Sănătatea celulelor: celulele care ies în evidență sunt grupate pe module — un singur cartonaș pe BMS, cu numele
+  modulului sus și dedesubt celulele lui, cele mai slabe primele.
+
 ## 1.0.0-beta.14 — 2026-10-30
 - Tema Cadrane: bateria e acum sub cele patru cadrane, deasupra graficului zilei, și arată ca o baterie (ca în
   iconiță: se umple de jos în sus, pe segmente), cu procentul scris alb cu contur închis, ca să se citească bine.
