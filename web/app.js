@@ -807,6 +807,7 @@ async function loadCells() {
     return;
   }
   const mv = (v) => `${v > 0 ? "+" : ""}${num(v, 0)} mV`;
+  const wait = (r.modules || []).filter((m) => !m.ready);
   const worst = r.cells[0];
   box.innerHTML = (worst && worst.level ? `<div class="ch-alert ${worst.level === 2 ? "al" : ""}"><b>${esc(worst.text.split(":")[0])}</b>${esc(worst.text.split(":").slice(1).join(":").trim())}</div>` : "") +
     // un cartonaș pe modul (cerut 2026-10-31): titlul = modulul, dedesubt celulele lui, cele mai slabe primele
@@ -821,9 +822,15 @@ async function loadCells() {
         <span class="chip ${CH_LV[c.level][0]}">${CH_LV[c.level][1]}</span></div>
         <div class="score" style="color:${color}">${c.score}<small>scor / 100</small></div></div>`;
     }).join("") + "</div>").join("") +
-    `<h2>${r.cells.length ? `Celelalte ${r.ok_count} de celule` : `Toate cele ${r.ok_count} de celule`}</h2>
-    <div class="mod ch-ok"><span>${r.ok_range ? `Toate în regulă · scor ${r.ok_range[0] === r.ok_range[1] ? r.ok_range[0] : r.ok_range.join("–")}` : "Toate în regulă"}</span><span class="chip ok">În regulă</span></div>
-    <p class="note">${data}</p>`;
+    (r.ok_count ? `<h2>${r.cells.length ? `Celelalte ${r.ok_count} de celule` : `Toate cele ${r.ok_count} de celule`}${wait.length ? " analizate" : ""}</h2>
+    <div class="mod ch-ok"><span>${r.ok_range ? `Toate în regulă · scor ${r.ok_range[0] === r.ok_range[1] ? r.ok_range[0] : r.ok_range.join("–")}` : "Toate în regulă"}</span><span class="chip ok">În regulă</span></div>` : "") +
+    // modulele care n-au încă destule momente (≥ 3 de același fel): celulele lor nu sunt în analiză
+    (wait.length ? `<h2>Încă fără destule date</h2><div class="rk-grp">${wait.map((m) => `<div class="rk"><div class="ln">
+      <span class="n">${esc(m.name)}</span><span class="v">${m.cells} celule</span></div><span class="chip">Se adună</span>
+      <div class="m"><span>încărcări complete <b>${m.chg}</b></span><span>descărcări adânci <b>${m.dis}</b></span><span>salturi de curent <b>${m.ir}</b></span></div></div>`).join("")}</div>
+      <p class="note">Un modul intră în analiză după cel puțin 3 momente de același fel. Saltul de curent se măsoară
+      când curentul modulului se schimbă cu cel puțin 15 A în câteva secunde.</p>` : "") +
+    `<p class="note">${data}</p>`;
 }
 
 /* ------------------------------------------------------------------ ecranul INVERTOR */

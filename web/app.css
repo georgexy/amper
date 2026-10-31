@@ -635,6 +635,7 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .rk-grp { background: var(--panel); border-radius: 16px; padding: 11px 13px 3px; margin-bottom: 8px; }
 .rk-h { font: 700 19px "Barlow Condensed", sans-serif; padding-bottom: 6px; }
 .rk-grp .rk { background: none; border-radius: 0; padding: 8px 0; margin: 0; border-top: 1px solid var(--line); }
+.rk-grp .rk:first-child { border-top: 0; }
 .rk .ln { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; min-width: 0; }
 .rk .ln .n { margin: 0; }
 .rk .ln .v { font-size: 13px; color: var(--muted); } .rk .ln .v b { color: var(--text); }

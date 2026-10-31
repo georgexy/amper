@@ -6,6 +6,9 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Sănătatea celulelor: celulele care ies în evidență sunt grupate pe module — un singur cartonaș pe BMS, cu numele
   modulului sus și dedesubt celulele lui, cele mai slabe primele. Fiecare celulă e pe un rând: celula, valorile
   (ex. rezistență +65%), starea și, în dreapta, scorul.
+- Sănătatea celulelor: modulele care încă n-au destule măsurători apar separat, la „Încă fără destule date”, cu
+  câte încărcări complete, descărcări adânci și salturi de curent au strâns. Înainte, celulele lor lipseau fără
+  explicație, iar „Celelalte 29 de celule” părea să cuprindă toată banca.
 
 ## 1.0.0-beta.14 — 2026-10-30
 - Tema Cadrane: bateria e acum sub cele patru cadrane, deasupra graficului zilei, și arată ca o baterie (ca în

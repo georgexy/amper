@@ -89,14 +89,15 @@ def _de(n: int) -> str:
 def analyze(db, names: dict[str, str], now: float | None = None) -> dict:
     """Pe fiecare celulă: abaterea mediană la final de încărcare și la descărcare (mV), de câte ori a fost cea mai sus /
     cea mai jos, rezistența față de celelalte (%), scorul 0–100 și evoluția pe săptămâni. Celulele cu scor sub 90,
-    cele mai slabe primele, în `cells`; restul numărate în `ok_count`."""
+    cele mai slabe primele, în `cells`; restul numărate în `ok_count`. `modules` = câte momente are fiecare modul
+    (`ready` = are destule pentru măsurătoare, altfel celulele lui nu intră încă în analiză)."""
     now = now or time.time()
     since = now - TREND_WEEKS * WEEK
     rows = db.cell_events(int(since))
     by: dict[str, dict[str, list]] = {}
     for r in rows:
         by.setdefault(r["device"], {}).setdefault(r["kind"], []).append((r["ts"], json.loads(r["vals"])))
-    out, ok_scores, totals = [], [], {"chg": 0, "dis": 0, "ir": 0}
+    out, ok_scores, totals, mods = [], [], {"chg": 0, "dis": 0, "ir": 0}, {}
     win = now - WINDOW_DAYS * 86400
     for dev, kinds in by.items():
         n = max((len(v) for evs in kinds.values() for _, v in evs), default=0)
@@ -104,6 +105,8 @@ def analyze(db, names: dict[str, str], now: float | None = None) -> dict:
         for k in totals:
             totals[k] += len(recent.get(k, []))
         chg, dis, ir = recent.get("chg", []), recent.get("dis", []), recent.get("ir", [])
+        mods[dev] = dict(device=dev, name=names.get(dev, dev), cells=n, chg=len(chg), dis=len(dis), ir=len(ir),
+                         ready=max(len(chg), len(dis), len(ir)) >= MIN_EVENTS)
         ir_med = statistics.median([statistics.median(e) for e in ir]) if len(ir) >= MIN_EVENTS else None
         for i in range(n):
             c = dict(device=dev, name=names.get(dev, dev), cell=i + 1, chg=None, dis=None, chg_top=None,
@@ -126,7 +129,9 @@ def analyze(db, names: dict[str, str], now: float | None = None) -> dict:
     out.sort(key=lambda c: c["score"])
     for c in out:
         c["text"] = describe(c)
-    return dict(cells=out, ok_count=len(ok_scores), ok_range=[min(ok_scores), max(ok_scores)] if ok_scores else None,
+    order = list(names)
+    return dict(cells=out, ok_count=len(ok_scores),
+                modules=sorted(mods.values(), key=lambda m: order.index(m["device"]) if m["device"] in order else 99), ok_range=[min(ok_scores), max(ok_scores)] if ok_scores else None,
                 events=totals, window_days=WINDOW_DAYS, ts=int(now),
                 enough=totals["chg"] >= MIN_EVENTS or totals["dis"] >= MIN_EVENTS)
 

@@ -228,6 +228,9 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   API `GET /api/cells/health` (ambele ediții). UI: `#ch-row` (după lista din Bateriile), `view-cells`, `loadCells`.
   `loadCells`: un cartonaș `.rk-grp` pe modul (titlul `.rk-h`), cu rândurile `.rk` pe o linie: „Celula N” · valorile · starea, scorul în dreapta; fără graficul pe 8
   săptămâni (cerut 2026-10-31).
+  `analyze` dă și `modules` [{device, name, cells, chg, dis, ir, ready}] (ready = ≥ MIN_EVENTS de un fel); web.py
+  adaugă modulele conectate fără niciun moment. UI: „Încă fără destule date” pentru cele cu `ready` fals (2026-10-31:
+  utilizatorul a văzut 3 + 29 = 32 din 48 de celule; al treilea modul avea sub 3 momente de fiecare fel).
   NEVERIFICAT pe date reale: pragurile (3,40/3,10 V, 15 A, scorul) se pot ajusta după primele săptămâni.
 - 2026-10-28 (1.0.0-beta.7): la 0x5F octeții 4..7 se schimbă singuri între citiri (Daly 1: `…00014b32` →
   `…700c7232`); `write_field` compară acum doar octeții câmpului (restul → doar avertisment în jurnal). Scrierea
