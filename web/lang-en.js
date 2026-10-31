@@ -397,13 +397,6 @@ const EN = {
   "{}. Accesul de oriunde se pornește doar pe Pi-ul instalat cu install.sh.": "{}. Remote access can only be turned on on a Pi installed with install.sh.",
   "{}. Actualizările din aplicație merg doar pe Pi-ul instalat cu install.sh.": "{}. Updates from the app only work on a Pi installed with install.sh.",
   "# de celule urmărite": "# cells tracked", "Celula #": "Cell #",
-  "Celelalte # de celule": "The other # cells", "Toate cele # de celule": "All # cells",
-  "Celelalte # de celule analizate": "The other # cells analysed", "Toate cele # de celule analizate": "All # cells analysed",
-  "Toate în regulă": "All fine", "Toate în regulă · scor #–#": "All fine · score #–#", "Toate în regulă · scor #": "All fine · score #",
-  "Încă fără destule date": "Not enough data yet", "# celule": "# cells", "Se adună": "Collecting",
-  "încărcări complete": "full charges", "descărcări adânci": "deep discharges", "salturi de curent": "current steps",
-  "Un modul intră în analiză după cel puțin # momente de același fel. Saltul de curent se măsoară când curentul modulului se schimbă cu cel puțin # A în câteva secunde.":
-    "A module enters the analysis after at least # moments of the same kind. A current step is measured when the module's current changes by at least # A within a few seconds.",
   "Procesor": "Processor", "Memorie": "Memory", "Alimentare": "Power supply", "Porturi USB": "USB ports", "Temperatură": "Temperature",
   "# / # GB": "# / # GB", "# / # MB": "# / # MB",
 

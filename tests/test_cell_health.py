@@ -1,6 +1,5 @@
 """Sănătatea celulelor: momentele salvate (final de încărcare, descărcare adâncă, salturi de curent), analiza pe
 celule (abatere, de câte ori e la capăt, rezistență, scor, evoluție) și notificarea săptămânală."""
-import json
 import time
 
 from amper import cell_health as ch
@@ -74,19 +73,6 @@ def test_weak_cell_found_ranked_and_described():
     assert worst["text"].startswith("Daly 2 · celula 7 rămâne în urmă: cea mai jos la")
     assert "rezistența internă e cu" in worst["text"] and "a crescut" in worst["text"]
     assert len(res["cells"]) == 1 and res["ok_count"] == 31            # celelalte 31 în regulă
-    assert [(m["name"], m["cells"], m["ready"]) for m in res["modules"]] == [("Daly 1", 16, True), ("Daly 2", 16, True)]
-
-
-def test_module_without_enough_moments_is_listed_apart():
-    """Un modul cu doar 2 salturi de curent nu intră în analiză și nu e numărat „în regulă” (cerut 2026-10-31)."""
-    db = Database(":memory:")
-    now = fill(db)
-    for k in range(2):
-        db.add_cell_event(int(now - (k + 1) * 3600), "daly3", "ir", json.dumps([1.0] * 16))
-    res = ch.analyze(db, {"daly1": "Daly 1", "daly2": "Daly 2", "daly3": "Daly 3"}, now)
-    d3 = res["modules"][-1]
-    assert (d3["name"], d3["ir"], d3["ready"]) == ("Daly 3", 2, False)
-    assert res["ok_count"] == 31 and all(c["device"] != "daly3" for c in res["cells"])
 
 
 def test_weekly_notifies_only_when_needed():

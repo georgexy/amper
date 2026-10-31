@@ -1075,13 +1075,8 @@ def make_app(engine) -> web.Application:
         res = await asyncio.to_thread(cell_health.analyze, engine.db, engine.device_names())
         last = await asyncio.to_thread(engine.db.get_meta, cell_health.META)
         res["last_weekly"] = int(float(last)) if last else None
-        packs = {d: st for d, st in engine.devices.items() if isinstance(st.reading, PackReading) and st.connected}
-        res["tracked"] = sum(len(st.reading.cells or []) for st in packs.values())
-        # modulele conectate fără niciun moment salvat apar și ele, ca „încă fără date”
-        have = {m["device"] for m in res["modules"]}
-        names = engine.device_names()
-        res["modules"] += [dict(device=d, name=names.get(d, d), cells=len(st.reading.cells or []), chg=0, dis=0, ir=0,
-                                ready=False) for d, st in packs.items() if d not in have]
+        res["tracked"] = sum(len(st.reading.cells or []) for st in engine.devices.values()
+                             if isinstance(st.reading, PackReading) and st.connected)
         return _json(i18n.report(res))
 
     # ---------------- raportul nopții ----------------
