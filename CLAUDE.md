@@ -498,7 +498,7 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `pro_code` în settings.yaml. `web.py`: middleware `pro_only` (403 `pro_required`), `/api/info.edition/pi_id`,
   `POST /api/pro/activate {code, app_password}`. `app.js`: `isPro()`, `renderEdition()`, `#ed-card`, `#iv-pro/#iv-lite`.
 - Antetul (2026-11-01): „Amper” + `#hd-ed` „Pro” (culoarea temei) / „Lite” (gri), din `renderEdition()` la pornire;
-  `site_name` doar în `document.title`.
+  `site_name` pe rândul `#site-line` („📍 nume”, varianta C aleasă din 3 machete) și în `document.title`.
 - Coduri: `.github/workflows/pro-code.yml` (Actions → „Cod Pro” → ID; codul în rezumatul rulării — public, dar
   merge doar pe acel Pi) sau `AMPER_SIGNING_KEY=… python tools/release.py pro <ID>`.
 - Aplicația de coduri (cerută 2026-10-28): `site/coduri/index.html` → https://georgexy.github.io/amper/coduri/

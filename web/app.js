@@ -102,8 +102,12 @@ async function boot() {
   if (state.info.password_reset) return openSetup(false, "password", true);
   $("#app").hidden = false;
   $("#simnote").hidden = !state.info.simulated;
-  // sus: AmperPro / AmperLite (cerut 2026-11-01); numele instalației rămâne în titlul paginii
-  if (state.info.site_name) document.title = `Amper · ${state.info.site_name}`;
+  // sus: AmperPro / AmperLite; numele instalației pe rândul de sub antet, cu 📍 (varianta C, cerut 2026-11-01)
+  if (state.info.site_name) {
+    document.title = `Amper · ${state.info.site_name}`;
+    $("#site-line-name").textContent = state.info.site_name;
+    $("#site-line").hidden = false;
+  }
   renderEdition();
   connect();
   loadEnergy();
