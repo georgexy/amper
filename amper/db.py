@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS push_subs (
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 
 -- sănătatea celulelor (cell_health.py): abaterile celulelor la final de încărcare / descărcare adâncă (mV) și
--- rezistențele la salturi de curent (mΩ), ca listă JSON pe fiecare moment util
+-- rezistențele din variațiile de curent (mΩ), ca listă JSON pe fiecare moment util
 CREATE TABLE IF NOT EXISTS cell_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, device TEXT NOT NULL, kind TEXT NOT NULL, vals TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS ix_cell_events_ts ON cell_events(ts);
@@ -91,6 +91,9 @@ class Database:
             # coloana „key” (identitatea alertei, ca să rămână deschisă peste o repornire) — adăugată ulterior
             if "key" not in {r[1] for r in self.conn.execute("PRAGMA table_info(alerts)")}:
                 self.conn.execute("ALTER TABLE alerts ADD COLUMN key TEXT")
+            # cell_events.meta (JSON: câte citiri, echilibrare, calitatea regresiei) — adăugată în 1.0.0-beta.16
+            if "meta" not in {r[1] for r in self.conn.execute("PRAGMA table_info(cell_events)")}:
+                self.conn.execute("ALTER TABLE cell_events ADD COLUMN meta TEXT")
 
     # ---------- scriere ----------
     def insert_pack(self, r: PackReading, ts: int | None = None) -> None:
@@ -175,19 +178,19 @@ class Database:
                 "INSERT INTO settings_log (ts, device, setting, old, new, ok, error, source) VALUES (?,?,?,?,?,?,?,?)",
                 (ts, device, setting, old, new, int(ok), error, source))
 
-    def add_cell_event(self, ts: int, device: str, kind: str, vals: str) -> int:
+    def add_cell_event(self, ts: int, device: str, kind: str, vals: str, meta: str | None = None) -> int:
         with self.lock:
-            return self.conn.execute("INSERT INTO cell_events (ts, device, kind, vals) VALUES (?,?,?,?)",
-                                     (ts, device, kind, vals)).lastrowid
+            return self.conn.execute("INSERT INTO cell_events (ts, device, kind, vals, meta) VALUES (?,?,?,?,?)",
+                                     (ts, device, kind, vals, meta)).lastrowid
 
-    def update_cell_event(self, row_id: int, ts: int, vals: str) -> None:
+    def update_cell_event(self, row_id: int, ts: int, vals: str, meta: str | None = None) -> None:
         with self.lock:
-            self.conn.execute("UPDATE cell_events SET ts=?, vals=? WHERE id=?", (ts, vals, row_id))
+            self.conn.execute("UPDATE cell_events SET ts=?, vals=?, meta=? WHERE id=?", (ts, vals, meta, row_id))
 
     def cell_events(self, since: int) -> list[dict]:
         with self.lock:
             return [dict(r) for r in self.conn.execute(
-                "SELECT ts, device, kind, vals FROM cell_events WHERE ts >= ? ORDER BY ts", (since,))]
+                "SELECT ts, device, kind, vals, meta FROM cell_events WHERE ts >= ? ORDER BY ts", (since,))]
 
     def purge_cell_events(self, before: int) -> None:
         with self.lock:

@@ -793,12 +793,14 @@ $("#nr-notify").onchange = async (e) => {
   catch { e.target.checked = !e.target.checked; }
 };
 
+// cât de sigur e rezultatul (cell_health.confidence): după numărul de momente și cât de mult diferă între ele
+const CONF = { high: "sigur", medium: "probabil", low: "incert" };
 async function loadCells() {
   const box = $("#ch-body");
   if (!cellsState.data) box.innerHTML = `<div class="note">Analizez…</div>`;
   let r;
   try { r = await fetchCells(true); } catch (e) { if (e.message !== "auth") box.innerHTML = `<div class="banner">${esc(e.message)}</div>`; return; }
-  const ev = r.events, data = `Date: ${ev.chg} încărcări complete, ${ev.dis} descărcări adânci și ${ev.ir} salturi de curent în ultimele
+  const ev = r.events, data = `Date: ${ev.chg} încărcări complete, ${ev.dis} descărcări adânci și ${ev.ir} măsurători de rezistență în ultimele
     ${Math.round(r.window_days / 7)} săptămâni. Scorul combină abaterea la încărcare, la descărcare și rezistența internă.`;
   if (!r.enough) {
     box.innerHTML = `<div class="mod ch-empty"><b>Se adună date</b><p>Diferențele dintre celule se văd doar la capete: la final de
@@ -819,7 +821,7 @@ async function loadCells() {
       // un rând (cerut 2026-10-31): celula · valorile · starea, iar scorul în dreapta
       return `<div class="rk"><div class="ln"><span class="n">Celula ${c.cell}</span>${m.map((x) => `<span class="v">${x}</span>`).join("")}
         <span class="chip ${CH_LV[c.level][0]}">${CH_LV[c.level][1]}</span></div>
-        <div class="score" style="color:${color}">${c.score}<small>scor / 100</small></div></div>`;
+        <div class="score" style="color:${color}">${c.score}<small>scor / 100</small><small class="cf ${c.confidence || ""}">${CONF[c.confidence] || ""}</small></div></div>`;
     }).join("") + "</div>").join("") +
     `<h2>${r.cells.length ? `Celelalte ${r.ok_count} de celule` : `Toate cele ${r.ok_count} de celule`}</h2>
     <div class="mod ch-ok"><span>${r.ok_range ? `Toate în regulă · scor ${r.ok_range[0] === r.ok_range[1] ? r.ok_range[0] : r.ok_range.join("–")}` : "Toate în regulă"}</span><span class="chip ok">În regulă</span></div>
