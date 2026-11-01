@@ -237,7 +237,13 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   API `GET /api/cells/health` (ambele ediții). UI: `#ch-row` (după lista din Bateriile), `view-cells`, `loadCells`.
   `loadCells`: un cartonaș `.rk-grp` pe modul (titlul `.rk-h`), cu rândurile `.rk` pe o linie: „Celula N” · valorile · starea, scorul în dreapta; fără graficul pe 8
   săptămâni (cerut 2026-10-31).
-  NEVERIFICAT pe date reale: pragurile (3,40/3,10 V, 15 A, scorul) se pot ajusta după primele săptămâni.
+  1.0.0-beta.16 (cerut 2026-11-01, „acuratețe mai mare”; utilizatorul a verificat prin SSH că modulul „lipsă” era
+  în regulă): „ir” = regresie V–I pe fereastra `IR_WINDOW` 120 s (≥ `IR_MIN_SAMPLES` 6, variație ≥ `IR_RANGE_A`
+  10 A, r² median ≥ 0,8, buffer golit la salt de ceas); episoadele = media celor `EPISODE_TOP` 5 citiri cele mai
+  extreme (fără echilibrare dacă sunt destule); `cell_events.meta` (coloană nouă, JSON n/bal/di/r2); analiza ocolește
+  episoadele doar cu echilibrare, rezistența relativă pe fiecare măsurătoare, `confidence` high/medium/low (MAD,
+  `SURE_EVENTS` 8) → UI „sigur/probabil/incert” sub scor; `weekly` nu notifică pentru „low”.
+  NEVERIFICAT pe date reale: pragurile (3,40/3,10 V, 10 A, scorul) se pot ajusta după primele săptămâni.
 - 2026-10-28 (1.0.0-beta.7): la 0x5F octeții 4..7 se schimbă singuri între citiri (Daly 1: `…00014b32` →
   `…700c7232`); `write_field` compară acum doar octeții câmpului (restul → doar avertisment în jurnal). Scrierea
   bal_start 3,40 V / bal_diff 20 mV s-a aplicat pe 3 Daly (firmware 31_2306, 31_2207, 11_2506).

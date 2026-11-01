@@ -142,11 +142,11 @@ const EN = {
   "De urmărit": "Watch", "de celule urmărite": "cells tracked", "· celula": "· cell", "scor / #": "score / #",
   "la încărcare": "when charging", "la descărcare": "when discharging", "rezistență": "resistance",
   "abatere în ultimele # săptămâni": "deviation over the last # weeks", "încărcări complete,": "full charges,",
-  "descărcări adânci și": "deep discharges and", "salturi de curent în ultimele": "current steps in the last",
+  "descărcări adânci și": "deep discharges and", "salturi de curent în ultimele": "current steps in the last", "măsurători de rezistență în ultimele": "resistance measurements in the last",
   "săptămâni. Scorul combină abaterea la încărcare, la descărcare și rezistența internă.":
     "weeks. The score combines the deviation when charging, when discharging and the internal resistance.",
-  "Date: # încărcări complete, # descărcări adânci și # salturi de curent în ultimele # săptămâni. Scorul combină abaterea la încărcare, la descărcare și rezistența internă.":
-    "Data: # full charges, # deep discharges and # current steps in the last # weeks. The score combines the deviation when charging, when discharging and the internal resistance.",
+  "Date: # încărcări complete, # descărcări adânci și # măsurători de rezistență în ultimele # săptămâni. Scorul combină abaterea la încărcare, la descărcare și rezistența internă.":
+    "Data: # full charges, # deep discharges and # resistance measurements in the last # weeks. The score combines the deviation when charging, when discharging and the internal resistance.",
   "Diferențele dintre celule se văd doar la capete: la final de încărcare (peste # V) și la descărcare adâncă (sub # V). E nevoie de cel puțin # astfel de momente; primele concluzii apar de obicei după #–# săptămâni.":
     "Differences between cells only show at the ends: at the end of charging (above # V) and in deep discharge (below # V). At least # such moments are needed; the first conclusions usually appear after #–# weeks.",
 
@@ -396,7 +396,7 @@ const EN = {
   ". Actualizările din aplicație merg doar pe Pi-ul instalat cu install.sh.": ". Updates from the app only work on a Pi installed with install.sh.",
   "{}. Accesul de oriunde se pornește doar pe Pi-ul instalat cu install.sh.": "{}. Remote access can only be turned on on a Pi installed with install.sh.",
   "{}. Actualizările din aplicație merg doar pe Pi-ul instalat cu install.sh.": "{}. Updates from the app only work on a Pi installed with install.sh.",
-  "# de celule urmărite": "# cells tracked", "Celula #": "Cell #",
+  "# de celule urmărite": "# cells tracked", "Celula #": "Cell #", "sigur": "certain", "probabil": "likely", "incert": "uncertain",
   "Procesor": "Processor", "Memorie": "Memory", "Alimentare": "Power supply", "Porturi USB": "USB ports", "Temperatură": "Temperature",
   "# / # GB": "# / # GB", "# / # MB": "# / # MB",
 

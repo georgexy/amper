@@ -2,6 +2,18 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.16 — 2026-11-01
+- Sănătatea celulelor, calcul mai precis:
+  - rezistența internă se calculează din toate citirile unui minut-două în care curentul modulului variază cu cel
+    puțin 10 A (dreapta tensiune–curent a fiecărei celule), nu din două citiri la un salt de 15 A — mai puțin zgomot
+    și mai multe măsurători, inclusiv pe modulele cu salturi mai mici; măsurătorile cu dreapta neclară se aruncă;
+  - la fiecare încărcare completă și descărcare adâncă se face media celor mai extreme 5 citiri, nu se ține una
+    singură;
+  - citirile cu echilibrarea pornită se ocolesc cât se poate (echilibrorul ascunde tocmai celulele care o iau înainte);
+  - fiecare celulă are acum „sigur”, „probabil” sau „incert”, după câte momente are și cât de mult diferă între ele;
+    notificarea săptămânală nu mai pleacă pentru rezultatele incerte.
+  Măsurătorile vechi rămân și se folosesc în continuare; cele noi se adaugă de la instalare.
+
 ## 1.0.0-beta.15 — 2026-11-01
 - Alerte: rămân doar cele importante, de protecție — protecțiile raportate de BMS, BMS care oprește încărcarea sau
   descărcarea, modulul care nu se încarcă cât restul băncii se încarcă, defectul invertorului și MOSFET-ul oprit din

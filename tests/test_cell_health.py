@@ -1,5 +1,8 @@
 """Sănătatea celulelor: momentele salvate (final de încărcare, descărcare adâncă, salturi de curent), analiza pe
 celule (abatere, de câte ori e la capăt, rezistență, scor, evoluție) și notificarea săptămânală."""
+import json
+import random
+import statistics
 import time
 
 from amper import cell_health as ch
@@ -30,13 +33,13 @@ def cycle(tr, dev, t, weak=None, grow=1.0, base_r=0.9):
         if weak is not None:
             cells[weak] -= 0.040 * grow
         tr.observe(dev, reading(t2 + k * 60, cells, -30.0), now=t2 + k * 60)
-    t3 = t + 4 * 3600                                     # salt de curent −5 A → −45 A în 2 s
-    before = [3.30] * n
-    after = [v - 40 * base_r / 1000 for v in before]
-    if weak is not None:
-        after[weak] = before[weak] - 40 * base_r * 1.45 / 1000
-    tr.observe(dev, reading(t3, before, -5.0), now=t3)
-    tr.observe(dev, reading(t3 + 2, after, -45.0), now=t3 + 2)
+    t3 = t + 4 * 3600                                     # consumul sare între −5 A și −45 A timp de un minut
+    for k in range(10):
+        i = -5.0 if k % 3 == 0 else -45.0 if k % 3 == 1 else -25.0
+        cells = [3.33 + i * base_r / 1000] * n
+        if weak is not None:
+            cells[weak] = 3.33 + i * base_r * 1.45 / 1000
+        tr.observe(dev, reading(t3 + 6 * k, cells, i), now=t3 + 6 * k)
 
 
 def fill(db, weeks=8, weak=6):
@@ -100,3 +103,75 @@ def test_not_enough_data():
     cycle(tr, "daly1", T0, weak=2)
     res = ch.analyze(db, {}, T0 + DAY)
     assert not res["enough"] and res["cells"] == []
+
+
+# ---------------- acuratețe (1.0.0-beta.16, cerut 2026-11-01) ----------------
+
+def test_resistance_by_regression_over_many_readings():
+    """Rezistența = panta tensiune–curent din toată fereastra, nu din două citiri: zgomotul de ±2 mV se mediază."""
+    db = Database(":memory:")
+    tr = ch.Tracker(db)
+    rnd = random.Random(1)
+    for k in range(30):
+        i = rnd.uniform(-45, -5)
+        cells = [3.30 + i * 0.9 / 1000 + rnd.uniform(-0.002, 0.002) for _ in range(16)]
+        cells[4] = 3.30 + i * 1.8 / 1000 + rnd.uniform(-0.002, 0.002)
+        tr.observe("d", reading(T0 + 4 * k, cells, i), now=T0 + 4 * k)
+    ir = [r for r in db.cell_events(0) if r["kind"] == "ir"]
+    assert len(ir) == 1
+    v = json.loads(ir[0]["vals"])
+    assert abs(v[4] / statistics.median(v) - 2.0) < 0.25          # dublă, cu tot zgomotul
+    assert json.loads(ir[0]["meta"])["r2"] >= ch.IR_MIN_R2
+
+
+def test_no_resistance_without_enough_current_change():
+    db = Database(":memory:")
+    tr = ch.Tracker(db)
+    for k in range(30):
+        i = -20.0 - (k % 2) * 6                                    # variază doar 6 A
+        tr.observe("d", reading(T0 + 4 * k, [3.30 + i * 0.9 / 1000] * 16, i), now=T0 + 4 * k)
+    assert not db.cell_events(0)
+
+
+def test_episode_averages_the_most_extreme_readings():
+    db = Database(":memory:")
+    tr = ch.Tracker(db)
+    for k in range(20):                                           # o citire „ciudată”, restul cu celula 3 +20 mV
+        cells = [3.40 + 0.005 * k] * 16
+        cells[3] += 0.080 if k == 19 else 0.020
+        tr.observe("d", reading(T0 + 30 * k, cells, 20.0), now=T0 + 30 * k)
+    rows = db.cell_events(0)
+    assert len(rows) == 1 and json.loads(rows[0]["meta"])["n"] == ch.EPISODE_TOP
+    dev3 = json.loads(rows[0]["vals"])[3]
+    assert 25 < dev3 < 40                                         # media celor 5: nu 75 mV din citirea ciudată
+
+
+def test_balancing_readings_are_avoided_when_possible():
+    db = Database(":memory:")
+    tr = ch.Tracker(db)
+    for k in range(12):
+        bal = k % 2 == 0
+        cells = [3.40 + 0.003 * k] * 16
+        cells[2] += 0.005 if bal else 0.025                       # echilibrarea ascunde abaterea
+        r = reading(T0 + 30 * k, cells, 20.0)
+        r.balancing = bal
+        tr.observe("d", r, now=T0 + 30 * k)
+    row = db.cell_events(0)[0]
+    assert json.loads(row["meta"])["bal"] == 0 and json.loads(row["vals"])[2] > 20
+
+
+def test_noisy_cell_gets_low_confidence_and_no_notification():
+    db = Database(":memory:")
+    rnd = random.Random(3)
+    now = T0 + 10 * DAY
+    for d in range(4):                                            # 4 descărcări; celula 5 sare de la −60 la +40 mV
+        vals = [0.0] * 16
+        vals[5] = [-60, 40, -55, 35][d]
+        db.add_cell_event(int(now - (d + 1) * DAY), "d", "dis", json.dumps(vals))
+    res = ch.analyze(db, {"d": "Daly 1"}, now)
+    c5 = next((c for c in res["cells"] if c["cell"] == 6), None)
+    assert c5 is None or c5["confidence"] == "low"
+    db2 = Database(":memory:")
+    fill(db2)
+    worst = ch.analyze(db2, {"daly1": "Daly 1", "daly2": "Daly 2"}, T0 + 56 * DAY)["cells"][0]
+    assert worst["confidence"] == "high"
