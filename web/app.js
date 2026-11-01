@@ -102,7 +102,9 @@ async function boot() {
   if (state.info.password_reset) return openSetup(false, "password", true);
   $("#app").hidden = false;
   $("#simnote").hidden = !state.info.simulated;
-  if (state.info.site_name) { $("#site-name").textContent = state.info.site_name; document.title = `Amper · ${state.info.site_name}`; }
+  // sus: AmperPro / AmperLite (cerut 2026-11-01); numele instalației rămâne în titlul paginii
+  if (state.info.site_name) document.title = `Amper · ${state.info.site_name}`;
+  renderEdition();
   connect();
   loadEnergy();
   setInterval(loadEnergy, 60000);
@@ -1434,6 +1436,8 @@ const isPro = () => state.info?.edition !== "lite";
 function renderEdition() {
   const pro = isPro();
   $("#ed-name").textContent = pro ? "Amper Pro" : "Amper Lite";
+  $("#hd-ed").textContent = pro ? "Pro" : "Lite";
+  $("#hd-ed").className = "ed " + (pro ? "pro" : "lite");
   $("#ed-pid").textContent = state.info?.pi_id || "–";
   $("#ed-ver").textContent = state.info?.version || "–";
   $("#ed-act").hidden = pro;

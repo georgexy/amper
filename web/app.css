@@ -55,6 +55,7 @@ button { font: inherit; color: inherit; }
 /* ---------- antet ---------- */
 .top { display: flex; align-items: center; justify-content: space-between; padding: 14px 0 6px; }
 .top h1 { margin: 0; font: 700 22px/1 "Barlow Condensed", sans-serif; letter-spacing: .01em; }
+.top h1 .ed { font-weight: 700; color: var(--acc); } .top h1 .ed.lite { color: var(--muted); }
 .conn { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
 .conn i { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); }
 .conn.ok i { background: var(--charge); }
