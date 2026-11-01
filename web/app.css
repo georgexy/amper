@@ -792,6 +792,5 @@ small.warnc { color: var(--warn); }
 .k-batt .c b sup { font-size: 18px; vertical-align: 16px; color: inherit; opacity: .85; }
 .k-g .sub, .c-it .s { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
 .k-g .sub b, .c-it .s b { color: var(--text); font-weight: 600; }
-.lang-opt { display: flex; justify-content: space-between; align-items: center; width: 100%; }
-.lang-opt .ck { visibility: hidden; color: var(--acc); }
-.lang-opt.on .ck { visibility: visible; }
+.look .sw.flag { background: var(--panel-2); display: grid; place-items: center; }
+.look .sw.flag svg { width: 30px; height: 20px; border-radius: 3px; display: block; }

@@ -592,7 +592,8 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 ## Limba aplicației (1.0.0-beta.14, în pregătire, cerut 2026-10-30; etapa 1 = ecranele)
 - Una pe Pi (decizia utilizatorului): overlay `language` (ro | en), `POST /api/language {lang}`, `/api/info.lang`.
   Telefonul o ține și în localStorage `lang` (ca pagina să pornească direct în limba bună); la boot, dacă diferă de
-  a Pi-ului → o salvează și reîncarcă. Setări → „Limbă · Language” (`#set-lang`, `.lang-opt`, `renderLang`).
+  a Pi-ului → o salvează și reîncarcă. Setări → „Limbă · Language” (`#set-lang`, `.lang-opt` = cartonașe `.card.look` cu steag `.sw.flag`, ca
+  la Teme, `aria-pressed`; `renderLang`). La Teme nu mai e nota despre `?tema=` (cerut 2026-11-01).
 - Mecanism (`web/i18n.js`, încărcat după `web/lang-en.js` și înaintea `app.js`): codul scrie textele în ROMÂNĂ; în
   engleză un MutationObserver traduce fiecare nod de text și `aria-label`/`title`/`placeholder` după dicționarul `EN`
   (cheia = textul românesc cu spațiile normalizate). Numerele din text se potrivesc cu „#” (inclusiv cu minus) și se pun

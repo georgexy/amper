@@ -1488,7 +1488,7 @@ $$(".set-btn[data-panel]").forEach((b) => (b.onclick = () => showPanel(b.dataset
 
 /* limba: una pe Pi (/api/language); telefonul o ține și local ca pagina să pornească direct în limba bună */
 function renderLang() {
-  $$(".lang-opt").forEach((b) => b.classList.toggle("on", b.dataset.lang === LANG));
+  $$(".lang-opt").forEach((b) => b.setAttribute("aria-pressed", b.dataset.lang === LANG));
 }
 $$(".lang-opt").forEach((b) => (b.onclick = async () => {
   if (b.dataset.lang === LANG) return;
