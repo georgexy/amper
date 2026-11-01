@@ -6,6 +6,8 @@ from amper.db import Database
 from amper.engine import Engine
 from amper.notify import Notifier
 
+ALL_RULES = {"only_important": False}      # aceste teste verifică toate regulile
+
 
 def make_engine(fault_after=None):
     from amper.drivers.simulator import SimWorld
@@ -17,7 +19,7 @@ def make_engine(fault_after=None):
         {"id": "daly3", "name": "Daly 3", "type": "sim_daly", "capacity_ah": 100, "start_soc": 60},
         {"id": "inv", "name": "Growatt", "type": "sim_growatt"},
     ]
-    cfg = _merge(DEFAULTS, {"database": ":memory:", "devices": devs})
+    cfg = _merge(DEFAULTS, {"alerts": ALL_RULES, "database": ":memory:", "devices": devs})
     return Engine(cfg, Database(":memory:"), Notifier({}))
 
 
@@ -152,7 +154,7 @@ def test_open_alerts_survive_restart_without_new_notification(tmp_path):
 
     def engine():
         SimWorld._instance = None
-        cfg = _merge(DEFAULTS, {"database": path, "devices": [{"id": "d1", "name": "Daly 1", "type": "sim_daly"}]})
+        cfg = _merge(DEFAULTS, {"alerts": ALL_RULES, "database": path, "devices": [{"id": "d1", "name": "Daly 1", "type": "sim_daly"}]})
         return Engine(cfg, Database(path), Notifier({}))
     e1 = engine()
     t = time.time()
@@ -178,7 +180,7 @@ def test_device_silent_5_days_disconnects_itself(tmp_path):
     from amper.models import PackReading
     path = str(tmp_path / "c.db")
     SimWorld._instance = None
-    cfg = _merge(DEFAULTS, {"database": path, "devices": [{"id": "s1", "name": "Seplos 1", "type": "sim_seplos"},
+    cfg = _merge(DEFAULTS, {"alerts": ALL_RULES, "database": path, "devices": [{"id": "s1", "name": "Seplos 1", "type": "sim_seplos"},
                                                           {"id": "s2", "name": "Seplos 2", "type": "sim_seplos"}]})
     db = Database(path)
     now = time.time()
@@ -251,3 +253,47 @@ def test_protection_says_if_mosfet_really_cut():
     assert "oprit descărcarea" in mos_note({"charge_mos": True, "discharge_mos": False})
     assert "doar semnal" in mos_note({"charge_mos": True, "discharge_mos": True})
     assert mos_note({}) == ""
+
+
+# ---------------- doar alertele de protecție (cerut 2026-11-01) ----------------
+from amper import alerts as al
+
+A = DEFAULTS["alerts"]
+
+
+def _snap(**r):
+    base = dict(soc=60, current=0.0, cells=[3.30] * 16, charge_mos=True, discharge_mos=True, protections=[], alarms=[])
+    base.update(r)
+    base["cell_min"], base["cell_max"] = min(base["cells"]), max(base["cells"])
+    dev = dict(kind="pack", name="Daly 1", reading=base, stale=False, connected=True, last_ok=1000.0)
+    return dict(started=0, devices={"daly1": dev}, bank={"current": base["current"]})
+
+
+def _rules(snap):
+    return {c.rule for c in al.evaluate(snap, A, 1000.0)}
+
+
+def test_full_charge_protection_is_normal():
+    # la plin (media celulelor 3,45 V), protecția de tensiune mare și MOSFET-ul de încărcare oprit sunt normale
+    full = _snap(soc=92, cells=[3.45] * 15 + [3.62], charge_mos=False,
+                 protections=["Tensiune celulă mare (nivel 2)", "SOC mare (nivel 2)"])
+    assert not {"bms_protection", "charge_mos_off"} & _rules(full)
+    # aceeași protecție cu pachetul la jumătate (o celulă urcă singură): se anunță
+    half = _snap(soc=55, cells=[3.32] * 15 + [3.62], charge_mos=False, protections=["Tensiune celulă mare (nivel 2)"])
+    assert {"bms_protection", "charge_mos_off"} <= _rules(half)
+    # alte protecții se anunță și la plin
+    assert "bms_protection" in _rules(_snap(soc=100, cells=[3.45] * 16, protections=["Supracurent la încărcare (nivel 2)"]))
+
+
+def test_only_important_alerts_reach_the_phone():
+    cfg = _merge(DEFAULTS, {"database": ":memory:", "devices": []})
+    sent = []
+    mgr = al.AlertManager(cfg["alerts"], Database(":memory:"), type("N", (), {"send": lambda s, m, **k: sent.append(m)})())
+    snap = _snap(soc=8, cells=[3.0] * 15 + [2.80], temps=[55], alarms=["Tensiune celulă mică (nivel 1)"],
+                 discharge_mos=False)
+    snap["devices"]["daly1"]["reading"]["temp_max"] = 55
+    snap["devices"]["daly1"]["last_ok"] = 0                      # și nu mai comunică
+    for t in range(1000, 2000, 10):
+        mgr.process(snap, now=t)
+    assert {a["rule"] for a in mgr.active_list()} == {"discharge_mos_off"}
+    assert len(sent) == 1 and "OPRIT descărcarea" in sent[0]

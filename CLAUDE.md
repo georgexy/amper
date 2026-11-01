@@ -32,6 +32,11 @@ starea fiecărui modul în timp real și să fie alertat pe telefon când un BMS
   integrare energie zilnică. Starea se trimite pe WebSocket imediat după fiecare citire reușită (`_push`), nu doar la tick.
 - `alerts.py` — reguli + histerezis (o condiție trebuie să persiste `hold` s; se închide după 180 s de absență).
   Regula cheie: `not_charging` (banca se încarcă, modulul are I ≈ 0, SOC < 97%, 10 min).
+  2026-11-01 (cerut: „foarte multe și inutile”): `alerts.only_important` (implicit true) → `AlertManager.process` ține
+  doar `IMPORTANT` (bms_protection, charge/discharge_mos_off, not_charging, inverter_fault, mos_forced_off, user);
+  celelalte deschise se închid în tăcere. `normal_at_full`: protecțiile toate din `FULL_PROT` (tensiune/SOC mare) +
+  `is_full` (SOC ≥ full_soc sau media celulelor ≥ `full_cell_volts` 3,40) → fără alertă; `is_full` scutește și
+  charge_mos_off / not_charging. Testele vechi ale regulilor folosesc `only_important: False`.
 - Ceasul: Pi-ul n-are RTC; la boot ora e cea din `/var/lib/systemd/timesync/clock`, apoi NTP o face să sară
   (2026-10-25: +4 min → alerte false `comm_lost`). `Engine.check_clock()` (la fiecare tick) detectează saltul
   (diferența time.time − monotonic > 5 s) și mută `started`, `last_ok` și momentele alertelor cu același salt.

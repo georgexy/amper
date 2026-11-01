@@ -35,6 +35,9 @@ DEFAULTS = {
         "temp_low_charge_c": 1,
         "comm_lost_seconds": 120,
         "mos_forced_minutes": 30,        # MOSFET oprit din Amper (comenzi Daly) și uitat așa
+        # doar alertele de protecție (cerut 2026-11-01: „foarte multe și inutile”); false = toate regulile
+        "only_important": True,
+        "full_cell_volts": 3.40,         # media celulelor peste ea = pachet plin (protecția la plin e normală)
     },
     "notify": {
         "ntfy": {"enabled": False, "server": "https://ntfy.sh", "topic": ""},

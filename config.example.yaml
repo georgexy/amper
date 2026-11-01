@@ -115,6 +115,12 @@ alerts:
 
   comm_lost_seconds: 120
 
+  # Doar alertele importante, de protecție: protecții BMS, BMS care oprește încărcarea/descărcarea, modul care nu
+  # se încarcă, defect invertor, MOSFET oprit din Amper și uitat. Protecția de la încărcarea completă (tensiune
+  # mare / SOC mare cu pachetul plin) e normală și nu se anunță. false = toate regulile de mai sus.
+  only_important: true
+  full_cell_volts: 3.40          # media celulelor peste această tensiune = pachet plin
+
 # ------------------------------------------------------------
 #  Notificări pe telefon
 #  ntfy: instalați aplicația "ntfy" (Android/iPhone) și abonați-vă la topicul de mai jos.
