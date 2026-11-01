@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.15 — în pregătire
+## 1.0.0-beta.15 — 2026-11-01
 - Alerte: rămân doar cele importante, de protecție — protecțiile raportate de BMS, BMS care oprește încărcarea sau
   descărcarea, modulul care nu se încarcă cât restul băncii se încarcă, defectul invertorului și MOSFET-ul oprit din
   Amper și uitat așa, modulul / invertorul care nu mai comunică. Plus alertele tale din „Alertele mele”. Nu mai
