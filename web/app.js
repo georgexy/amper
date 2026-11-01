@@ -102,7 +102,13 @@ async function boot() {
   if (state.info.password_reset) return openSetup(false, "password", true);
   $("#app").hidden = false;
   $("#simnote").hidden = !state.info.simulated;
-  if (state.info.site_name) { $("#site-name").textContent = state.info.site_name; document.title = `Amper · ${state.info.site_name}`; }
+  // sus: AmperPro / AmperLite; numele instalației pe rândul de sub antet, cu 📍 (varianta C, cerut 2026-11-01)
+  if (state.info.site_name) {
+    document.title = `Amper · ${state.info.site_name}`;
+    $("#site-line-name").textContent = state.info.site_name;
+    $("#site-line").hidden = false;
+  }
+  renderEdition();
   connect();
   loadEnergy();
   setInterval(loadEnergy, 60000);
@@ -1434,6 +1440,8 @@ const isPro = () => state.info?.edition !== "lite";
 function renderEdition() {
   const pro = isPro();
   $("#ed-name").textContent = pro ? "Amper Pro" : "Amper Lite";
+  $("#hd-ed").textContent = pro ? "Pro" : "Lite";
+  $("#hd-ed").className = "ed " + (pro ? "pro" : "lite");
   $("#ed-pid").textContent = state.info?.pi_id || "–";
   $("#ed-ver").textContent = state.info?.version || "–";
   $("#ed-act").hidden = pro;
@@ -1480,7 +1488,7 @@ $$(".set-btn[data-panel]").forEach((b) => (b.onclick = () => showPanel(b.dataset
 
 /* limba: una pe Pi (/api/language); telefonul o ține și local ca pagina să pornească direct în limba bună */
 function renderLang() {
-  $$(".lang-opt").forEach((b) => b.classList.toggle("on", b.dataset.lang === LANG));
+  $$(".lang-opt").forEach((b) => b.setAttribute("aria-pressed", b.dataset.lang === LANG));
 }
 $$(".lang-opt").forEach((b) => (b.onclick = async () => {
   if (b.dataset.lang === LANG) return;

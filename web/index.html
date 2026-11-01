@@ -41,12 +41,13 @@
   <div id="app" hidden>
     <div class="wrap">
       <header class="top">
-        <h1><img class="logo" src="icon.svg" alt=""><span id="site-name">Amper</span></h1>
+        <h1><img class="logo" src="icon.svg" alt=""><span id="site-name">Amper<b class="ed" id="hd-ed"></b></span></h1>
         <div class="conn" id="conn"><i></i><span>Se conectează…</span></div>
         <button class="gear" id="gear" aria-label="Setări">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
         </button>
       </header>
+      <div class="site-line" id="site-line" hidden><span aria-hidden="true">📍</span> <span id="site-line-name"></span></div>
       <div class="sim" id="simnote" hidden>Date simulate — nu e conectat la hardware</div>
     </div>
 
@@ -215,9 +216,9 @@
 
       <section class="set-panel" id="set-lang" hidden>
         <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Limbă · Language</h2></div>
-        <div class="list lang-list">
-          <button class="row lang-opt" data-lang="ro"><span>Română</span><b class="ck">✓</b></button>
-          <button class="row lang-opt" data-lang="en"><span>English</span><b class="ck">✓</b></button>
+        <div class="looks lang-list">
+          <button class="card look lang-opt" data-lang="ro" style="--lc:var(--acc)"><span class="sw flag"><svg viewBox="0 0 3 2"><path fill="#002B7F" d="M0 0h1v2H0z"/><path fill="#FCD116" d="M1 0h1v2H1z"/><path fill="#CE1126" d="M2 0h1v2H2z"/></svg></span><span><b>Română</b><span>Aplicația și notificările în română</span></span><span class="ck"></span></button>
+          <button class="card look lang-opt" data-lang="en" style="--lc:var(--acc)"><span class="sw flag"><svg viewBox="0 0 60 30"><clipPath id="uk-c"><path d="M30 15h30v15zv15H0zH0V0zV0h30z"/></clipPath><path fill="#012169" d="M0 0h60v30H0z"/><path stroke="#fff" stroke-width="6" d="M0 0l60 30m0-30L0 30"/><path stroke="#C8102E" stroke-width="4" d="M0 0l60 30m0-30L0 30" clip-path="url(#uk-c)"/><path stroke="#fff" stroke-width="10" d="M30 0v30M0 15h60"/><path stroke="#C8102E" stroke-width="6" d="M30 0v30M0 15h60"/></svg></span><span><b>English</b><span>App and notifications in English</span></span><span class="ck"></span></button>
         </div>
         <p class="note">Limba aplicației, aceeași pe toate telefoanele legate la acest Pi.</p>
         <p class="note" id="lang-msg"></p>
@@ -226,8 +227,6 @@
       <section class="set-panel" id="set-teme" hidden>
         <div class="pk-top"><button class="back set-back" aria-label="Înapoi la setări">‹</button><h2>Teme</h2></div>
         <div class="looks" id="looks"></div>
-        <p class="note">Tema se păstrează pe fiecare telefon sau calculator în parte. Pentru ecranul HDMI se alege din
-          adresă, de exemplu <code>http://localhost:8080/?tema=flux</code>.</p>
       </section>
 
       <section class="set-panel" id="set-notif" hidden>
