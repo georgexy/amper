@@ -295,5 +295,5 @@ def test_only_important_alerts_reach_the_phone():
     snap["devices"]["daly1"]["last_ok"] = 0                      # și nu mai comunică
     for t in range(1000, 2000, 10):
         mgr.process(snap, now=t)
-    assert {a["rule"] for a in mgr.active_list()} == {"discharge_mos_off"}
-    assert len(sent) == 1 and "OPRIT descărcarea" in sent[0]
+    assert {a["rule"] for a in mgr.active_list()} == {"discharge_mos_off", "comm_lost"}
+    assert len(sent) == 2 and any("OPRIT descărcarea" in m for m in sent) and any("nu mai comunică" in m for m in sent)

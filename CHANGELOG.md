@@ -5,7 +5,8 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 ## 1.0.0-beta.15 — în pregătire
 - Alerte: rămân doar cele importante, de protecție — protecțiile raportate de BMS, BMS care oprește încărcarea sau
   descărcarea, modulul care nu se încarcă cât restul băncii se încarcă, defectul invertorului și MOSFET-ul oprit din
-  Amper și uitat așa. Plus alertele tale din „Alertele mele”. Nu mai apar: „nu mai comunică”, SOC scăzut, celule,
+  Amper și uitat așa, modulul / invertorul care nu mai comunică. Plus alertele tale din „Alertele mele”. Nu mai
+  apar: SOC scăzut, celule,
   dezechilibru, temperaturi, avertismentele BMS și ale invertorului, SOC diferit între module. Alertele de acest fel
   rămase deschise se închid fără notificare.
 - Protecția normală de la încărcarea completă nu mai e alertă: tensiune mare / SOC mare cu pachetul plin (SOC ≥ 97 %

@@ -53,7 +53,7 @@ def mos_note(r: dict) -> str:
 
 # alertele păstrate cu `only_important` (implicit): cele de protecție (cerut 2026-11-01)
 IMPORTANT = {"bms_protection", "charge_mos_off", "discharge_mos_off", "not_charging", "inverter_fault",
-             "mos_forced_off", "user"}
+             "mos_forced_off", "comm_lost", "user"}
 
 # protecțiile care apar normal la încărcarea completă (BMS-ul oprește încărcarea la plin): Daly, Seplos/PACE, JK
 FULL_PROT = re.compile(r"^(tensiune (celulă|totală) mare|soc mare|celulă: protecție la supratensiune"

@@ -33,7 +33,7 @@ starea fiecărui modul în timp real și să fie alertat pe telefon când un BMS
 - `alerts.py` — reguli + histerezis (o condiție trebuie să persiste `hold` s; se închide după 180 s de absență).
   Regula cheie: `not_charging` (banca se încarcă, modulul are I ≈ 0, SOC < 97%, 10 min).
   2026-11-01 (cerut: „foarte multe și inutile”): `alerts.only_important` (implicit true) → `AlertManager.process` ține
-  doar `IMPORTANT` (bms_protection, charge/discharge_mos_off, not_charging, inverter_fault, mos_forced_off, user);
+  doar `IMPORTANT` (bms_protection, charge/discharge_mos_off, not_charging, inverter_fault, mos_forced_off, comm_lost, user);
   celelalte deschise se închid în tăcere. `normal_at_full`: protecțiile toate din `FULL_PROT` (tensiune/SOC mare) +
   `is_full` (SOC ≥ full_soc sau media celulelor ≥ `full_cell_volts` 3,40) → fără alertă; `is_full` scutește și
   charge_mos_off / not_charging. Testele vechi ale regulilor folosesc `only_important: False`.
