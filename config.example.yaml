@@ -37,6 +37,7 @@ wifi_setup:
 #  port: folosiți căile /dev/serial/by-id/... (nu se schimbă la repornire).
 #        Comanda  `amper scan`  le găsește și vă spune ce e pe fiecare.
 #  capacity_ah: capacitatea modulului — folosită pentru SOC-ul total al băncii.
+#  nominal_voltage: tensiunea nominală (V), pentru kWh; implicit celule × 3,2 V (LiFePO4), altfel 51,2 V.
 # ------------------------------------------------------------
 #
 #  Daly — trei variante de legătură:
@@ -113,6 +114,12 @@ alerts:
   temp_low_charge_c: 1           # încărcare sub această temperatură = pericol pentru LiFePO4
 
   comm_lost_seconds: 120
+
+  # Doar alertele importante, de protecție: protecții BMS, BMS care oprește încărcarea/descărcarea, modul care nu
+  # se încarcă, defect invertor, MOSFET oprit din Amper și uitat, dispozitiv care nu mai comunică. Protecția de la încărcarea completă (tensiune
+  # mare / SOC mare cu pachetul plin) e normală și nu se anunță. false = toate regulile de mai sus.
+  only_important: true
+  full_cell_volts: 3.40          # media celulelor peste această tensiune = pachet plin
 
 # ------------------------------------------------------------
 #  Notificări pe telefon

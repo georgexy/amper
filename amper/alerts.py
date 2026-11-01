@@ -6,6 +6,7 @@ O alertă se declanșează doar după ce condiția persistă `hold` secunde și 
 """
 from __future__ import annotations
 
+import re
 import statistics
 import time
 from dataclasses import dataclass, field
@@ -48,6 +49,31 @@ def mos_note(r: dict) -> str:
     if r.get("charge_mos") and r.get("discharge_mos"):
         return " (MOSFET-urile sunt pornite: doar semnal de la BMS, nu a tăiat nimic)"
     return ""
+
+
+# alertele păstrate cu `only_important` (implicit): cele de protecție (cerut 2026-11-01)
+IMPORTANT = {"bms_protection", "charge_mos_off", "discharge_mos_off", "not_charging", "inverter_fault",
+             "mos_forced_off", "comm_lost", "user"}
+
+# protecțiile care apar normal la încărcarea completă (BMS-ul oprește încărcarea la plin): Daly, Seplos/PACE, JK
+FULL_PROT = re.compile(r"^(tensiune (celulă|totală) mare|soc mare|celulă: protecție la supratensiune"
+                       r"|protecție la supratensiune totală|supratensiune (celulă|pachet|la încărcare)"
+                       r"|celula \d+: tensiune prea mare|tensiune totală prea mare)\b", re.I)
+
+
+def is_full(r: dict, a: dict) -> bool:
+    """Pachetul e plin: SOC ≥ full_soc sau media celulelor ≥ full_cell_volts (SOC-ul BMS-ului poate rămâne în urmă)."""
+    cells = r.get("cells") or []
+    avg = sum(cells) / len(cells) if len(cells) >= 4 else None
+    return (r.get("soc") is not None and r["soc"] >= a["full_soc"]) or \
+        (avg is not None and avg >= a.get("full_cell_volts", 3.40))
+
+
+def normal_at_full(r: dict, a: dict) -> bool:
+    """Protecția e cea normală de la încărcarea completă: doar tensiune mare / SOC mare, cu pachetul plin.
+    Aceeași protecție cu pachetul neplin (o celulă urcă singură) NU e normală și se anunță."""
+    prot = r.get("protections") or []
+    return bool(prot) and all(FULL_PROT.match(p) for p in prot) and is_full(r, a)
 
 
 def evaluate(snapshot: dict, cfg: dict, now: float) -> list[Condition]:
@@ -116,13 +142,14 @@ def evaluate(snapshot: dict, cfg: dict, now: float) -> list[Condition]:
         cur = r.get("current") or 0
 
         # --- modulul NU se încarcă, deși banca se încarcă (problema principală) ---
-        if bank_charging and soc is not None and soc < a["full_soc"] and cur < a["pack_idle_amps"]:
+        full = is_full(r, a)
+        if bank_charging and soc is not None and not full and cur < a["pack_idle_amps"]:
             out.append(Condition(f"notchg:{d}", "not_charging", d, "critical",
                                  f"{n} NU se încarcă (curent {ro(cur)} A, SOC {soc:.0f}%) "
                                  f"în timp ce restul băncii se încarcă", hold=a["not_charging_minutes"] * 60))
 
         # --- MOSFET încărcare / descărcare oprit ---
-        if r.get("charge_mos") is False and (soc is None or soc < a["full_soc"]):
+        if r.get("charge_mos") is False and not full:
             out.append(Condition(f"chgmos:{d}", "charge_mos_off", d, "critical",
                                  f"{n}: BMS-ul a OPRIT încărcarea (MOSFET încărcare OFF)", hold=60))
         if r.get("discharge_mos") is False and (soc is None or soc > 5):
@@ -156,7 +183,7 @@ def evaluate(snapshot: dict, cfg: dict, now: float) -> list[Condition]:
                                  f"{n}: se încarcă la {r['temp_min']:.0f} °C (prea rece pentru LiFePO4)", hold=60))
 
         # --- raportate de BMS: protecții/defecte (critice) și alarme (avertismente) ---
-        if r.get("protections"):
+        if r.get("protections") and not normal_at_full(r, a):
             out.append(Condition(f"bmsprot:{d}", "bms_protection", d, "critical",
                                  f"{n}: PROTECȚIE BMS — " + "; ".join(r["protections"][:4]) + mos_note(r), hold=10))
         if r.get("alarms"):
@@ -259,6 +286,12 @@ class AlertManager:
         conds = {c.key: c for c in evaluate(snapshot, self.cfg, now)}
         fired = {k for k, a in self.active.items() if a.fired}
         conds.update({c.key: c for c in evaluate_user(self.user_rules(), snapshot, fired)})
+        if self.cfg.get("only_important", True):
+            conds = {k: c for k, c in conds.items() if c.rule in IMPORTANT}
+            for key in [k for k, a in self.active.items() if a.cond.rule not in IMPORTANT]:
+                act = self.active.pop(key)     # alertele de alt fel rămase deschise: închise în tăcere
+                if act.fired and act.db_id:
+                    self.db.close_alert(act.db_id, int(now))
 
         for c in list(conds.values()):
             for k in c.replaces:                # alertele înlocuite (ex. per dispozitiv → pe adaptor): fără „Rezolvat”

@@ -32,9 +32,18 @@ starea fiecărui modul în timp real și să fie alertat pe telefon când un BMS
   integrare energie zilnică. Starea se trimite pe WebSocket imediat după fiecare citire reușită (`_push`), nu doar la tick.
 - `alerts.py` — reguli + histerezis (o condiție trebuie să persiste `hold` s; se închide după 180 s de absență).
   Regula cheie: `not_charging` (banca se încarcă, modulul are I ≈ 0, SOC < 97%, 10 min).
+  2026-11-01 (cerut: „foarte multe și inutile”): `alerts.only_important` (implicit true) → `AlertManager.process` ține
+  doar `IMPORTANT` (bms_protection, charge/discharge_mos_off, not_charging, inverter_fault, mos_forced_off, comm_lost, user);
+  celelalte deschise se închid în tăcere. `normal_at_full`: protecțiile toate din `FULL_PROT` (tensiune/SOC mare) +
+  `is_full` (SOC ≥ full_soc sau media celulelor ≥ `full_cell_volts` 3,40) → fără alertă; `is_full` scutește și
+  charge_mos_off / not_charging. Testele vechi ale regulilor folosesc `only_important: False`.
 - Ceasul: Pi-ul n-are RTC; la boot ora e cea din `/var/lib/systemd/timesync/clock`, apoi NTP o face să sară
   (2026-10-25: +4 min → alerte false `comm_lost`). `Engine.check_clock()` (la fiecare tick) detectează saltul
   (diferența time.time − monotonic > 5 s) și mută `started`, `last_ok` și momentele alertelor cu același salt.
+- Energia stocată (kWh, 2026-11-01): `DeviceState.nominal_voltage()` = config `nominal_voltage`, altfel celule × 3,2 V
+  (`cells_n` = ultimul număr complet de celule), altfel 51,2 V; `Engine._bank` dă `kwh` și `capacity_kwh` adunate pe
+  pachete (Ah × V nominală al fiecăruia). NU tensiunea de moment (la plin ieșea 17,3 în loc de 16,1 kWh).
+  `app.js` `capKwh` = `bank.capacity_kwh`. Integrările de energie (curent × tensiune de moment) rămân cum sunt.
 - `notify.py` — ntfy (JSON publish) și Telegram, cu coadă de reîncercare.
 - `db.py` — `pack_samples` / `inverter_samples` (brute, 14 zile) + `*_5m` (agregate permanente), `energy_daily`, `alerts`.
 - `web.py` (aiohttp) + `web/` — PWA în vanilla JS, fără CDN (fonturi Barlow locale), WebSocket `/api/ws`.
@@ -226,6 +235,8 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   urmărit, <90 ușor diferită, `trend` 8 săptămâni, `describe` (text). `weekly` luni ≥ 9:00 (meta `cell_health_last`,
   din maintenance_loop): notificare doar pentru nivel 2 sau ușor diferită dar mereu la capăt (≥ 70%), url `/?v=cells`.
   API `GET /api/cells/health` (ambele ediții). UI: `#ch-row` (după lista din Bateriile), `view-cells`, `loadCells`.
+  `loadCells`: un cartonaș `.rk-grp` pe modul (titlul `.rk-h`), cu rândurile `.rk` pe o linie: „Celula N” · valorile · starea, scorul în dreapta; fără graficul pe 8
+  săptămâni (cerut 2026-10-31).
   NEVERIFICAT pe date reale: pragurile (3,40/3,10 V, 15 A, scorul) se pot ajusta după primele săptămâni.
 - 2026-10-28 (1.0.0-beta.7): la 0x5F octeții 4..7 se schimbă singuri între citiri (Daly 1: `…00014b32` →
   `…700c7232`); `write_field` compară acum doar octeții câmpului (restul → doar avertisment în jurnal). Scrierea

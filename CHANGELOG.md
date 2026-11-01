@@ -2,6 +2,23 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.15 — 2026-11-01
+- Alerte: rămân doar cele importante, de protecție — protecțiile raportate de BMS, BMS care oprește încărcarea sau
+  descărcarea, modulul care nu se încarcă cât restul băncii se încarcă, defectul invertorului și MOSFET-ul oprit din
+  Amper și uitat așa, modulul / invertorul care nu mai comunică. Plus alertele tale din „Alertele mele”. Nu mai
+  apar: SOC scăzut, celule, dezechilibru, temperaturi, avertismentele BMS și ale invertorului, SOC diferit între module. Alertele de acest fel
+  rămase deschise se închid fără notificare.
+- Protecția normală de la încărcarea completă nu mai e alertă: tensiune mare / SOC mare cu pachetul plin (SOC ≥ 97 %
+  sau media celulelor ≥ 3,40 V), și MOSFET-ul de încărcare oprit la plin. Aceeași protecție cu pachetul neplin (o
+  celulă urcă singură) se anunță în continuare.
+- Corectură: capacitatea și energia rămasă a băncii (kWh) se calculează cu tensiunea nominală a fiecărui pachet
+  (celule × 3,2 V la LiFePO4, de ex. 51,2 V la 16 celule), nu cu tensiunea de moment. Banca de 3 × 105 Ah arată
+  acum 16,1 kWh, nu 17,3 kWh când e plină; energia rămasă și autonomia nu mai cresc / scad odată cu tensiunea.
+  Tensiunea nominală se poate da și în config (`nominal_voltage`).
+- Sănătatea celulelor: celulele care ies în evidență sunt grupate pe module — un singur cartonaș pe BMS, cu numele
+  modulului sus și dedesubt celulele lui, cele mai slabe primele. Fiecare celulă e pe un rând: celula, valorile
+  (ex. rezistență +65%), starea și, în dreapta, scorul.
+
 ## 1.0.0-beta.14 — 2026-10-30
 - Tema Cadrane: bateria e acum sub cele patru cadrane, deasupra graficului zilei, și arată ca o baterie (ca în
   iconiță: se umple de jos în sus, pe segmente), cu procentul scris alb cu contur închis, ca să se citească bine.
