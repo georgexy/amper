@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.17 — în pregătire
+## 1.0.0-beta.17 — 2026-11-01
 - Sus, în aplicație, scrie acum **AmperPro** sau **AmperLite**, după ediție. Numele instalației (din ghid) apare pe
   rândul de dedesubt, cu 📍.
 - Setări → Limbă: română și engleză arată acum ca alegerea temei, cu steagul în față.
