@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.16 — în pregătire
+## 1.0.0-beta.16 — 2026-11-01
 - Sănătatea celulelor, calcul mai precis:
   - rezistența internă se calculează din toate citirile unui minut-două în care curentul modulului variază cu cel
     puțin 10 A (dreapta tensiune–curent a fiecărei celule), nu din două citiri la un salt de 15 A — mai puțin zgomot
