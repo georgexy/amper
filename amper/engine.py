@@ -14,6 +14,8 @@ from .models import InverterReading, PackReading
 from .notify import Notifier
 
 log = logging.getLogger(__name__)
+CELL_NOMINAL_V = 3.2      # V — celulă LiFePO4
+PACK_NOMINAL_V = 51.2     # V — pachet de 48 V (16 celule) când nu se știe numărul de celule
 
 
 class DeviceState:
@@ -30,11 +32,24 @@ class DeviceState:
         self.gen = 0          # crește la deconectare: o citire pornită înainte nu mai e luată în seamă
         self.restart_until: float | None = None   # repornit din Amper: fără „nu comunică” până atunci (max. 2 min)
         self.forced: dict[str, float] = {}       # MOSFET oprit din Amper: {"chg"|"dsg": momentul opririi}
+        self.cells_n: int | None = None          # ultimul număr de celule văzut (Bluetooth-ul pierde uneori celule)
 
     def port_missing(self) -> bool:
         """Portul serial din config nu mai există (adaptorul USB scos din Pi)."""
         port = str(self.cfg.get("port") or "")
         return port.startswith("/dev/") and not os.path.exists(port)
+
+    def nominal_voltage(self) -> float:
+        """Tensiunea nominală a pachetului, pentru kWh: `nominal_voltage` din config, altfel celule × 3,2 V (LiFePO4),
+        altfel 51,2 V. Energia stocată nu se calculează cu tensiunea de moment (la plin ~55 V ar ieși prea mare)."""
+        if self.cfg.get("nominal_voltage"):
+            return float(self.cfg["nominal_voltage"])
+        cells = getattr(self.reading, "cells", None) or []
+        if len(cells) >= 4:
+            self.cells_n = len(cells)
+        n = self.cells_n or getattr(getattr(self.driver, "proto", None), "cell_count", None) \
+            or getattr(self.driver, "cell_count", None)
+        return round(n * CELL_NOMINAL_V, 2) if isinstance(n, int) and n >= 4 else PACK_NOMINAL_V
 
     def to_dict(self, now: float, stale_after: float) -> dict:
         r = self.reading.to_dict() if self.reading else None
@@ -45,7 +60,8 @@ class DeviceState:
                     connected=self.connected, port=self.cfg.get("port"), port_missing=self.port_missing(),
                     stale=self.last_ok is None or now - self.last_ok > stale_after,
                     capacity_ah=self.cfg.get("capacity_ah") or (r or {}).get("capacity_ah"),
-                    restarting=bool(self.restart_until and now < self.restart_until), forced=dict(self.forced))
+                    restarting=bool(self.restart_until and now < self.restart_until), forced=dict(self.forced),
+                    nominal_voltage=self.nominal_voltage() if self.driver.kind == "pack" else None)
 
 
 class Engine:
@@ -173,6 +189,13 @@ class Engine:
         soc = (sum((d["reading"].get("soc") or 0) * float(d["capacity_ah"] or 0) for d in packs) / cap) if cap else None
         if soc is not None:
             rem = cap * soc / 100
+        # energia (kWh) pe fiecare pachet cu tensiunea lui nominală, apoi adunată (bănci mixte Daly + Seplos)
+        kwh = cap_kwh = 0.0
+        for d in packs:
+            r, c, vn = d["reading"], float(d["capacity_ah"] or 0), d.get("nominal_voltage") or PACK_NOMINAL_V
+            left = c * r["soc"] / 100 if c and r.get("soc") is not None else r.get("remaining_ah") or 0
+            kwh += left * vn / 1000
+            cap_kwh += c * vn / 1000
         hours = None
         if cur < -0.5:
             hours = rem / -cur
@@ -181,7 +204,7 @@ class Engine:
         return dict(soc=round(soc, 1) if soc is not None else None, capacity_ah=round(cap, 1),
                     remaining_ah=round(rem, 1), current=round(cur, 1), voltage=round(volt, 2),
                     power=round(cur * volt), packs=len(packs), hours=round(hours, 1) if hours else None,
-                    kwh=round(rem * volt / 1000, 2))
+                    kwh=round(kwh, 2), capacity_kwh=round(cap_kwh, 2) if cap_kwh else None)
 
     # ---------------- bucle ----------------
     async def poll_device(self, st: DeviceState) -> None:

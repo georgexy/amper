@@ -37,6 +37,7 @@ wifi_setup:
 #  port: folosiți căile /dev/serial/by-id/... (nu se schimbă la repornire).
 #        Comanda  `amper scan`  le găsește și vă spune ce e pe fiecare.
 #  capacity_ah: capacitatea modulului — folosită pentru SOC-ul total al băncii.
+#  nominal_voltage: tensiunea nominală (V), pentru kWh; implicit celule × 3,2 V (LiFePO4), altfel 51,2 V.
 # ------------------------------------------------------------
 #
 #  Daly — trei variante de legătură:

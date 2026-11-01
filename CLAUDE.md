@@ -35,6 +35,10 @@ starea fiecărui modul în timp real și să fie alertat pe telefon când un BMS
 - Ceasul: Pi-ul n-are RTC; la boot ora e cea din `/var/lib/systemd/timesync/clock`, apoi NTP o face să sară
   (2026-10-25: +4 min → alerte false `comm_lost`). `Engine.check_clock()` (la fiecare tick) detectează saltul
   (diferența time.time − monotonic > 5 s) și mută `started`, `last_ok` și momentele alertelor cu același salt.
+- Energia stocată (kWh, 2026-11-01): `DeviceState.nominal_voltage()` = config `nominal_voltage`, altfel celule × 3,2 V
+  (`cells_n` = ultimul număr complet de celule), altfel 51,2 V; `Engine._bank` dă `kwh` și `capacity_kwh` adunate pe
+  pachete (Ah × V nominală al fiecăruia). NU tensiunea de moment (la plin ieșea 17,3 în loc de 16,1 kWh).
+  `app.js` `capKwh` = `bank.capacity_kwh`. Integrările de energie (curent × tensiune de moment) rămân cum sunt.
 - `notify.py` — ntfy (JSON publish) și Telegram, cu coadă de reîncercare.
 - `db.py` — `pack_samples` / `inverter_samples` (brute, 14 zile) + `*_5m` (agregate permanente), `energy_daily`, `alerts`.
 - `web.py` (aiohttp) + `web/` — PWA în vanilla JS, fără CDN (fonturi Barlow locale), WebSocket `/api/ws`.

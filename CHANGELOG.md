@@ -3,6 +3,10 @@
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
 ## 1.0.0-beta.15 — în pregătire
+- Corectură: capacitatea și energia rămasă a băncii (kWh) se calculează cu tensiunea nominală a fiecărui pachet
+  (celule × 3,2 V la LiFePO4, de ex. 51,2 V la 16 celule), nu cu tensiunea de moment. Banca de 3 × 105 Ah arată
+  acum 16,1 kWh, nu 17,3 kWh când e plină; energia rămasă și autonomia nu mai cresc / scad odată cu tensiunea.
+  Tensiunea nominală se poate da și în config (`nominal_voltage`).
 - Sănătatea celulelor: celulele care ies în evidență sunt grupate pe module — un singur cartonaș pe BMS, cu numele
   modulului sus și dedesubt celulele lui, cele mai slabe primele. Fiecare celulă e pe un rând: celula, valorile
   (ex. rezistență +65%), starea și, în dreapta, scorul.

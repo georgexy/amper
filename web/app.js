@@ -319,7 +319,7 @@ function homeData() {
   const today = state.energy.find((r) => r.day === todayStr()) || {};
   const week = state.energy.slice(-7).reduce((a, r) => a + (r.pv_kwh || 0), 0);
   return { b, inv, ir, bp, list, mode, modeText, eta, health, autonomy, today, week,
-    capKwh: b.capacity_ah && b.voltage ? (b.capacity_ah * b.voltage) / 1000 : null };
+    capKwh: b.capacity_kwh ?? null };            // pe server, cu tensiunea nominală a fiecărui pachet
 }
 
 const ICON = {
