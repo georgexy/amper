@@ -101,6 +101,9 @@ section > .wrap > p.sub { color: var(--muted); margin: 0 0 34px; max-width: 40em
 .final { text-align: center; }
 .final .cta { justify-content: center; }
 .final .dlnote { text-align: center; }
+.dlbeta { color: var(--faint); font-size: 14px; margin-top: 6px; }
+.dlbeta a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.final .dlbeta { text-align: center; }
 
 footer { border-top: 1px solid #16242E; padding: 30px 0 50px; color: var(--faint); font-size: 15px; }
 footer .wrap { display: flex; flex-wrap: wrap; gap: 10px 28px; justify-content: space-between; }
@@ -147,6 +150,7 @@ footer a { color: var(--muted); }
         <a class="btn" href="#instalare">Cum se instalează</a>
       </div>
       <div class="dlnote"></div>
+      <div class="dlbeta" hidden></div>
     </div>
     <div class="phones" aria-hidden="true">
       <div class="phone a"><img src="img/acasa.webp" alt=""></div>
@@ -282,6 +286,7 @@ footer a { color: var(--muted); }
         <span>Descarcă imaginea SD</span></a>
     </div>
     <div class="dlnote"></div>
+      <div class="dlbeta" hidden></div>
   </div>
 </section>
 
@@ -311,6 +316,22 @@ footer a { color: var(--muted); }
     note(`Versiunea ${ver}` + (rel.published_at ? `, din ${new Date(rel.published_at).toLocaleDateString("ro-RO")}` : "") +
       ". Nu trebuie dezarhivată: Raspberry Pi Imager o scrie direct.");
   } catch (e) { soon(); }
+})();
+// Versiunea de test (beta): imaginea celei mai noi pre-versiuni, doar dacă e mai nouă decât cea stabilă (cerut 2026-11-03)
+(async () => {
+  try {
+    const r = await fetch("https://api.github.com/repos/georgexy/amper/releases?per_page=15");
+    const all = r.ok ? await r.json() : [];
+    const stable = all.find((x) => !x.prerelease && !x.draft);
+    const beta = all.find((x) => x.prerelease && !x.draft && (x.assets || []).some((a) => a.name.endsWith(".img.xz")));
+    if (!beta || (stable && new Date(stable.published_at) > new Date(beta.published_at))) return;
+    const img = beta.assets.find((a) => a.name.endsWith(".img.xz"));
+    const gb = (img.size / 1e9).toLocaleString("ro-RO", { maximumFractionDigits: 1 });
+    document.querySelectorAll(".dlbeta").forEach((d) => {
+      d.innerHTML = `Versiune de test: <a href="${img.browser_download_url}" download>imaginea ${beta.tag_name.replace(/^v/, "")} · ${gb} GB</a> — pentru încercare, poate avea erori.`;
+      d.hidden = false;
+    });
+  } catch (e) {}
 })();
 </script>
 </body>
