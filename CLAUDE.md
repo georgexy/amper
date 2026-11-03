@@ -248,6 +248,19 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `…700c7232`); `write_field` compară acum doar octeții câmpului (restul → doar avertisment în jurnal). Scrierea
   bal_start 3,40 V / bal_diff 20 mV s-a aplicat pe 3 Daly (firmware 31_2306, 31_2207, 11_2506).
 
+## Parametrii Seplos V2 (1.0.0-beta.18, în pregătire; citire verificată pe hardware 2026-11-03)
+- `SeplosDriver.read_params()` = 0x47 (INFO = adresa), prin `transact`/`bus_gap`, doar la cerere; `decode_params`:
+  adresa, n (60), valorile u16 BE, octeți de stare/comutatoare (structură necunoscută, `extra`), modelul ASCII de la
+  coadă („1101-LB03”, „1101-NY01”). 0x51 = model + „CAN:…”; 0x4F = fără date. Cadrele reale în `tests/test_seplos_params.py`.
+- `amper/seplos_params.py`: `FIELDS` (idx = „Num” din BatteryMonitor V16.4 → Parameter Manage). CONFIRMATE: 0–11
+  (celule mV, 8 = pornire echilibrare, schimbată de utilizator și recitită; 10/11 pachet 10 mV) și 58 (capacitate
+  0,01 Ah). Restul PROBABILE, `locked` (12–17 pachet, 20–49 temperaturi 0,1 K −273,1, 50–56 curenți s16 0,01 A).
+- API: `GET /api/seplos/<id>/params` (cadru brut + valori), `GET/POST /api/seplos/<id>/settings` (PRO_ONLY).
+  UI: ⚙ și la `seplos`; `loadBms` după `bmsKind()`, comenzile doar la Daly; câmpurile `locked` = „neconfirmat”.
+- Scrierea 0x49: NEVERIFICATĂ, format INFO ipotetic (`write_info`: adresa, index 1 o., valoare u16); oprită implicit
+  (`seplos.allow_write: false`); doar confirmate, limite LiFePO4 16S, parolă, 0x47 → 0x49 → 0x47 și compararea TUTUROR
+  valorilor, `settings_log`, notificare. Primul test doar cu utilizatorul: câmpul 8, un pachet, ±10 mV și înapoi.
+
 ## Setările invertorului (Growatt)
 - Protocolul de referință: „OffGrid Modbus RS485&RS232 RTU Protocol V0.17” (în Google Drive-ul utilizatorului,
   folderul Amper/Growatt docs). Cere ≥850 ms între comenzi (`GrowattSPFDriver.bus_gap = 0.85`) și blocuri de cel mult

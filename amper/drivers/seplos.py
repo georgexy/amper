@@ -179,6 +179,23 @@ def decode_status(info: bytes, r: PackReading) -> None:
         r.balancing = bool(custom[7] or custom[8])
 
 
+def decode_params(info: bytes) -> dict:
+    """Răspunsul 0x47 (citit pe hardware 2026-11-03, BatteryMonitor V16.4): adresa, numărul de valori, valorile u16
+    big-endian (indexate 0…n-1), apoi octeți de stare/comutatoare (structură necunoscută) și, la final, modelul ASCII."""
+    if len(info) < 2:
+        raise DriverError("Seplos: răspuns 0x47 prea scurt")
+    n = info[1]
+    if len(info) < 2 + 2 * n:
+        raise DriverError("Seplos: răspuns 0x47 incomplet")
+    values = [int.from_bytes(info[2 + 2 * i:4 + 2 * i], "big") for i in range(n)]
+    rest = info[2 + 2 * n:]
+    k = len(rest)
+    while k > 0 and 0x20 <= rest[k - 1] < 0x7F:      # modelul = textul tipăribil de la coadă
+        k -= 1
+    model = rest[k:].decode("ascii").strip() if len(rest) - k >= 4 else ""
+    return dict(address=info[0], count=n, values=values, extra=(rest[:k] if model else rest).hex(), model=model)
+
+
 class SeplosDriver(SerialDriver):
     kind = "pack"
     default_baudrate = 19200
@@ -190,7 +207,11 @@ class SeplosDriver(SerialDriver):
         super().__init__(cfg)
         self.address = int(cfg.get("address", 0))
 
-    def _query(self, cid2: int) -> bytes:
+    def _query(self, cid2: int, info: str | None = None) -> bytes:
+        return self._query_raw(cid2, info)[1]
+
+    def _query_raw(self, cid2: int, info: str | None = None) -> tuple[str, bytes]:
+        """(cadrul primit ca text, INFO ca octeți)."""
         def reader(ser):
             buf = b""
             deadline = time.monotonic() + 1.5
@@ -203,10 +224,16 @@ class SeplosDriver(SerialDriver):
                         break
             return buf
 
-        raw = self.transact(build_request(self.address, cid2), reader)
+        raw = self.transact(build_request(self.address, cid2, info), reader)
         if not raw:
             raise DriverError(f"Seplos {self.id}: fără răspuns (verificați baudrate și adresa)")
-        return parse_response(raw[:raw.index(b"\r") + 1] if b"\r" in raw else raw)
+        frame = raw[raw.index(b"~"):raw.index(b"\r") + 1] if b"~" in raw and b"\r" in raw else raw
+        return frame.decode("ascii", errors="replace").strip(), parse_response(frame)
+
+    def read_params(self) -> dict:
+        """Parametrii BMS-ului (CID2 0x47), citiți doar la cerere; trec prin același port și aceeași pauză (bus_gap)."""
+        frame, info = self._query_raw(0x47)
+        return dict(frame=frame, **decode_params(info))
 
     def read(self) -> PackReading:
         r = PackReading(device_id=self.id, ts=time.time())

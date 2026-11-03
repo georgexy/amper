@@ -396,7 +396,11 @@ const EN = {
   ". Actualizările din aplicație merg doar pe Pi-ul instalat cu install.sh.": ". Updates from the app only work on a Pi installed with install.sh.",
   "{}. Accesul de oriunde se pornește doar pe Pi-ul instalat cu install.sh.": "{}. Remote access can only be turned on on a Pi installed with install.sh.",
   "{}. Actualizările din aplicație merg doar pe Pi-ul instalat cu install.sh.": "{}. Updates from the app only work on a Pi installed with install.sh.",
-  "# de celule urmărite": "# cells tracked", "Celula #": "Cell #", "Aplicația și notificările în română": "App and notifications in Romanian", "sigur": "certain", "probabil": "likely", "incert": "uncertain",
+  "# de celule urmărite": "# cells tracked", "Celula #": "Cell #",
+  "Valorile sunt citite acum din BMS. Cele marcate „neconfirmat” nu au fost încă verificate cu programul Seplos și nu se pot modifica.":
+    "The values are read from the BMS now. Those marked “unconfirmed” have not yet been checked against the Seplos program and cannot be changed.",
+  "Doar citire": "Read only", "neconfirmat": "unconfirmed", "Model:": "Model:",
+  "Scrierea parametrilor Seplos nu e încă verificată pe hardware, așa că e oprită.": "Writing Seplos parameters has not been verified on hardware yet, so it is turned off.", "Aplicația și notificările în română": "App and notifications in Romanian", "sigur": "certain", "probabil": "likely", "incert": "uncertain",
   "Procesor": "Processor", "Memorie": "Memory", "Alimentare": "Power supply", "Porturi USB": "USB ports", "Temperatură": "Temperature",
   "# / # GB": "# / # GB", "# / # MB": "# / # MB",
 
