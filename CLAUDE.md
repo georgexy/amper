@@ -519,6 +519,8 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - Site (2026-10-29): utilizatorul NU vrea nicio legătură spre GitHub pe site (scoase: ghidul README, licența, Întrebări,
   Codul sursă, suma de control, fallback-ul butonului). Butonul de descărcare e inactiv („vine în curând”) până când
   API-ul GitHub găsește `.img.xz` în ultima versiune stabilă; atunci duce direct la fișier (descărcare, nu pagină).
+  Sub el (2026-11-03): `.dlbeta` „Versiune de test: imaginea <ver>” = imaginea celei mai noi pre-versiuni, doar dacă
+  e mai nouă decât stabila (până la testul imaginii pe un Pi real).
 - 1.0.0-beta.8 (în pregătire): în aplicație NU apare cuvântul GitHub (mesajele `UpdateError` din `update.py` spun
   „server”/„serverul de actualizări”). Actualizări: buton „Istoric versiuni” → panoul `set-uphist` (`#up-prev` +
   `#up-hist`, înapoi → update).
