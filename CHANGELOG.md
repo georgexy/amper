@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.18 — în pregătire
+## 1.0.0-beta.18 — 2026-11-04
 - Seplos V2: rotița ⚙ apare și la pachetele Seplos (Amper Pro). Arată parametrii citiți din BMS (comanda 0x47) și
   modelul pachetului. Pragurile de tensiune ale celulelor, pornirea echilibrării, pragurile de tensiune mare ale
   pachetului și capacitatea nominală sunt verificate cu programul Seplos; restul sunt marcate „neconfirmat”.
