@@ -595,6 +595,11 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `night_report.pack_stats`/`counts_right` → în câte nopți numără greșit / 0 A, împărțirea medie, trendul p90;
   energia din `energy_daily` (toate invertoarele); `note` când perioada iese din cele 14 zile brute.
   NEVERIFICAT pe date reale.
+- Resetare (1.0.0-beta.18, cerută 2026-11-04: Pi mutat la altă instalație): meta `reports_since`
+  (`night_report.SINCE`, `reports_since(db)`) → `night_report.build` și `battery_report.build` ignoră datele de dinainte
+  (graficele/istoricul NU se șterg); `POST /api/reports/reset`. `cell_health.reset` șterge `cell_events` și golește
+  `Tracker` (episode/buf/last_ir); `POST /api/cells/health/reset`. Ambele cer `app_password`; UI `#rep-reset`,
+  `#ch-reset` (`.reset-box`, jos în ecrane), `resetData()` în app.js.
 
 ## Teme: Cadrane și Carduri (1.0.0-beta.14, în pregătire, cerut 2026-10-30)
 - Cadrane: ordinea = `.k-gauges` (4 cadrane) → `.k-hero` (bateria) → `.k-day` → `inv-line`. Inelul `.k-ring` înlocuit

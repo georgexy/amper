@@ -7,6 +7,9 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
   modelul pachetului. Pragurile de tensiune ale celulelor, pornirea echilibrării, pragurile de tensiune mare ale
   pachetului și capacitatea nominală sunt verificate cu programul Seplos; restul sunt marcate „neconfirmat”.
   Deocamdată doar citire: scrierea nu e încă verificată pe hardware și e oprită.
+- Butoane de resetare, pentru un Pi mutat la altă instalație: „Resetează sănătatea celulelor” (șterge măsurătorile
+  strânse, analiza o ia de la capăt) și „Resetează rapoartele” (raportul nopții și Raport baterii pornesc de acum;
+  istoricul și graficele rămân). Amândouă cer parola aplicației.
 
 ## 1.0.0-beta.17 — 2026-11-01
 - Sus, în aplicație, scrie acum **AmperPro** sau **AmperLite**, după ediție. Numele instalației (din ghid) apare pe

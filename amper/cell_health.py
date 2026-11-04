@@ -122,6 +122,15 @@ class Tracker:
         buf.clear()
 
 
+def reset(db, tracker=None) -> None:
+    """„Resetează sănătatea celulelor” (Pi mutat la altă instalație): toate momentele salvate se șterg."""
+    db.purge_cell_events(2 ** 62)
+    if tracker is not None:
+        tracker.episode.clear()
+        tracker.buf.clear()
+        tracker.last_ir.clear()
+
+
 # ---------------- analiza ----------------
 def _num(v: float, d: int = 0) -> str:
     return f"{v:.{d}f}".replace(".", ",")

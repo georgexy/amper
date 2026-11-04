@@ -1140,6 +1140,15 @@ def make_app(engine) -> web.Application:
     # ---------------- sănătatea celulelor (ambele ediții) ----------------
     from . import cell_health
 
+    async def cells_health_reset(request):
+        """Pi mutat la altă instalație: momentele salvate pentru sănătatea celulelor se șterg; analiza o ia de la capăt."""
+        body = await request.json()
+        if (err := await confirm(request, body, "resetare sănătatea celulelor")) is not None:
+            return err
+        await asyncio.to_thread(cell_health.reset, engine.db, engine.cells)
+        log.warning("sănătatea celulelor resetată din aplicație (de la %s)", client_ip(request))
+        return _json({"ok": True})
+
     async def cells_health(request):
         res = await asyncio.to_thread(cell_health.analyze, engine.db, engine.device_names())
         last = await asyncio.to_thread(engine.db.get_meta, cell_health.META)
@@ -1178,6 +1187,16 @@ def make_app(engine) -> web.Application:
         invs = [k for k, st in engine.devices.items() if st.driver.kind == "inverter"]
         rep = await asyncio.to_thread(battery_report.build, engine.db, pack_names(), start, end, invs)
         return _json(i18n.report(rep))
+
+    async def reports_reset(request):
+        """Pi mutat la altă instalație: rapoartele (nopții / pe perioadă) pornesc de acum; datele rămân în istoric."""
+        body = await request.json()
+        if (err := await confirm(request, body, "resetare rapoarte")) is not None:
+            return err
+        now = int(time.time())
+        await asyncio.to_thread(engine.db.set_meta, night_report.SINCE, str(now))
+        log.warning("rapoartele bateriilor pornesc de acum (resetate din aplicație, de la %s)", client_ip(request))
+        return _json({"ok": True, "since": now})
 
     async def night_notify(request):
         body = await request.json()
@@ -1261,6 +1280,8 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/api/seplos/{device}/params", seplos_params_get)
     app.router.add_get("/api/seplos/{device}/settings", seplos_settings_get)
     app.router.add_post("/api/seplos/{device}/settings", seplos_settings_set)
+    app.router.add_post("/api/cells/health/reset", cells_health_reset)
+    app.router.add_post("/api/reports/reset", reports_reset)
     app.router.add_get("/api/daly/{device}/actions", daly_actions_get)
     app.router.add_post("/api/daly/{device}/action", daly_action)
     app.router.add_post("/api/daly/{device}/actions/retry", daly_actions_retry)

@@ -43,7 +43,7 @@ def build(db, names: dict[str, str], start: float, end: float, inverters: list[s
           now: float | None = None) -> dict:
     now = now or time.time()
     end = min(end, now)
-    start = max(start, end - MAX_DAYS * 86400)
+    start = max(start, end - MAX_DAYS * 86400, nr.reports_since(db))      # nimic de dinainte de resetare
     s, e = int(start), int(end)
     days = max(1, round((e - s) / 86400))
     nm = lambda d: names.get(d, d)          # noqa: E731

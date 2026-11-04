@@ -99,6 +99,11 @@
       </section>
       <label class="row-check"><span><b>Raportul nopții pe telefon</b><small>O notificare scurtă dimineața, după ce se
         termină noaptea</small></span><input type="checkbox" id="nr-notify"></label>
+      <div class="reset-box">
+        <button class="btn danger" id="rep-reset">Resetează rapoartele</button>
+        <p class="note">Pentru un Pi mutat la altă instalație: rapoartele pornesc de acum, fără datele de dinainte.
+          Istoricul (graficele) rămâne.</p>
+      </div>
     </main>
 
     <!-- ====================== SĂNĂTATEA CELULELOR ====================== -->
@@ -109,6 +114,11 @@
       </div>
       <p class="note">Celulele care se abat cel mai mult de la celelalte din modul, cele mai slabe primele.</p>
       <div id="ch-body"></div>
+      <div class="reset-box">
+        <button class="btn danger" id="ch-reset">Resetează sănătatea celulelor</button>
+        <p class="note">Pentru un Pi mutat la altă instalație: șterge măsurătorile strânse până acum, iar analiza o ia de
+          la capăt.</p>
+      </div>
     </main>
 
     <!-- ====================== SETĂRI BMS (Daly) ====================== -->

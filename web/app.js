@@ -741,6 +741,21 @@ async function loadNight() {
 }
 /* Raport baterii: la deschidere ultima noapte; taburile aleg altă perioadă (battery_report.py pe server) */
 $("#rep-row").onclick = () => show("report");
+// Pi mutat la altă instalație: rapoartele / sănătatea celulelor pornesc de acum (cerut 2026-11-04)
+async function resetData(url, question, done) {
+  if (!confirm(t(question))) return;
+  try {
+    const { r, j } = await securePost(url, {});
+    if (!r.ok || !j.ok) throw new Error(j.error || `eroare ${r.status}`);
+    done();
+  } catch (e) { if (e.message !== "auth") alert(e.message); }
+}
+$("#rep-reset").onclick = () => resetData("/api/reports/reset",
+  "Rapoartele vor porni de acum, fără datele de dinainte. Continui?", () => { nr.ago = 0; setRange("night"); });
+$("#ch-reset").onclick = () => resetData("/api/cells/health/reset",
+  "Se șterg toate măsurătorile pentru sănătatea celulelor, iar analiza o ia de la capăt. Continui?", () => {
+    cellsState.data = null; loadCells(); loadCellsRow();
+  });
 $("#rep-back").onclick = () => show("packs");
 function openReport() {
   nr.ago = 0;

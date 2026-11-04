@@ -27,6 +27,14 @@ ZERO_BAD = 0.20             # peste 20 % din citiri cu 0 A = BMS-ul pierde curen
 GAP_S = 120                 # o pauză mai lungă între citirile unui modul = n-a comunicat
 SHARE_BAD = 1.3             # un modul dă cu 30 % mai mult curent decât altul
 META = "night_report_last"
+SINCE = "reports_since"         # „Resetează rapoartele” (Pi mutat la altă instalație): datele de dinainte se ignoră
+
+
+def reports_since(db) -> int:
+    try:
+        return int(float(db.get_meta(SINCE) or 0))
+    except ValueError:
+        return 0
 
 
 def _n(v, d=1) -> str:
@@ -144,11 +152,12 @@ def counts_right(x: dict) -> bool | None:
 def build(db, names: dict[str, str], now: float | None = None, night: dict | None = None) -> dict:
     now = now or time.time()
     night = night or find_night(db, now)
-    s, e = int(night["start"]), int(night["end"])
+    since = reports_since(db)
+    s, e = max(int(night["start"]), since), int(night["end"])
     packs_rows = night_rows(db, names, s, e)
     st = {d: x for d, rows in packs_rows.items() if (x := pack_stats(rows))}
     prev = {}
-    for r in db.samples("pack", s - 86400, e - 86400):
+    for r in db.samples("pack", max(s - 86400, since), max(e - 86400, since)):
         if r["device"] in st:
             prev.setdefault(r["device"], []).append(r)
     prev = {d: x for d, rows in prev.items() if (x := pack_stats(rows))}
@@ -323,7 +332,7 @@ def build(db, names: dict[str, str], now: float | None = None, night: dict | Non
     rep["bank"] = (f"Banca la {_hm(e)}: " if not night["ongoing"] else "Banca acum: ") + text
 
     # ---- de urmărit: o încărcare completă în ultimele 7 zile?
-    full = db.samples_max_since(int(now - 7 * 86400))
+    full = db.samples_max_since(max(int(now - 7 * 86400), since))
     if not any((v.get("soc") or 0) >= 99 or (v.get("cell_max") or 0) >= 3.45 for d, v in full.items() if d in order):
         rep["watch"] = ("Rămâne de urmărit o încărcare completă (n-a fost niciuna în ultimele 7 zile), unde se vede cum "
                         "se comportă celulele sus și dacă echilibrarea lucrează.")
