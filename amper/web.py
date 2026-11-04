@@ -73,7 +73,8 @@ def make_app(engine) -> web.Application:
     pid = edition_.pi_id()
     ed = {"v": edition_.current(cfg, pid)}          # „lite” / „pro”; se schimbă la activarea cu cod
     # doar în Pro: setările BMS și ale invertorului și datele brute de depanare (serverul refuză, nu doar pagina)
-    PRO_ONLY = re.compile(r"^/api/(inverter/(settings|clock)|daly/[^/]+/(settings|params|actions?(/retry)?)|debug/[^/]+)$")
+    PRO_ONLY = re.compile(r"^/api/(inverter/(settings|clock)|daly/[^/]+/(settings|params|actions?(/retry)?)"
+                          r"|seplos/[^/]+/(settings|params)|debug/[^/]+)$")
     COOKIE_AGE = 3600 * 24 * 365
 
     def client_ip(request) -> str:
@@ -939,6 +940,74 @@ def make_app(engine) -> web.Application:
         return _json(dict(ok=True, changed=res["changed"], old=res["old"], new=res["new"],
                           settings=daly_params.describe(blocks)))
 
+    # ---------------- parametrii Seplos V2 (0x47 citire; 0x49 scriere NEVERIFICATĂ, oprită implicit) ----------------
+    from . import seplos_params
+
+    def seplos_driver(dev_id):
+        st = engine.devices.get(dev_id)
+        if not st or st.cfg.get("type") != "seplos" or not hasattr(st.driver, "read_params"):
+            return None, None
+        return st, st.driver
+
+    def seplos_can_write() -> bool:
+        return bool(auth_.enabled and (cfg.get("seplos") or {}).get("allow_write"))
+
+    async def seplos_params_get(request):
+        st, drv = seplos_driver(request.match_info["device"])
+        if not drv:
+            return _json({"error": "BMS-ul nu e legat"}, 404)
+        try:
+            p = await asyncio.to_thread(drv.read_params)
+        except (DriverError, OSError) as e:
+            return _json({"error": str(e)}, 502)
+        return _json(dict(device=st.cfg["id"], **p))
+
+    async def seplos_settings_get(request):
+        st, drv = seplos_driver(request.match_info["device"])
+        if not drv:
+            return _json({"error": "BMS-ul nu e legat"}, 404)
+        try:
+            p = await asyncio.to_thread(drv.read_params)
+        except (DriverError, OSError) as e:
+            return _json({"error": str(e)}, 502)
+        log_rows = await asyncio.to_thread(engine.db.settings_log, st.cfg["id"], 20)
+        return _json(dict(device=st.cfg["id"], name=st.cfg.get("name"), model=p["model"],
+                          settings=seplos_params.describe(p), log=log_rows, can_write=seplos_can_write(),
+                          write_off=not (cfg.get("seplos") or {}).get("allow_write")))
+
+    async def seplos_settings_set(request):
+        body = await request.json()
+        if (err := await confirm(request, body, "setare BMS")) is not None:
+            return err
+        st, drv = seplos_driver(request.match_info["device"])
+        if not drv:
+            return _json({"error": "BMS-ul nu e legat"}, 404)
+        key = str(body.get("key"))
+        name = st.cfg.get("name", st.cfg["id"])
+        async with daly_lock:
+            try:
+                res = await asyncio.to_thread(seplos_params.write_field, drv, key, body.get("value"),
+                                              seplos_can_write())
+            except PermissionError as e:
+                return _json({"error": str(e)}, 403)
+            except ValueError as e:
+                return _json({"error": str(e)}, 400)
+            except (DriverError, OSError) as e:
+                await asyncio.to_thread(engine.db.log_setting, int(time.time()), st.cfg["id"], key, None, None,
+                                        False, str(e), request.remote)
+                log.warning("setare Seplos %s %s: EȘUAT: %s", name, key, e)
+                return _json({"error": str(e)}, 502)
+        if res["changed"]:
+            await asyncio.to_thread(engine.db.log_setting, int(time.time()), st.cfg["id"], res["label"], res["old"],
+                                    res["new"], True, None, request.remote)
+            log.warning("setare Seplos schimbată: %s: %s: %s → %s (de la %s)", name, res["label"], res["old"],
+                        res["new"], request.remote)
+            engine.notifier.send(f"⚙️ {name}: {res['label']}: {res['old']} → {res['new']}",
+                                 title="Amper: setare BMS schimbată", priority="default")
+        p = await asyncio.to_thread(drv.read_params)
+        return _json(dict(ok=True, changed=res["changed"], old=res["old"], new=res["new"],
+                          settings=seplos_params.describe(p)))
+
     # ---------------- comenzile BMS Daly (MOSFET-uri, repornire, SOC) ----------------
     from . import daly_actions
     support = daly_actions.Support(engine.db)
@@ -1071,6 +1140,15 @@ def make_app(engine) -> web.Application:
     # ---------------- sănătatea celulelor (ambele ediții) ----------------
     from . import cell_health
 
+    async def cells_health_reset(request):
+        """Pi mutat la altă instalație: momentele salvate pentru sănătatea celulelor se șterg; analiza o ia de la capăt."""
+        body = await request.json()
+        if (err := await confirm(request, body, "resetare sănătatea celulelor")) is not None:
+            return err
+        await asyncio.to_thread(cell_health.reset, engine.db, engine.cells)
+        log.warning("sănătatea celulelor resetată din aplicație (de la %s)", client_ip(request))
+        return _json({"ok": True})
+
     async def cells_health(request):
         res = await asyncio.to_thread(cell_health.analyze, engine.db, engine.device_names())
         last = await asyncio.to_thread(engine.db.get_meta, cell_health.META)
@@ -1109,6 +1187,16 @@ def make_app(engine) -> web.Application:
         invs = [k for k, st in engine.devices.items() if st.driver.kind == "inverter"]
         rep = await asyncio.to_thread(battery_report.build, engine.db, pack_names(), start, end, invs)
         return _json(i18n.report(rep))
+
+    async def reports_reset(request):
+        """Pi mutat la altă instalație: rapoartele (nopții / pe perioadă) pornesc de acum; datele rămân în istoric."""
+        body = await request.json()
+        if (err := await confirm(request, body, "resetare rapoarte")) is not None:
+            return err
+        now = int(time.time())
+        await asyncio.to_thread(engine.db.set_meta, night_report.SINCE, str(now))
+        log.warning("rapoartele bateriilor pornesc de acum (resetate din aplicație, de la %s)", client_ip(request))
+        return _json({"ok": True, "since": now})
 
     async def night_notify(request):
         body = await request.json()
@@ -1189,6 +1277,11 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/api/daly/{device}/params", daly_params_raw)
     app.router.add_get("/api/daly/{device}/settings", daly_settings_get)
     app.router.add_post("/api/daly/{device}/settings", daly_settings_set)
+    app.router.add_get("/api/seplos/{device}/params", seplos_params_get)
+    app.router.add_get("/api/seplos/{device}/settings", seplos_settings_get)
+    app.router.add_post("/api/seplos/{device}/settings", seplos_settings_set)
+    app.router.add_post("/api/cells/health/reset", cells_health_reset)
+    app.router.add_post("/api/reports/reset", reports_reset)
     app.router.add_get("/api/daly/{device}/actions", daly_actions_get)
     app.router.add_post("/api/daly/{device}/action", daly_action)
     app.router.add_post("/api/daly/{device}/actions/retry", daly_actions_retry)

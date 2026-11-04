@@ -99,6 +99,11 @@
       </section>
       <label class="row-check"><span><b>Raportul nopții pe telefon</b><small>O notificare scurtă dimineața, după ce se
         termină noaptea</small></span><input type="checkbox" id="nr-notify"></label>
+      <div class="reset-box">
+        <button class="btn danger" id="rep-reset">Resetează rapoartele</button>
+        <p class="note">Pentru un Pi mutat la altă instalație: rapoartele pornesc de acum, fără datele de dinainte.
+          Istoricul (graficele) rămâne.</p>
+      </div>
     </main>
 
     <!-- ====================== SĂNĂTATEA CELULELOR ====================== -->
@@ -109,6 +114,11 @@
       </div>
       <p class="note">Celulele care se abat cel mai mult de la celelalte din modul, cele mai slabe primele.</p>
       <div id="ch-body"></div>
+      <div class="reset-box">
+        <button class="btn danger" id="ch-reset">Resetează sănătatea celulelor</button>
+        <p class="note">Pentru un Pi mutat la altă instalație: șterge măsurătorile strânse până acum, iar analiza o ia de
+          la capăt.</p>
+      </div>
     </main>
 
     <!-- ====================== SETĂRI BMS (Daly) ====================== -->
@@ -117,13 +127,17 @@
         <button class="back" id="bms-back" aria-label="Înapoi la baterii">‹</button>
         <h2 id="bms-title">Setări BMS</h2>
       </div>
-      <p class="note">Valorile sunt citite acum din BMS. La fiecare pereche de praguri, primul e avertismentul (nivel 1),
+      <p class="note" id="bms-note-daly">Valorile sunt citite acum din BMS. La fiecare pereche de praguri, primul e avertismentul (nivel 1),
         al doilea e protecția (nivel 2): la el BMS-ul taie încărcarea sau descărcarea. Fiecare modificare se citește înapoi din BMS ca să fie verificată.</p>
+      <p class="note" id="bms-note-seplos" hidden>Valorile sunt citite acum din BMS. Cele marcate „neconfirmat” nu au fost încă
+        verificate cu programul Seplos și nu se pot modifica.</p>
       <div id="bms-list"></div>
-      <h2>Comenzi</h2>
-      <p class="note">Comenzi trimise direct BMS-ului. Fiecare cere confirmare și parola, iar rezultatul se citește înapoi
-        din BMS. Dacă restul băncii nu poate duce curentul de acum, oprirea unui MOSFET arată un avertisment și cere o confirmare în plus.</p>
-      <div id="bms-cmds"></div>
+      <div id="bms-cmds-box">
+        <h2>Comenzi</h2>
+        <p class="note">Comenzi trimise direct BMS-ului. Fiecare cere confirmare și parola, iar rezultatul se citește înapoi
+          din BMS. Dacă restul băncii nu poate duce curentul de acum, oprirea unui MOSFET arată un avertisment și cere o confirmare în plus.</p>
+        <div id="bms-cmds"></div>
+      </div>
       <h2>Modificări făcute</h2>
       <div class="list" id="bms-log"></div>
     </main>

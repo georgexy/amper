@@ -2,6 +2,16 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.18 — 2026-11-04
+- Seplos V2: rotița ⚙ apare și la pachetele Seplos (Amper Pro). Arată parametrii citiți din BMS (comanda 0x47) și
+  modelul pachetului. Pragurile de tensiune ale celulelor, pornirea echilibrării, pragurile de tensiune mare ale
+  pachetului și capacitatea nominală sunt verificate cu programul Seplos; restul sunt marcate „neconfirmat”.
+  Deocamdată doar citire: scrierea nu e încă verificată pe hardware și e oprită.
+- Butoane de resetare, pentru un Pi mutat la altă instalație: „Resetează sănătatea celulelor” (șterge măsurătorile
+  strânse, analiza o ia de la capăt) și „Resetează rapoartele” (raportul nopții și Raport baterii pornesc de acum;
+  istoricul și graficele rămân). Amândouă cer parola aplicației.
+- Setări → Info → Bluetooth: apar doar modulele conectate acum, nu și cele rămase în config de la altă instalație.
+
 ## 1.0.0-beta.17 — 2026-11-01
 - Sus, în aplicație, scrie acum **AmperPro** sau **AmperLite**, după ediție. Numele instalației (din ghid) apare pe
   rândul de dedesubt, cu 📍.
@@ -200,7 +210,7 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
   actualiza.” Atinsă, deschide direct Setări → Actualizări.
 
 ## 0.3.0-beta.9 — 2026-10-27
-- Bateriile pe Bluetooth au pe card numele modulului (ex. „DL-40D63C2A1F2B”, același ca în aplicația Daly de pe
+- Bateriile pe Bluetooth au pe card numele modulului (ex. „DL-A1B2C3D4E5F6”, același ca în aplicația Daly de pe
   telefon) și adresa, ca să știi care baterie e Daly 1, 2, 3. Apar și în Setări → Dispozitive conectate.
 - „Dispozitive conectate”: butonul de adăugare e acum un „+” mic, sus în dreapta. Deschide ecranul „Adaugă
   dispozitiv”: ce e nou pe cablu (căutat singur) și „Caută prin Bluetooth”; alegi modulul, apoi ce BMS este (Daly;

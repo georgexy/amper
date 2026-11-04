@@ -39,6 +39,8 @@ DEFAULTS = {
         "only_important": True,
         "full_cell_volts": 3.40,         # media celulelor peste ea = pachet plin (protecția la plin e normală)
     },
+    # Seplos V2: scrierea parametrilor (0x49) e NEVERIFICATĂ pe hardware → oprită până la testul cu utilizatorul
+    "seplos": {"allow_write": False},
     "notify": {
         "ntfy": {"enabled": False, "server": "https://ntfy.sh", "topic": ""},
         "telegram": {"enabled": False, "bot_token": "", "chat_id": ""},

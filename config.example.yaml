@@ -43,7 +43,7 @@ wifi_setup:
 #  Daly — trei variante de legătură:
 #    port: auto                          se găsește singur: cablu USB nou SAU modul Bluetooth („DL-...”)
 #    port: /dev/serial/by-id/usb-...     cablu USB-UART anume
-#    ble: AA:BB:CC:DD:EE:FF              modul Bluetooth anume (adresa sau numele, ex. DL-40D63C2xxxxx)
+#    ble: AA:BB:CC:DD:EE:FF              modul Bluetooth anume (adresa sau numele, ex. DL-XXXXXXXXXXXX)
 #  Cu „auto”, legătura găsită se ține minte în /var/lib/amper/daly-auto.json (ștergeți-l ca să se refacă).
 #  `amper scan` arată și modulele Bluetooth din jur.
 # ------------------------------------------------------------

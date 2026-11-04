@@ -673,7 +673,7 @@ function renderPacks() {
     const facts = [r.current == null ? null : `${r.current > 0 ? "+" : ""}${num(r.current, 1)} A`, r.voltage == null ? null : `${num(r.voltage, 2)} V`,
       r.temps?.length ? `${num(Math.max(...r.temps), 0)} °C` : null, r.cycles != null ? `${r.cycles} cicluri` : null].filter(Boolean).join(" · ");
     el.innerHTML = `<div class="h"><div class="pk-mini"><i style="height:${Math.max(0, Math.min(100, r.soc ?? 0))}%"></i></div>
-      <div class="t"><div class="n">${esc(d.name)} <span class="tag">${esc(label)}</span>${d.type === "daly" && !d.stale
+      <div class="t"><div class="n">${esc(d.name)} <span class="tag">${esc(label)}</span>${["daly", "seplos"].includes(d.type) && !d.stale
         && isPro() ? `<span class="pk-gear" data-bms="${esc(d.id)}" role="button" tabindex="0" aria-label="Setările BMS ${esc(d.name)}">⚙</span>` : ""}</div>
       <div class="s">${d.restarting ? "Repornește…" : d.stale ? `Nu comunică${d.error ? ": " + esc(d.error) : ""}` : facts}</div>${bleId(r)}</div>
       <div class="soc">${r.soc == null ? "–" : num(r.soc, 0)}<sup>%</sup></div></div>
@@ -741,6 +741,21 @@ async function loadNight() {
 }
 /* Raport baterii: la deschidere ultima noapte; taburile aleg altă perioadă (battery_report.py pe server) */
 $("#rep-row").onclick = () => show("report");
+// Pi mutat la altă instalație: rapoartele / sănătatea celulelor pornesc de acum (cerut 2026-11-04)
+async function resetData(url, question, done) {
+  if (!confirm(t(question))) return;
+  try {
+    const { r, j } = await securePost(url, {});
+    if (!r.ok || !j.ok) throw new Error(j.error || `eroare ${r.status}`);
+    done();
+  } catch (e) { if (e.message !== "auth") alert(e.message); }
+}
+$("#rep-reset").onclick = () => resetData("/api/reports/reset",
+  "Rapoartele vor porni de acum, fără datele de dinainte. Continui?", () => { nr.ago = 0; setRange("night"); });
+$("#ch-reset").onclick = () => resetData("/api/cells/health/reset",
+  "Se șterg toate măsurătorile pentru sănătatea celulelor, iar analiza o ia de la capăt. Continui?", () => {
+    cellsState.data = null; loadCells(); loadCellsRow();
+  });
 $("#rep-back").onclick = () => show("packs");
 function openReport() {
   nr.ago = 0;
@@ -1089,13 +1104,18 @@ async function runCmd(key, value, fromEditor = false) {
   renderCmds(res);
   if (fromEditor && !res.ok) throw new Error(res.t);
 }
+// tipul BMS-ului deschis: Daly (setări + comenzi) sau Seplos V2 (parametrii 0x47; doar cei confirmați se pot modifica)
+const bmsKind = () => (state.snap?.devices?.[bms.id]?.type === "seplos" ? "seplos" : "daly");
 async function loadBms() {
-  const d = state.snap?.devices?.[bms.id];
+  const d = state.snap?.devices?.[bms.id], kind = bmsKind();
   $("#bms-title").textContent = `Setări BMS — ${d?.name || bms.id}`;
-  loadCmds();
+  $("#bms-note-daly").hidden = kind !== "daly";
+  $("#bms-note-seplos").hidden = kind !== "seplos";
+  $("#bms-cmds-box").hidden = kind !== "daly";
+  if (kind === "daly") loadCmds();
   if (!bms.data) $("#bms-list").innerHTML = `<div class="note">Citesc setările din BMS…</div>`;
   try {
-    const r = await api(`/api/daly/${encodeURIComponent(bms.id)}/settings`);
+    const r = await api(`/api/${kind}/${encodeURIComponent(bms.id)}/settings`);
     if (r.error) throw new Error(r.error);
     bms.data = r;
     renderBms();
@@ -1106,20 +1126,25 @@ async function loadBms() {
 function renderBms() {
   const r = bms.data, groups = [...new Set(r.settings.map((x) => x.group))];
   const alerts = r.settings.filter((x) => x.alert);
-  $("#bms-list").innerHTML = (r.can_write ? "" : `<div class="banner warning"><b>Modificarea e dezactivată</b>
+  const editable = (x) => r.can_write && !x.locked;          // Seplos: câmpurile neconfirmate nu se pot scrie
+  $("#bms-list").innerHTML = (r.can_write ? "" : r.write_off ? `<div class="banner warning"><b>Doar citire</b>
+      <small>Scrierea parametrilor Seplos nu e încă verificată pe hardware, așa că e oprită.</small></div>`
+      : `<div class="banner warning"><b>Modificarea e dezactivată</b>
       <small>Setați o parolă pentru aplicație ca să poată fi schimbate setările.</small></div>`) +
+    (r.model ? `<p class="note">Model: <b>${esc(r.model)}</b></p>` : "") +
     (alerts.length ? `<div class="banner warning"><b>Praguri de verificat</b>${alerts.map((x) =>
       `<small><b>${esc(x.group)}, ${esc(x.label.toLowerCase())}:</b> ${esc(x.alert)}</small>`).join("")}</div>` : "") +
     groups.map((g) => `<h2>${esc(g)}</h2><div class="list iv-set">${r.settings.filter((x) => x.group === g).map((x) => `
-      <button class="row iv-row" data-key="${esc(x.key)}" ${r.can_write ? "" : "disabled"}>
+      <button class="row iv-row" data-key="${esc(x.key)}" ${editable(x) ? "" : "disabled"}>
         <span class="k">${esc(x.label)}${x.risky ? ' <i class="risk" title="Setare cu risc">!</i>' : ""}${x.role
-          ? ` <span class="role ${x.role === "protecție" ? "p" : ""}" title="${esc(x.role_text || x.role)}">${esc(x.role_text || x.role)}</span>` : ""}${x.alert
+          ? ` <span class="role ${x.role === "protecție" ? "p" : ""}" title="${esc(x.role_text || x.role)}">${esc(x.role_text || x.role)}</span>` : ""}${x.locked
+          ? ' <span class="role">neconfirmat</span>' : ""}${x.alert
           ? '<small class="bad">protecția e mai puțin severă decât avertismentul</small>' : ""}</span>
-        <span class="v">${esc(x.text)}</span>${r.can_write ? '<span class="ed">Modifică ›</span>' : ""}</button>`).join("")}</div>`).join("");
+        <span class="v">${esc(x.text)}</span>${editable(x) ? '<span class="ed">Modifică ›</span>' : ""}</button>`).join("")}</div>`).join("");
   $$(".iv-row", $("#bms-list")).forEach((el) => (el.onclick = () => {
     const x = bms.data.settings.find((s) => s.key === el.dataset.key);
     openEditor(x, "BMS", async (v) => {
-      const { r: res, j } = await securePost(`/api/daly/${encodeURIComponent(bms.id)}/settings`, { key: x.key, value: v });
+      const { r: res, j } = await securePost(`/api/${bmsKind()}/${encodeURIComponent(bms.id)}/settings`, { key: x.key, value: v });
       if (!res.ok || !j.ok) throw new Error(j.error || `eroare ${res.status}`);
       bms.data.settings = j.settings;
       renderBms();
@@ -1567,7 +1592,7 @@ async function loadInfo() {
     <h2>Bluetooth</h2>
     <div class="list">${(x.bluetooth || []).map((b) => `<div class="row"><span>${esc(b.device)}</span>
       <span class="t">${esc(b.target)} · ${b.ok ? "conectat, citește" : b.connected ? "conectat, nu răspunde" : "neconectat"}</span></div>`).join("")
-      || `<div class="empty">Niciun modul Bluetooth.</div>`}</div>
+      || `<div class="empty">Niciun modul Bluetooth conectat.</div>`}</div>
     <p class="note">Actualizat ${esc(x.time)}</p>`;
   $("#info-wifi").onclick = () => showPanel("wifi");
   $("#set-info-sub").textContent = `${num(x.cpu_temp, 0)} °C · ${w ? "WiFi " + w.ssid + " " + w.signal + "%" : "fără WiFi"}`;
