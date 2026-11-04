@@ -270,7 +270,7 @@ class DalyDriver(DalyProtocol, SerialDriver):
 
 
 class DalyBleDriver(DalyProtocol, Driver):
-    """Daly prin modulul Bluetooth (BLE) al BMS-ului; `ble:` = adresa MAC sau numele (ex. DL-40D63C2xxxxx)."""
+    """Daly prin modulul Bluetooth (BLE) al BMS-ului; `ble:` = adresa MAC sau numele (ex. DL-XXXXXXXXXXXX)."""
 
     def __init__(self, cfg: dict):
         Driver.__init__(self, cfg)
@@ -281,7 +281,7 @@ class DalyBleDriver(DalyProtocol, Driver):
 
     @property
     def link_desc(self) -> str:
-        """„Bluetooth DL-40D63C2A1F2B” (numele din aplicația Daly) + adresa, dacă numele n-o conține deja."""
+        """„Bluetooth DL-A1B2C3D4E5F6” (numele din aplicația Daly) + adresa, dacă numele n-o conține deja."""
         name = getattr(self.link, "name", None) or self.ble_name
         mac = getattr(self.link, "address", None)
         if not mac and re.fullmatch(r"(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}", str(self.link.target)):

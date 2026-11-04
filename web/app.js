@@ -1592,7 +1592,7 @@ async function loadInfo() {
     <h2>Bluetooth</h2>
     <div class="list">${(x.bluetooth || []).map((b) => `<div class="row"><span>${esc(b.device)}</span>
       <span class="t">${esc(b.target)} · ${b.ok ? "conectat, citește" : b.connected ? "conectat, nu răspunde" : "neconectat"}</span></div>`).join("")
-      || `<div class="empty">Niciun modul Bluetooth.</div>`}</div>
+      || `<div class="empty">Niciun modul Bluetooth conectat.</div>`}</div>
     <p class="note">Actualizat ${esc(x.time)}</p>`;
   $("#info-wifi").onclick = () => showPanel("wifi");
   $("#set-info-sub").textContent = `${num(x.cpu_temp, 0)} °C · ${w ? "WiFi " + w.ssid + " " + w.signal + "%" : "fără WiFi"}`;

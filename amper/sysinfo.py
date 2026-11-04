@@ -122,14 +122,17 @@ def ports(engine) -> list[dict]:
 
 
 def bluetooth(engine) -> list[dict]:
-    """Legăturile Bluetooth ale modulelor (Daly)."""
+    """Legăturile Bluetooth ale modulelor (Daly) — doar cele conectate acum (cerut 2026-11-04: modulele rămase în config
+    de la altă instalație nu se mai afișează)."""
     out = []
     for k, st in engine.devices.items():
         link = getattr(getattr(st.driver, "inner", None) or st.driver, "link", None)
-        if link is not None:
-            out.append(dict(device=st.cfg.get("name", k), target=link.target,
-                            connected=bool(link.client and link.client.is_connected),
-                            ok=st.last_ok is not None and time.time() - st.last_ok < 30))
+        if link is None:
+            continue
+        connected = bool(link.client and link.client.is_connected)
+        ok = st.last_ok is not None and time.time() - st.last_ok < 30
+        if connected or ok:
+            out.append(dict(device=st.cfg.get("name", k), target=link.target, connected=connected, ok=ok))
     return out
 
 

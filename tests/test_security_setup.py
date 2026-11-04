@@ -296,7 +296,7 @@ def test_api_add_device(tmp_path):
 def test_api_disconnect_needs_password_and_excluded_list(tmp_path):
     from amper.drivers import daly_auto
     daly_auto.set_state_dir(str(tmp_path))
-    daly_auto.exclude({"type": "ble", "ble": "EE:01", "name": "DL-B77B"}, "daly2: DL-B77B", "respins din aplicație")
+    daly_auto.exclude({"type": "ble", "ble": "EE:01", "name": "DL-E0E1"}, "daly2: DL-E0E1", "respins din aplicație")
 
     async def steps(c, eng, n):
         await c.post("/api/login", json={"password": "pw-corecta"})
@@ -312,7 +312,7 @@ def test_api_disconnect_needs_password_and_excluded_list(tmp_path):
         {"id": "seplos1", "name": "Seplos 1", "type": "seplos", "port": "/dev/ttyX", "address": 1, "capacity_ah": 100}]},
         steps, tmp_path)
     assert no == 403 and bad == 403 and ok == 200 and okj["action"] == "removed" and inv == 404
-    assert devs == ["inv"] and ex["items"][0]["label"] == "daly2: DL-B77B" and allow["items"] == []
+    assert devs == ["inv"] and ex["items"][0]["label"] == "daly2: DL-E0E1" and allow["items"] == []
     over = yaml.safe_load((tmp_path / "settings.yaml").read_text())
     assert [d["id"] for d in over["devices"]] == ["inv"]
 

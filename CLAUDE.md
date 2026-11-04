@@ -450,7 +450,7 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
     `{model, link, address}` (`setup_scan.scan`); vechiul `{what}` rămâne. Alegerea → `devForm` → `/api/devices/add`.
 
 ## Deconectare BMS, module excluse, egalizatoare (1.0.0-beta.1, în pregătire)
-- Pe Pi-ul utilizatorului, căutarea a legat un EGALIZATOR ACTIV (BLE „DL-B77B020306D3”) ca daly2: răspunde la 0x90 cu
+- Pe Pi-ul utilizatorului, căutarea a legat un EGALIZATOR ACTIV (BLE „DL-…”, adresa în LOCAL.md) ca daly2: răspunde la 0x90 cu
   tensiuni reale, SOC 0, 0 cicluri, MOSFET 0. Utilizatorul a scos modulele BLE de pe egalizatoare și va deconecta daly2.
 - `daly_auto.check_bms(drv)`: 0x90 (+0x50 capacitate, 0x93 Ah rămași, 0x94 celule/cicluri); BMS = 5–100 V, SOC 0–100
   și (capacitate 1–2000 Ah sau SOC>0 și Ah rămași>0). `_probe` pune valorile în `b["check"]`; `_note_found` →

@@ -47,7 +47,7 @@ def test_daly_over_bluetooth(fake_ble):
 
 
 def test_config_daly_without_port_is_auto():
-    cfg = {"devices": [{"id": "daly1", "type": "daly"}, {"id": "daly2", "type": "daly", "ble": "DL-40D63C"}]}
+    cfg = {"devices": [{"id": "daly1", "type": "daly"}, {"id": "daly2", "type": "daly", "ble": "DL-A1B2C3"}]}
     validate(cfg)
     assert cfg["devices"][0]["port"] == "auto"
     assert daly_auto.is_auto(cfg["devices"][0]) and not daly_auto.is_auto(cfg["devices"][1])
@@ -77,27 +77,27 @@ def auto_devices():
 
 
 def test_auto_binds_bluetooth_modules_in_signal_order(auto_env):
-    auto_env["ble"] += [{"address": "AA:00:00:00:00:02", "name": "DL-40D63C2B", "rssi": -60},
-                        {"address": "AA:00:00:00:00:01", "name": "DL-40D63C2A", "rssi": -50},
+    auto_env["ble"] += [{"address": "AA:00:00:00:00:02", "name": "DL-A1B2C32B", "rssi": -60},
+                        {"address": "AA:00:00:00:00:01", "name": "DL-A1B2C32A", "rssi": -50},
                         {"address": "AA:00:00:00:00:09", "name": "Telefon", "rssi": -40}]
     _, drvs = auto_devices()
     assert drvs[0]._search_once() and drvs[1]._search_once()
     assert not drvs[2]._search_once()                     # doar două module Daly în jur
-    assert [d.inner.link_desc for d in drvs[:2]] == ["Bluetooth DL-40D63C2A · AA:00:00:00:00:01",
-                                                          "Bluetooth DL-40D63C2B · AA:00:00:00:00:02"]
+    assert [d.inner.link_desc for d in drvs[:2]] == ["Bluetooth DL-A1B2C32A · AA:00:00:00:00:01",
+                                                          "Bluetooth DL-A1B2C32B · AA:00:00:00:00:02"]
     assert drvs[0].read().soc == 64.3
     # după repornire, legăturile rămân aceleași (din daly-auto.json)
     daly_auto._claimed.clear()
     _, again = auto_devices()
-    assert again[0].inner.link_desc == "Bluetooth DL-40D63C2A · AA:00:00:00:00:01"   # numele, ținut minte
-    assert again[1].inner.link_desc == "Bluetooth DL-40D63C2B · AA:00:00:00:00:02"
-    assert drvs[0].read().raw["ble_name"] == "DL-40D63C2A"
+    assert again[0].inner.link_desc == "Bluetooth DL-A1B2C32A · AA:00:00:00:00:01"   # numele, ținut minte
+    assert again[1].inner.link_desc == "Bluetooth DL-A1B2C32B · AA:00:00:00:00:02"
+    assert drvs[0].read().raw["ble_name"] == "DL-A1B2C32A"
 
 
 def test_auto_bluetooth_right_after_boot(auto_env, monkeypatch):
     """Pi-ul (sau mașina de test) pornit de mai puțin de 30 s: prima căutare Bluetooth se face oricum."""
     monkeypatch.setattr(daly_auto.time, "monotonic", lambda: 12.0)
-    auto_env["ble"].append({"address": "AA:00:00:00:00:01", "name": "DL-40D63C2A", "rssi": -50})
+    auto_env["ble"].append({"address": "AA:00:00:00:00:01", "name": "DL-A1B2C32A", "rssi": -50})
     _, drvs = auto_devices()
     assert drvs[0]._search_once()
 
@@ -160,15 +160,15 @@ def equalizer(fake_ble, monkeypatch):
 
 
 def test_equalizer_is_not_bound_as_bms(auto_env, equalizer):
-    auto_env["ble"] += [{"address": "EE:00:00:00:00:01", "name": "DL-B77B020306D3", "rssi": -40},
-                        {"address": "AA:00:00:00:00:01", "name": "DL-40D63C2A", "rssi": -60}]
+    auto_env["ble"] += [{"address": "EE:00:00:00:00:01", "name": "DL-E0E1E2E3E4E5", "rssi": -40},
+                        {"address": "AA:00:00:00:00:01", "name": "DL-A1B2C32A", "rssi": -60}]
     _, drvs = auto_devices()
     assert drvs[0]._search_once()
     assert drvs[0].binding["ble"] == "AA:00:00:00:00:01"          # egalizatorul (semnal mai bun) a fost sărit
     assert not drvs[1]._search_once()
     found = {x["label"]: x for x in daly_auto.recent_found()}
-    assert not found["DL-B77B020306D3"]["ok"] and found["DL-B77B020306D3"]["check"]["soc"] == 0
-    assert found["DL-40D63C2A"]["ok"] and found["DL-40D63C2A"]["device"] == "daly1"
+    assert not found["DL-E0E1E2E3E4E5"]["ok"] and found["DL-E0E1E2E3E4E5"]["check"]["soc"] == 0
+    assert found["DL-A1B2C32A"]["ok"] and found["DL-A1B2C32A"]["device"] == "daly1"
 
 
 def test_disconnect_frees_position_and_excludes(auto_env, tmp_path):
@@ -176,8 +176,8 @@ def test_disconnect_frees_position_and_excludes(auto_env, tmp_path):
     from amper.db import Database
     from amper.engine import Engine
     from amper.notify import Notifier
-    auto_env["ble"] += [{"address": "AA:00:00:00:00:01", "name": "DL-40D63C2A", "rssi": -50},
-                        {"address": "AA:00:00:00:00:02", "name": "DL-40D63C2B", "rssi": -60}]
+    auto_env["ble"] += [{"address": "AA:00:00:00:00:01", "name": "DL-A1B2C32A", "rssi": -50},
+                        {"address": "AA:00:00:00:00:02", "name": "DL-A1B2C32B", "rssi": -60}]
     cfg = _merge(DEFAULTS, {"database": str(tmp_path / "amper.db"), "devices": [
         {"id": "daly1", "name": "Daly 1", "type": "daly", "port": "auto", "capacity_ah": 105},
         {"id": "seplos1", "name": "Seplos 1", "type": "seplos", "port": "/dev/ttyX", "address": 1, "capacity_ah": 100}]})
@@ -197,7 +197,7 @@ def test_disconnect_frees_position_and_excludes(auto_env, tmp_path):
     assert not any("Rezolvat" in m["message"] for m in eng.notifier.sent)
     assert any("Daly 1 a fost deconectat" in m["message"] for m in eng.notifier.sent)
     assert eng.db.settings_log("daly1")[0]["setting"] == "conexiune"
-    assert daly_auto.load_excluded()[0]["keys"] == ["ble:AA:00:00:00:00:01", "name:DL-40D63C2A"]
+    assert daly_auto.load_excluded()[0]["keys"] == ["ble:AA:00:00:00:00:01", "name:DL-A1B2C32A"]
     # căutarea leagă alt modul pe poziția liberă, nu pe cel exclus
     assert st.driver._search_once() and st.driver.binding["ble"] == "AA:00:00:00:00:02"
     daly_auto.allow_again(0)

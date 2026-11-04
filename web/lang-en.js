@@ -396,7 +396,7 @@ const EN = {
   ". Actualizările din aplicație merg doar pe Pi-ul instalat cu install.sh.": ". Updates from the app only work on a Pi installed with install.sh.",
   "{}. Accesul de oriunde se pornește doar pe Pi-ul instalat cu install.sh.": "{}. Remote access can only be turned on on a Pi installed with install.sh.",
   "{}. Actualizările din aplicație merg doar pe Pi-ul instalat cu install.sh.": "{}. Updates from the app only work on a Pi installed with install.sh.",
-  "# de celule urmărite": "# cells tracked", "Celula #": "Cell #",
+  "# de celule urmărite": "# cells tracked", "Celula #": "Cell #", "Niciun modul Bluetooth conectat.": "No Bluetooth module connected.",
   "Resetează rapoartele": "Reset reports", "Resetează sănătatea celulelor": "Reset cell health",
   "Pentru un Pi mutat la altă instalație: rapoartele pornesc de acum, fără datele de dinainte. Istoricul (graficele) rămâne.":
     "For a Pi moved to another installation: the reports start from now, without the earlier data. The history (charts) stays.",
