@@ -2,6 +2,12 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.20 — 2026-11-08
+- Tema „Casă 3D”: pe etichetele bateriei, panourilor și invertorului e un „i” mic, lângă valoare. Atingerea lui
+  deschide ecranul complet: Bateriile (fiecare modul cu SOC-ul lui), respectiv ecranul invertorului (cu setările).
+  Atingerea elementului sau a etichetei deschide în continuare fișa cu detalii. Bilele care arată curentul pe fire
+  strălucesc mai puțin.
+
 ## 1.0.0-beta.19 — 2026-11-08
 - Temă nouă „Casă 3D” (Setări → Teme): casa ta în 3D, pe tot ecranul, cu panourile, invertorul, bateria și rețeaua,
   iar energia curge pe cabluri în timp real. Noaptea se aprind luminile. Atinge panourile, bateria, casa, invertorul
