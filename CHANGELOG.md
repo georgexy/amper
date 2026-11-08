@@ -2,6 +2,12 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.19 — 2026-11-08
+- Temă nouă „Casă 3D” (Setări → Teme): casa ta în 3D, pe tot ecranul, cu panourile, invertorul, bateria și rețeaua,
+  iar energia curge pe cabluri în timp real. Noaptea se aprind luminile. Atinge panourile, bateria, casa, invertorul
+  sau stâlpul (ori eticheta lor) și jos apare o fișă cu detaliile (producția de azi, SOC, celule, consum, stare).
+  Tema e gândită pentru telefon; pe ecranul Pi-ului (HDMI) e mai bine să rămână o temă obișnuită.
+
 ## 1.0.0-beta.18 — 2026-11-04
 - Seplos V2: rotița ⚙ apare și la pachetele Seplos (Amper Pro). Arată parametrii citiți din BMS (comanda 0x47) și
   modelul pachetului. Pragurile de tensiune ale celulelor, pornirea echilibrării, pragurile de tensiune mare ale

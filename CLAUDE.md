@@ -609,6 +609,17 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - Sub Panouri / Consum: `produs azi` / `consumat azi` (`h.today`) — `.k-g .sub` (`s-pv`, `s-load`) în Cadrane și
   `.c-it .s` în Carduri.
 
+
+## Tema „Casă 3D” (1.0.0-beta.19, cerută 2026-11-07, „similar cu FusionSolar”)
+- Scena: `tools/casa3d/scene.js` (three.js 0.169 + RoundedBox, RoomEnvironment, bloom), construită cu
+  `tools/casa3d/build.sh` (esbuild, `npm install` în tools/casa3d; node_modules ignorat) → `web/casa3d.js` (un singur
+  fișier, licența three la coadă). API: `supported()`, `mount(host, {onPick, onFrame})` → `set({night, flows, soc})`,
+  `anchors()`, `dispose()`; atingerea = raycast pe `userData.kind` (pv/bat/load/inv/grid).
+- `app.js`: obiectul `casa` (`LOOKS.casa`), `import("./casa3d.js")` doar pentru tema asta; etichetele HTML urmăresc
+  scena (`casaFrame`), fișa de jos `#cs-sheet` (`casaInfo`); hook nou `leave()` în `LOOKS`, apelat în `renderNow` la
+  schimbarea temei (eliberează WebGL). Noaptea = PV < 30 W și ora 18–7. Fără WebGL → `.cs-fail`.
+- Cerut explicit: NU trebuie să meargă pe Pi (kiosk); ținta e telefonul. Captură headless: Chromium cu
+  `--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader`.
 ## Limba aplicației (1.0.0-beta.14, în pregătire, cerut 2026-10-30; etapa 1 = ecranele)
 - Una pe Pi (decizia utilizatorului): overlay `language` (ro | en), `POST /api/language {lang}`, `/api/info.lang`.
   Telefonul o ține și în localStorage `lang` (ca pagina să pornească direct în limba bună); la boot, dacă diferă de
