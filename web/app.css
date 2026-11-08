@@ -810,6 +810,9 @@ body[data-look="casa"] nav.tabs { z-index: 6; }
   border: 1px solid rgba(255,255,255,.14); box-shadow: 0 6px 18px rgba(0,0,0,.35); white-space: nowrap; cursor: pointer;
   text-align: left; transform: translate(-200px, -200px); will-change: transform; }
 .cs-tag::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 1px; height: 7px; background: rgba(255,255,255,.35); }
+.cs-i { width: 20px; height: 20px; margin-left: 2px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  border: 1.5px solid rgba(255,255,255,.55); color: #fff; font: italic 700 12px/1 Georgia, serif; position: relative; }
+.cs-i::before { content: ""; position: absolute; inset: -10px; }   /* zonă de atingere mai mare */
 .cs-tag.on { border-color: rgba(255,255,255,.6); box-shadow: 0 0 0 3px rgba(255,255,255,.25), 0 8px 22px rgba(0,0,0,.45); }
 .cs-ic { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; flex: none; }
 .cs-ic svg { width: 14px; height: 14px; fill: none; stroke: #0E1A22; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }

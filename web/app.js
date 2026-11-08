@@ -607,6 +607,7 @@ const carduri = {
 /* Tema „Casă” (cerută 2026-11-07): scena 3D din casa3d.js (three.js, încărcat doar pentru tema asta), pe tot ecranul.
    Etichetele și fișa cu detalii sunt HTML aici; atingerea unui element (pe scenă sau pe etichetă) deschide fișa lui. */
 const CASA_COL = { pv: "#FFB627", bat: "#3DDC84", load: "#A98BFF", grid: "#45B4FF", inv: "#C9D3DA" };
+const CASA_GO = { bat: "packs", pv: "inverter", inv: "inverter" };   // unde duce „i” de pe etichetă
 const CASA_IC = { pv: "sun", bat: "batt", load: "home", grid: "grid", inv: "inv" };
 const casa = { api: null, loading: false, failed: false, sel: null, h: null, hinted: false };
 const casaCell = (v, k, c = "") => `<div><b${c ? ` style="color:${c}"` : ""}>${v}</b><span>${k}</span></div>`;
@@ -662,9 +663,6 @@ function casaPick(kind) {
     const hint = $("#cs-hint");
     if (hint) hint.hidden = true;
   }
-  // bateria și invertorul duc direct la ecranele lor, ca în celelalte teme (cerut 2026-11-08)
-  const go = { bat: "packs", inv: "inverter" }[kind];
-  if (go) { casa.sel = null; $$(".cs-tag").forEach((t) => t.classList.remove("on")); casaSheet(); show(go); return; }
   casa.sel = kind && casa.sel !== kind ? kind : null;
   $$(".cs-tag").forEach((t) => t.classList.toggle("on", t.dataset.kind === casa.sel));
   casaSheet();
@@ -697,14 +695,18 @@ casa.html = () => {
   return `<div class="cs-wrap">
     <div class="cs-host"></div>
     ${["grid", "pv", "inv", "load", "bat"].map((k) => `<button class="cs-tag" data-kind="${k}"><span class="cs-ic" style="background:${CASA_COL[k]}">${icon(CASA_IC[k])}</span>
-      <span><b class="num" data-k="ct-${k}">–</b><small data-k="cl-${k}"></small></span></button>`).join("")}
+      <span><b class="num" data-k="ct-${k}">–</b><small data-k="cl-${k}"></small></span>${CASA_GO[k] ? `<span class="cs-i" role="button" aria-label="Deschide ecranul" data-go="${CASA_GO[k]}">i</span>` : ""}</button>`).join("")}
     ${hint}<div class="cs-sheet" id="cs-sheet"></div>
     <div class="cs-fail" hidden><b>Tema 3D nu merge pe acest ecran</b><span>Browserul nu are grafică 3D (WebGL). Alege altă temă din Setări → Teme.</span></div>
   </div>`;
 };
 casa.update = (root, h) => {
   casa.h = h;
-  $$(".cs-tag", root).forEach((t) => (t.onclick = (e) => { e.stopPropagation(); casaPick(t.dataset.kind); }));
+  $$(".cs-tag", root).forEach((t) => (t.onclick = (e) => {
+    e.stopPropagation();
+    const i = e.target.closest(".cs-i");             // „i” de lângă valoare = ecranul cu setări (cerut 2026-11-08)
+    if (i) { casaPick(null); show(i.dataset.go); } else casaPick(t.dataset.kind);
+  }));
   const ir = h.ir, bp = h.bp, pv = ir?.pv_power ?? 0, ld = ir?.load_power ?? 0, ac = ir?.ac_in_power ?? 0;
   put(root, "ct-pv", watts(ir?.pv_power, false)); put(root, "cl-pv", "Panouri");
   put(root, "ct-load", watts(ir?.load_power, false)); put(root, "cl-load", "Consum casă");

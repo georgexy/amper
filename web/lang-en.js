@@ -315,7 +315,7 @@ const EN = {
   "Partajează Amper": "Share Amper", "De oriunde": "From anywhere", "De oriunde (doar telefoanele conectate la server)": "From anywhere (only phones connected to the server)",
   "Acasă": "At home", "Accesul de oriunde": "Remote access", "Oprește accesul de oriunde": "Turn remote access off",
   "✓ Accesul de oriunde e pornit.": "✓ Remote access is on.", "Conectare la server": "Connect to the server",
-  "Deschide pagina de conectare": "Open the login page", "Deschide pagina de mai jos și loghează-te (cu Google).": "Open the page below and log in (with Google).",
+  "Deschide ecranul": "Open the screen", "Deschide pagina de conectare": "Open the login page", "Deschide pagina de mai jos și loghează-te (cu Google).": "Open the page below and log in (with Google).",
   "Aștept logarea…": "Waiting for the login…", "Aprobă pe server": "Approve on the server", "Aștept aprobarea…": "Waiting for approval…",
   "Verific conexiunea la server…": "Checking the server connection…", "Revino aici: pagina se actualizează singură.": "Come back here: the page updates by itself.",
   "Serverul cere o singură dată aprobarea ta pentru adresa publică. Deschide pagina, apasă „Enable” / „Approve”, apoi revino aici.":
