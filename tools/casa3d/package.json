@@ -1,0 +1,9 @@
+{
+  "name": "amper-casa3d",
+  "private": true,
+  "description": "Tema „Casă” (scena 3D) — se împachetează în web/casa3d.js cu tools/casa3d/build.sh",
+  "devDependencies": {
+    "esbuild": "0.24.0",
+    "three": "0.169.0"
+  }
+}

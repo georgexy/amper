@@ -18,3 +18,4 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+tools/casa3d/node_modules/

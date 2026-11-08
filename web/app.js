@@ -604,10 +604,124 @@ const carduri = {
   },
 };
 
+/* Tema „Casă” (cerută 2026-11-07): scena 3D din casa3d.js (three.js, încărcat doar pentru tema asta), pe tot ecranul.
+   Etichetele și fișa cu detalii sunt HTML aici; atingerea unui element (pe scenă sau pe etichetă) deschide fișa lui. */
+const CASA_COL = { pv: "#FFB627", bat: "#3DDC84", load: "#A98BFF", grid: "#45B4FF", inv: "#C9D3DA" };
+const CASA_IC = { pv: "sun", bat: "batt", load: "home", grid: "grid", inv: "inv" };
+const casa = { api: null, loading: false, failed: false, sel: null, h: null, hinted: false };
+const casaCell = (v, k, c = "") => `<div><b${c ? ` style="color:${c}"` : ""}>${v}</b><span>${k}</span></div>`;
+function casaInfo(kind, h) {
+  const { b, ir, bp, today } = h;
+  if (kind === "pv") return { t: "Panouri", s: ir?.pv_power > 20 ? "produc acum" : "nu produc acum", big: watts(ir?.pv_power),
+    body: `<div class="cs-grid">${casaCell(today.pv_kwh == null ? "–" : `${num(today.pv_kwh, 1)} kWh`, "produs azi", CASA_COL.pv)}
+      ${casaCell(`${num(h.week, 1)} kWh`, "în ultimele 7 zile")}</div><div class="cs-pv">${pvInfoHtml()}</div>`, go: ["hist", "Istoricul producției"] };
+  if (kind === "bat") {
+    const cells = h.list.map((x) => x.d.reading).filter((r) => r && r.cell_min != null);
+    const lo = cells.length ? Math.min(...cells.map((r) => r.cell_min)) : null, hi = cells.length ? Math.max(...cells.map((r) => r.cell_max)) : null;
+    return { t: "Baterie", s: h.modeText, big: `${b.soc == null ? "–" : num(b.soc, 0)}<small>%</small>`, bar: b.soc,
+      body: `${h.eta ? `<div class="cs-sub">${esc(h.eta)}</div>` : ""}<div class="cs-grid">
+        ${casaCell(bp == null ? "–" : `${bp > 0 ? "+" : ""}${watts(bp, false)}`, bp > 20 ? "încărcare" : bp < -20 ? "descărcare" : "putere", CASA_COL.bat)}
+        ${casaCell(b.kwh == null ? "–" : `${num(b.kwh, 1)} / ${num(h.capKwh, 1)} kWh`, "energie rămasă")}
+        ${casaCell(b.voltage == null ? "–" : `${num(b.voltage, 1)} V`, "tensiune")}
+        ${casaCell(lo == null ? "–" : `${num(lo, 3)}–${num(hi, 3)} V`, "celule min–max")}</div>`, go: ["packs", "Bateriile, pe module"] };
+  }
+  if (kind === "load") return { t: "Consum casă", s: "acum", big: watts(ir?.load_power),
+    body: `<div class="cs-grid">${casaCell(today.load_kwh == null ? "–" : `${num(today.load_kwh, 1)} kWh`, "consumat azi", CASA_COL.load)}
+      ${casaCell(today.ac_in_kwh == null ? "–" : `${num(today.ac_in_kwh, 1)} kWh`, "din rețea azi")}
+      ${casaCell(ir?.load_percent == null ? "–" : `${num(ir.load_percent, 0)} %`, "din puterea invertorului")}
+      ${casaCell(h.autonomy ? duration(h.autonomy) : "–", "ajunge bateria")}</div>`, go: ["hist", "Istoricul consumului"] };
+  if (kind === "inv") return { t: "Invertor", s: esc(h.inv?.name || ""), big: esc(ir?.fault_code ? `Defect ${ir.fault_code}` : ir?.status || "–"),
+    body: `${ir?.fault_text ? `<div class="cs-sub bad">${esc(ir.fault_text)}</div>` : ""}<div class="cs-grid">
+      ${casaCell(ir?.output_voltage == null ? "–" : `${num(ir.output_voltage, 0)} V · ${num(ir.output_freq, 1)} Hz`, "ieșire")}
+      ${casaCell(ir?.inverter_temp == null ? "–" : `${num(ir.inverter_temp, 0)} °C`, "temperatură")}
+      ${casaCell(ir?.battery_voltage == null ? "–" : `${num(ir.battery_voltage, 1)} V`, "baterie, la invertor")}
+      ${casaCell(ir?.warnings?.length ? esc(ir.warnings[0]) : "niciunul", "avertismente")}</div>`, go: ["inverter", "Invertorul"] };
+  return { t: "Rețea", s: ir?.ac_in_power > 20 ? "se folosește acum" : "nefolosită acum", big: watts(ir?.ac_in_power ?? 0),
+    body: `<div class="cs-grid">${casaCell(today.ac_in_kwh == null ? "–" : `${num(today.ac_in_kwh, 1)} kWh`, "din rețea azi", CASA_COL.grid)}
+      ${casaCell(ir?.ac_in_voltage > 50 ? `${num(ir.ac_in_voltage, 0)} V` : "fără tensiune", "tensiune rețea")}</div>`, go: null };
+}
+function casaSheet() {
+  const el = $("#cs-sheet");
+  if (!el) return;
+  if (!casa.sel || !casa.h) { el.classList.toggle("open", false); return; }
+  const d = casaInfo(casa.sel, casa.h), c = CASA_COL[casa.sel];
+  el.innerHTML = `<div class="cs-hd"><span class="cs-ic" style="background:${c}">${icon(CASA_IC[casa.sel])}</span>
+      <div><b>${d.t}</b><small>${d.s}</small></div><button class="cs-x" aria-label="Închide">×</button></div>
+    <div class="cs-big num" style="color:${c}">${d.big}</div>
+    ${d.bar != null ? `<div class="cs-bar"><i style="width:${Math.max(0, Math.min(100, d.bar))}%"></i></div>` : ""}${d.body}
+    ${d.go ? `<button class="cs-more" data-go="${d.go[0]}">${d.go[1]} ›</button>` : ""}`;
+  el.querySelector(".cs-x").onclick = () => casaPick(null);
+  const more = el.querySelector(".cs-more");
+  if (more) more.onclick = () => { casaPick(null); show(more.dataset.go); };
+  el.classList.toggle("open", true);
+}
+function casaPick(kind) {
+  casa.sel = kind && casa.sel !== kind ? kind : null;
+  if (kind && !casa.hinted) {
+    casa.hinted = true;
+    try { localStorage.setItem("casaHint", "1"); } catch {}
+    const hint = $("#cs-hint");
+    if (hint) hint.hidden = true;
+  }
+  $$(".cs-tag").forEach((t) => t.classList.toggle("on", t.dataset.kind === casa.sel));
+  casaSheet();
+}
+function casaFrame(pos) {
+  for (const [k, [x, y]] of Object.entries(pos)) {
+    const t = document.querySelector(`.cs-tag[data-kind="${k}"]`);
+    if (t) t.style.transform = `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px) translate(-50%, -100%)`;
+  }
+}
+async function casaMount(root) {
+  if (casa.api || casa.loading || casa.failed) return;
+  casa.loading = true;
+  try {
+    const m = await import("./casa3d.js");
+    if (!m.supported()) throw new Error("webgl");
+    const host = root.querySelector(".cs-host");
+    if (!host || !host.isConnected) return;
+    casa.api = m.mount(host, { onPick: (k) => casaPick(k), onFrame: casaFrame });
+    if (casa.h) casa.update(root, casa.h);
+  } catch (e) {
+    casa.failed = true;
+    const fb = root.querySelector(".cs-fail");
+    if (fb) fb.hidden = false;
+  } finally { casa.loading = false; }
+}
+casa.html = () => {
+  let hint = "";
+  try { hint = localStorage.getItem("casaHint") ? "" : `<div class="cs-hint" id="cs-hint">Atinge panourile, bateria sau casa pentru detalii</div>`; } catch {}
+  return `<div class="cs-wrap">
+    <div class="cs-host"></div>
+    ${["grid", "pv", "inv", "load", "bat"].map((k) => `<button class="cs-tag" data-kind="${k}"><span class="cs-ic" style="background:${CASA_COL[k]}">${icon(CASA_IC[k])}</span>
+      <span><b class="num" data-k="ct-${k}">–</b><small data-k="cl-${k}"></small></span></button>`).join("")}
+    ${hint}<div class="cs-sheet" id="cs-sheet"></div>
+    <div class="cs-fail" hidden><b>Tema 3D nu merge pe acest ecran</b><span>Browserul nu are grafică 3D (WebGL). Alege altă temă din Setări → Teme.</span></div>
+  </div>`;
+};
+casa.update = (root, h) => {
+  casa.h = h;
+  $$(".cs-tag", root).forEach((t) => (t.onclick = (e) => { e.stopPropagation(); casaPick(t.dataset.kind); }));
+  const ir = h.ir, bp = h.bp, pv = ir?.pv_power ?? 0, ld = ir?.load_power ?? 0, ac = ir?.ac_in_power ?? 0;
+  put(root, "ct-pv", watts(ir?.pv_power, false)); put(root, "cl-pv", "Panouri");
+  put(root, "ct-load", watts(ir?.load_power, false)); put(root, "cl-load", "Consum casă");
+  put(root, "ct-grid", watts(ir ? ac : null, false)); put(root, "cl-grid", "Rețea");
+  put(root, "ct-inv", !ir ? "–" : ir.fault_code ? `Defect ${ir.fault_code}` : "Funcționează"); put(root, "cl-inv", "Invertor");
+  put(root, "ct-bat", `${h.b.soc == null ? "–" : num(h.b.soc, 0) + " %"}${bp == null ? "" : ` · ${bp > 0 ? "+" : ""}${watts(bp, false)}`}`);
+  put(root, "cl-bat", h.mode === "charging" ? "Baterie, se încarcă" : h.mode === "discharging" ? "Baterie, se descarcă" : "Baterie");
+  const hr = new Date().getHours();
+  casa.api?.set({ night: pv < 30 && (hr >= 18 || hr < 7), soc: h.b.soc,
+    flows: { pv: pv > 20 ? 1 : 0, bat: bp > 20 ? 1 : bp < -20 ? -1 : 0, load: ld > 20 ? 1 : 0, grid: ac > 20 ? 1 : 0 } });
+  if (casa.sel) casaSheet();
+  casaMount(root);
+};
+casa.leave = () => { casa.api?.dispose(); casa.api = null; casa.sel = null; };
+
 const LOOKS = {
   cadrane: { name: "Cadrane", desc: "Inel cu încărcarea, cadrane și graficul zilei", sw: "conic-gradient(#52C98F 0 75%, #2A4255 0)", c: "#63B7E6", ...cadrane },
   flux: { name: "Flux de energie", desc: "Soare → invertor → casă și baterie, cu energia în mișcare", sw: "radial-gradient(circle at 50% 40%, #F3B840 0 22%, #18303F 24%)", c: "#F3B840", ...flux },
   carduri: { name: "Carduri", desc: "Antet portocaliu, baterie pe segmente, listă cu bare", sw: "linear-gradient(135deg, #E08A2E, #8E3320)", c: "#FF8A3D", ...carduri },
+  casa: { name: "Casă 3D", desc: "Casa ta în 3D, cu energia în mișcare; atinge un element pentru detalii", sw: "linear-gradient(160deg, #7fb4d6 0 45%, #86b86a 46% 100%)", c: "#3DDC84", ...casa },
 };
 let drawnLook = null;
 
@@ -617,6 +731,7 @@ function renderNow() {
   const home = $("#home");
   const L = LOOKS[state.look] || LOOKS.cadrane;
   if (drawnLook !== state.look) {
+    LOOKS[drawnLook]?.leave?.();
     home.innerHTML = L.html();
     drawnLook = state.look;
     state.dayDrawn = null;
