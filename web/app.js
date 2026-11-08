@@ -2020,6 +2020,7 @@ function renderSheet() {
 $$("nav.tabs button").forEach((b) => (b.onclick = () => show(b.dataset.view)));
 function show(v) {
   state.view = v;
+  document.body.dataset.view = v;              // tema Casă 3D: fără spațiu jos doar pe „Acum”
   const tab = ["packs", "inverter", "bms", "cells", "report"].includes(v) ? "now" : v;      // se deschid din „Acum”
   $$("nav.tabs button").forEach((b) => b.dataset.view === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
   for (const k of ["now", "hist", "alerts", "packs", "inverter", "bms", "cells", "report", "settings"]) $("#view-" + k).hidden = v !== k;

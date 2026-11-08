@@ -620,6 +620,8 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   schimbarea temei (eliberează WebGL). Noaptea = PV < 30 W și ora 18–7. Fără WebGL → `.cs-fail`.
 - Cerut explicit: NU trebuie să meargă pe Pi (kiosk); ținta e telefonul. Captură headless: Chromium cu
   `--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader`.
+- 1.0.0-beta.21: `body[data-view]` (setat în `show()`, implicit „now” în index.html); `padding-bottom: 0` doar pe
+  `body[data-look=casa][data-view=now]` — înainte era pe toate ecranele și bara de jos acoperea „Sănătatea celulelor”.
 - 1.0.0-beta.20 (cerut 2026-11-08): atingerea elementului/etichetei = fișa (ca înainte); `.cs-i` („i” pe etichetă,
   `CASA_GO`: bat → `packs`, pv și inv → `inverter`) deschide ecranul complet (a doua variantă a utilizatorului, după
   ce navigarea directă de la atingere a scos fișele). Fișa deschisă acoperă eticheta bateriei: „i” merge cu fișa închisă. Bilele fluxurilor: rază 0,12, culoare ×1,8 (sub pragul

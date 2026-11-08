@@ -797,7 +797,8 @@ small.warnc { color: var(--warn); }
 .look .sw.flag svg { width: 30px; height: 20px; border-radius: 3px; display: block; }
 
 /* ---------- tema „Casă 3D” (casa3d.js): scena pe tot ecranul, antetul și bara de jos deasupra ---------- */
-body[data-look="casa"] { --acc: #3DDC84; padding-bottom: 0; }
+body[data-look="casa"] { --acc: #3DDC84; }
+body[data-look="casa"][data-view="now"] { padding-bottom: 0; }   /* pe celelalte ecrane rămâne spațiul pentru bara de jos */
 body[data-look="casa"] #app > .wrap:first-child { position: relative; z-index: 3; max-width: none;
   background: linear-gradient(180deg, rgba(10,20,28,.82) 0%, rgba(10,20,28,.45) 65%, rgba(10,20,28,0) 100%); padding-bottom: 18px; }
 body[data-look="casa"] #app > .wrap:first-child > * { max-width: 688px; margin-left: auto; margin-right: auto; }
