@@ -206,7 +206,7 @@ export function mount(host, { onPick = () => {}, onFrame = () => {} } = {}) {
     add(new THREE.TubeGeometry(curve, 120, 0.07, 8), tubeMat, 0, 0, 0, { cast: false, receive: false });
     const dots = [];
     for (let i = 0; i < 7; i++) {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(COL[k]).multiplyScalar(5) }));
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(COL[k]).multiplyScalar(1.8) }));
       m.visible = false; scene.add(m); dots.push(m);
     }
     flows[k] = { curve, tubeMat, dots, dir: 0 };

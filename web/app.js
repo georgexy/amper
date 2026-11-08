@@ -656,13 +656,16 @@ function casaSheet() {
   el.classList.toggle("open", true);
 }
 function casaPick(kind) {
-  casa.sel = kind && casa.sel !== kind ? kind : null;
   if (kind && !casa.hinted) {
     casa.hinted = true;
     try { localStorage.setItem("casaHint", "1"); } catch {}
     const hint = $("#cs-hint");
     if (hint) hint.hidden = true;
   }
+  // bateria și invertorul duc direct la ecranele lor, ca în celelalte teme (cerut 2026-11-08)
+  const go = { bat: "packs", inv: "inverter" }[kind];
+  if (go) { casa.sel = null; $$(".cs-tag").forEach((t) => t.classList.remove("on")); casaSheet(); show(go); return; }
+  casa.sel = kind && casa.sel !== kind ? kind : null;
   $$(".cs-tag").forEach((t) => t.classList.toggle("on", t.dataset.kind === casa.sel));
   casaSheet();
 }

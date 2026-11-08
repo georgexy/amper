@@ -620,6 +620,10 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   schimbarea temei (eliberează WebGL). Noaptea = PV < 30 W și ora 18–7. Fără WebGL → `.cs-fail`.
 - Cerut explicit: NU trebuie să meargă pe Pi (kiosk); ținta e telefonul. Captură headless: Chromium cu
   `--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader`.
+- 1.0.0-beta.20 (cerut 2026-11-08): `casaPick` — bateria → `show("packs")`, invertorul → `show("inverter")` direct
+  (fără fișă); fișa rămâne pentru panouri, consum, rețea. Bilele fluxurilor: rază 0,12, culoare ×1,8 (sub pragul
+  bloom-ului noaptea; ziua doar o strălucire slabă) — înainte ×5, „prea strălucitoare”.
+
 ## Limba aplicației (1.0.0-beta.14, în pregătire, cerut 2026-10-30; etapa 1 = ecranele)
 - Una pe Pi (decizia utilizatorului): overlay `language` (ro | en), `POST /api/language {lang}`, `/api/info.lang`.
   Telefonul o ține și în localStorage `lang` (ca pagina să pornească direct în limba bună); la boot, dacă diferă de
