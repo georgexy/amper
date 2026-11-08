@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.20 — în pregătire
+## 1.0.0-beta.20 — 2026-11-08
 - Tema „Casă 3D”: pe etichetele bateriei, panourilor și invertorului e un „i” mic, lângă valoare. Atingerea lui
   deschide ecranul complet: Bateriile (fiecare modul cu SOC-ul lui), respectiv ecranul invertorului (cu setările).
   Atingerea elementului sau a etichetei deschide în continuare fișa cu detalii. Bilele care arată curentul pe fire
