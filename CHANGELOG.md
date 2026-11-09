@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.22 — în pregătire
+## 1.0.0-beta.22 — 2026-11-09
 - Tema „Casă 3D”: casa se rotește cu un deget și se apropie / se mută cu două (ca o piesă într-un program CAD);
   butonul ⟲ din dreapta jos o aduce la vederea de la început.
 - Tema „Casă 3D”: mesajul „Tema 3D nu merge pe acest ecran” nu mai apare la întâmplare. Scena se reface singură
