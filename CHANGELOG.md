@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.21 — în pregătire
+## 1.0.0-beta.21 — 2026-11-09
 - Tema „Casă 3D”: pe celelalte ecrane (Bateriile, Setări etc.) pagina se poate derula din nou până jos, ca bara de
   meniu să nu mai acopere ultimele rânduri (de exemplu „Sănătatea celulelor”).
 - Alerte → „Toate notificările”: fiecare notificare trimisă pe telefon rămâne aici, și după ce ai închis-o
