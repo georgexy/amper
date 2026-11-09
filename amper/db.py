@@ -60,6 +60,13 @@ CREATE TABLE IF NOT EXISTS push_subs (
 
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 
+-- toate notificările trimise (și cele care nu sunt alerte), ca să rămână vizibile în tabul Alerte;
+-- `channels` = canalele pe care a plecat („webpush,ntfy”), gol = nelivrată (încă) sau niciun canal configurat
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, title TEXT, message TEXT NOT NULL,
+    priority TEXT, url TEXT, source TEXT, channels TEXT);
+CREATE INDEX IF NOT EXISTS ix_notifications_ts ON notifications(ts);
+
 -- sănătatea celulelor (cell_health.py): abaterile celulelor la final de încărcare / descărcare adâncă (mV) și
 -- rezistențele din variațiile de curent (mΩ), ca listă JSON pe fiecare moment util
 CREATE TABLE IF NOT EXISTS cell_events (
@@ -427,6 +434,30 @@ class Database:
             rows = self.conn.execute(
                 "SELECT * FROM alerts ORDER BY (ts_end IS NULL) DESC, ts_start DESC LIMIT ?", (limit,)).fetchall()
         return [dict(r) for r in rows]
+
+    # ---------- notificări (tabul Alerte → Notificări) ----------
+    def add_notification(self, ts: float, title: str, message: str, priority: str = "default",
+                         url: str | None = None, source: str = "amper") -> int:
+        with self.lock:
+            return self.conn.execute(
+                "INSERT INTO notifications (ts, title, message, priority, url, source, channels) "
+                "VALUES (?, ?, ?, ?, ?, ?, '')", (int(ts), title, message, priority, url, source)).lastrowid
+
+    def set_notification_channels(self, row_id: int, channels: str) -> None:
+        with self.lock:
+            self.conn.execute("UPDATE notifications SET channels = ? WHERE id = ?", (channels, row_id))
+
+    def notifications(self, limit: int = 50, before: int | None = None) -> list[dict]:
+        """Cele mai noi întâi; `before` = id-ul ultimei notificări primite (pentru cele mai vechi)."""
+        with self.lock:
+            rows = self.conn.execute(
+                "SELECT * FROM notifications WHERE id < ? ORDER BY id DESC LIMIT ?",
+                (before if before is not None else 2 ** 62, limit)).fetchall()
+        return [dict(r) for r in rows]
+
+    def purge_notifications(self, before: int) -> None:
+        with self.lock:
+            self.conn.execute("DELETE FROM notifications WHERE ts < ?", (before,))
 
     def close(self) -> None:
         with self.lock:

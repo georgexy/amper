@@ -2,6 +2,11 @@
    „{0}”, „{1}” = valori puse de cod prin tf()). Un text nou din aplicație trebuie adăugat și aici. */
 "use strict";
 const EN = {
+  // ---------- Alerte → Toate notificările
+  "Toate notificările": "All notifications", "Mai vechi": "Older", "Nicio notificare până acum.": "No notifications yet.",
+  "importantă": "important", "normală": "normal", "informativă": "informational",
+  "Tot ce a plecat pe telefon (alerte, copia de siguranță, actualizări, setări schimbate, pornirea Pi-ului…), și după ce ai închis notificarea. Atinge una ca s-o deschizi.":
+    "Everything sent to the phone (alerts, backup, updates, changed settings, Pi start-up…), even after you dismissed the notification. Tap one to open it.",
   // ---------- general
   "Amper": "Amper", "Live": "Live", "Acum": "Now", "Acum:": "Now:", "Istoric": "History", "Alerte": "Alerts",
   "Setări": "Settings", "Înapoi": "Back", "‹ Înapoi": "‹ Back", "Renunță": "Cancel", "‹ Renunță": "‹ Cancel",

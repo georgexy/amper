@@ -324,19 +324,51 @@ def cmd_notify(args) -> None:
     i18n.set_lang(cfg.get("language"))
     i18n.set_names(d.get("name", "") for d in cfg.get("devices") or [])
     n = Notifier(cfg["notify"])
-    state_dir = os.path.dirname(os.path.abspath(cfg["database"]))
-    if os.path.exists(os.path.join(state_dir, "vapid.json")):      # cheile le creează serviciul amper
+    n.source = args.source
+    db_path = cfg["database"]
+    state_dir = os.path.dirname(os.path.abspath(db_path))
+    db = None
+    if os.path.exists(db_path):          # baza o creează serviciul amper; aici doar scriem în ea (WAL, în paralel)
         from .db import Database
+        try:
+            db = n.db = Database(db_path)
+        except Exception as e:
+            print(f"notificarea nu se poate salva în baza de date: {e}", file=sys.stderr)
+    if db is not None and os.path.exists(os.path.join(state_dir, "vapid.json")):   # cheile le creează serviciul amper
         from .webpush import WebPush, public_url
-        n.webpush = WebPush(Database(cfg["database"]), state_dir, subject=public_url(cfg))
-    if not n.enabled:
-        sys.exit("notificările nu sunt configurate")
+        n.webpush = WebPush(db, state_dir, subject=public_url(cfg))
+    item = {"message": i18n.tr(args.message), "title": i18n.tr(args.title), "priority": args.priority,
+            "url": args.url, "done": set()}            # în limba Pi-ului, ca Notifier.send
+    n.record(item)                       # în Alerte → Notificări, chiar dacă niciun canal nu e configurat
+    try:
+        if not n.enabled:
+            sys.exit("notificările nu sunt configurate")
 
-    async def go():
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as http:
-            await n._deliver(http, {"message": args.message, "title": args.title, "priority": args.priority,
-                                    "url": args.url})
-    asyncio.run(go())
+        async def go():
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as http:
+                await n._deliver(http, item)
+        asyncio.run(go())
+    finally:
+        if db is not None:
+            db.close()
+            _keep_db_owner(db_path)
+
+
+def _keep_db_owner(db_path: str) -> None:
+    """Rulată ca root (copia de siguranță), comanda poate crea fișierele -wal/-shm ale bazei ca root, iar
+    serviciul amper n-ar mai putea scrie în ea: le dăm înapoi proprietarului bazei."""
+    if not hasattr(os, "geteuid") or os.geteuid() != 0:
+        return
+    try:
+        st = os.stat(db_path)
+    except OSError:
+        return
+    for p in (db_path, db_path + "-wal", db_path + "-shm"):
+        try:
+            if os.path.exists(p) and (os.stat(p).st_uid, os.stat(p).st_gid) != (st.st_uid, st.st_gid):
+                os.chown(p, st.st_uid, st.st_gid)
+        except OSError:
+            pass
 
 
 def main(argv=None) -> None:
@@ -367,6 +399,7 @@ def main(argv=None) -> None:
     nt.add_argument("--title", default="Amper")
     nt.add_argument("--priority", default="default", choices=["low", "default", "high"])
     nt.add_argument("--url", help="ce deschide atingerea notificării în aplicație (ex. /?v=update)")
+    nt.add_argument("--source", default="cli", help="cine trimite (backup, update…), salvat cu notificarea")
     nt.add_argument("-c", "--config", default="/etc/amper/config.yaml")
     sub.add_parser("update", help="actualizări fără aplicație: --check, --install, --rollback (cu sudo)")
     args = p.parse_args(argv)

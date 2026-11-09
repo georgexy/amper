@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 from collections import deque
 
 log = logging.getLogger(__name__)
@@ -46,6 +47,8 @@ class Notifier:
         self.sent: list[dict] = []          # folosit în teste / simulare
         self._wake = asyncio.Event() if _has_loop() else None
         self.webpush = None                 # amper.webpush.WebPush, setat de Engine
+        self.db = None                      # amper.db.Database: fiecare notificare se salvează (tabul Alerte)
+        self.source = "amper"               # cine trimite: amper (serviciul), backup, update, cli…
 
     def _ntfy_on(self) -> bool:
         return bool(self.ntfy.get("enabled") and self.ntfy.get("topic") and "REPLACE" not in self.ntfy["topic"])
@@ -63,12 +66,32 @@ class Notifier:
         message, title = i18n.tr(message), i18n.tr(title)
         log.info("NOTIFICARE [%s] %s", priority, message)
         item = {"message": message, "title": title, "priority": priority, "url": url, "done": set()}
+        self.record(item)
         self.sent.append(item)
         del self.sent[:-200]
         if self.enabled:
             self.queue.append(item)
             if self._wake:
                 self._wake.set()
+
+    def record(self, item: dict) -> None:
+        """Salvează notificarea în baza de date (chiar dacă niciun canal nu e configurat): rămâne în Alerte →
+        Notificări și după ce a fost închisă pe telefon. O eroare aici nu oprește trimiterea."""
+        if self.db is None:
+            return
+        try:
+            item["id"] = self.db.add_notification(time.time(), item.get("title") or "", item["message"],
+                                                  item.get("priority") or "default", item.get("url"), self.source)
+        except Exception as e:
+            log.warning("notificarea nu s-a putut salva: %s", e)
+
+    def _record_channels(self, item: dict) -> None:
+        if self.db is None or not item.get("id"):
+            return
+        try:
+            self.db.set_notification_channels(item["id"], ",".join(sorted(item.get("done") or ())))
+        except Exception as e:
+            log.warning("notificarea nu s-a putut actualiza: %s", e)
 
     async def run(self) -> None:
         import aiohttp
@@ -101,6 +124,7 @@ class Notifier:
                 done.add(name)
             except Exception as e:
                 errors.append(f"{name}: {e}")
+        self._record_channels(item)
         if errors:
             raise RuntimeError("; ".join(errors))
 

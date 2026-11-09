@@ -5,6 +5,13 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 ## 1.0.0-beta.21 — în pregătire
 - Tema „Casă 3D”: pe celelalte ecrane (Bateriile, Setări etc.) pagina se poate derula din nou până jos, ca bara de
   meniu să nu mai acopere ultimele rânduri (de exemplu „Sănătatea celulelor”).
+- Alerte → „Toate notificările”: fiecare notificare trimisă pe telefon rămâne aici, și după ce ai închis-o
+  (alerte, copia de siguranță, actualizări, setări schimbate, pornirea Pi-ului, raportul nopții…), cele mai noi
+  sus, cu ora și nivelul; „Mai vechi” aduce restul. Atinsă, deschide același ecran ca notificarea. Se păstrează un an.
+- Jurnalul Pi-ului se păstrează acum pe card (cel mult 200 MB, o lună), nu se mai pierde la repornire.
+- Copia de siguranță: când eșuează, notificarea spune pasul și eroarea (ex. „clona: încărcarea în Drive a eșuat:
+  …”); încărcarea în Drive se reîncearcă de 3 ori, la 5 minute, dacă internetul cade. Jurnalul fiecărei rulări
+  rămâne în /var/log/amper/backup.log, iar al actualizărilor în /var/log/amper/update.log.
 
 ## 1.0.0-beta.20 — 2026-11-08
 - Tema „Casă 3D”: pe etichetele bateriei, panourilor și invertorului e un „i” mic, lângă valoare. Atingerea lui

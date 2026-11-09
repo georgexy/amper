@@ -155,6 +155,8 @@ for f in multi-user.target.wants/ssh.service sockets.target.wants/ssh.socket; do
   [ -L "$ROOT/etc/systemd/system/$f" ] && fail "SSH e pornit ($f)"
 done
 [ -f "$ROOT/etc/amper/.firstboot" ] || fail "lipsește marcajul primei porniri"
+grep -qx "Storage=persistent" "$ROOT/etc/systemd/journald.conf.d/50-amper.conf" && [ -d "$ROOT/var/log/journal" ] \
+  || fail "jurnalul sistemului nu e păstrat pe card"
 grep -q "REPLACE-TOPIC" "$ROOT/etc/amper/config.yaml" || fail "topicul ntfy e deja generat"
 in_root python3 -c "import yaml,sys; c=yaml.safe_load(open('/etc/amper/config.yaml')); sys.exit(c['devices']!=[])" \
   || fail "imaginea are dispozitive în config"
