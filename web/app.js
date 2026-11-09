@@ -659,7 +659,7 @@ function casaSheet() {
 function casaPick(kind) {
   if (kind && !casa.hinted) {
     casa.hinted = true;
-    try { localStorage.setItem("casaHint", "1"); } catch {}
+    try { localStorage.setItem("casaHint2", "1"); } catch {}
     const hint = $("#cs-hint");
     if (hint) hint.hidden = true;
   }
@@ -673,35 +673,72 @@ function casaFrame(pos) {
     if (t) t.style.transform = `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px) translate(-50%, -100%)`;
   }
 }
+/* Pe iPhone, scena poate să nu pornească uneori (fișierul nedescărcat la revenirea în aplicație, prea multe
+   contexte WebGL, contextul pierdut în fundal): reîncercăm singuri de câteva ori, mesajul apare doar la final,
+   cu „Reîncearcă”; la revenirea în aplicație se reîncearcă din nou. */
+const CASA_RETRY = [1000, 3000, 8000];
 async function casaMount(root) {
-  if (casa.api || casa.loading || casa.failed) return;
+  if (casa.api || casa.loading || casa.failed || casa.timer) return;
   casa.loading = true;
   try {
     const m = await import("./casa3d.js");
-    if (!m.supported()) throw new Error("webgl");
     const host = root.querySelector(".cs-host");
     if (!host || !host.isConnected) return;
-    casa.api = m.mount(host, { onPick: (k) => casaPick(k), onFrame: casaFrame });
+    if (!m.supported()) throw new Error("webgl");
+    casa.api = m.mount(host, { onPick: (k) => casaPick(k), onFrame: casaFrame, onLost: () => casaLost(root),
+      onMove: (on) => {
+        const r = root.querySelector(".cs-reset");
+        if (r) r.hidden = !on;
+        const hint = $("#cs-hint");                 // a învățat să rotească: indicația nu mai e necesară
+        if (on && hint && !hint.hidden) { hint.hidden = true; try { localStorage.setItem("casaHint2", "1"); } catch {} }
+      } });
+    casa.tries = 0;
+    const fb = root.querySelector(".cs-fail");
+    if (fb) fb.hidden = true;
     if (casa.h) casa.update(root, casa.h);
   } catch (e) {
-    casa.failed = true;
-    const fb = root.querySelector(".cs-fail");
-    if (fb) fb.hidden = false;
+    console.warn("Casă 3D:", e);
+    const wait = CASA_RETRY[casa.tries || 0];
+    casa.tries = (casa.tries || 0) + 1;
+    if (wait != null) casa.timer = setTimeout(() => { casa.timer = 0; if (root.isConnected) casaMount(root); }, wait);
+    else {
+      casa.failed = true;
+      const fb = root.querySelector(".cs-fail");
+      if (fb) fb.hidden = false;
+    }
   } finally { casa.loading = false; }
 }
+function casaLost(root) {                     // contextul WebGL pierdut: refacem scena
+  casa.api?.dispose();
+  casa.api = null;
+  setTimeout(() => { if (root.isConnected && !document.hidden) casaMount(root); }, 500);
+}
+function casaRetry() {
+  const root = $("#home");
+  if (drawnLook !== "casa" || !root || casa.api || casa.loading) return;
+  casa.failed = false;
+  casa.tries = 0;
+  casaMount(root);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) casaRetry(); });
 casa.html = () => {
   let hint = "";
-  try { hint = localStorage.getItem("casaHint") ? "" : `<div class="cs-hint" id="cs-hint">Atinge panourile, bateria sau casa pentru detalii</div>`; } catch {}
+  try { hint = localStorage.getItem("casaHint2") ? "" : `<div class="cs-hint" id="cs-hint">Atinge panourile, bateria sau casa pentru detalii. Rotește casa cu un deget, apropie cu două.</div>`; } catch {}
   return `<div class="cs-wrap">
     <div class="cs-host"></div>
     ${["grid", "pv", "inv", "load", "bat"].map((k) => `<button class="cs-tag" data-kind="${k}"><span class="cs-ic" style="background:${CASA_COL[k]}">${icon(CASA_IC[k])}</span>
       <span><b class="num" data-k="ct-${k}">–</b><small data-k="cl-${k}"></small></span>${CASA_GO[k] ? `<span class="cs-i" role="button" aria-label="Deschide ecranul" data-go="${CASA_GO[k]}">i</span>` : ""}</button>`).join("")}
+    <button class="cs-reset" hidden aria-label="Vederea inițială">⟲</button>
     ${hint}<div class="cs-sheet" id="cs-sheet"></div>
-    <div class="cs-fail" hidden><b>Tema 3D nu merge pe acest ecran</b><span>Browserul nu are grafică 3D (WebGL). Alege altă temă din Setări → Teme.</span></div>
+    <div class="cs-fail" hidden><b>Tema 3D nu merge pe acest ecran</b><span>Browserul nu are grafică 3D (WebGL). Alege altă temă din Setări → Teme.</span><button class="btn sm cs-retry">Reîncearcă</button></div>
   </div>`;
 };
 casa.update = (root, h) => {
   casa.h = h;
+  const rb = root.querySelector(".cs-retry");
+  if (rb) rb.onclick = casaRetry;
+  const rv = root.querySelector(".cs-reset");
+  if (rv) rv.onclick = () => casa.api?.resetView();
   $$(".cs-tag", root).forEach((t) => (t.onclick = (e) => {
     e.stopPropagation();
     const i = e.target.closest(".cs-i");             // „i” de lângă valoare = ecranul cu setări (cerut 2026-11-08)
@@ -720,7 +757,10 @@ casa.update = (root, h) => {
   if (casa.sel) casaSheet();
   casaMount(root);
 };
-casa.leave = () => { casa.api?.dispose(); casa.api = null; casa.sel = null; };
+casa.leave = () => {
+  casa.api?.dispose(); casa.api = null; casa.sel = null;
+  clearTimeout(casa.timer); casa.timer = 0; casa.tries = 0; casa.failed = false;   // la revenirea în temă, de la capăt
+};
 
 const LOOKS = {
   cadrane: { name: "Cadrane", desc: "Inel cu încărcarea, cadrane și graficul zilei", sw: "conic-gradient(#52C98F 0 75%, #2A4255 0)", c: "#63B7E6", ...cadrane },

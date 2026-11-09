@@ -3,6 +3,8 @@
 "use strict";
 const EN = {
   // ---------- Alerte → Toate notificările
+  "Reîncearcă": "Retry", "Vederea inițială": "Initial view",
+  "Atinge panourile, bateria sau casa pentru detalii. Rotește casa cu un deget, apropie cu două.": "Tap the panels, the battery or the house for details. Rotate the house with one finger, zoom with two.",
   "Toate notificările": "All notifications", "Mai vechi": "Older", "Nicio notificare până acum.": "No notifications yet.",
   "importantă": "important", "normală": "normal", "informativă": "informational",
   "Tot ce a plecat pe telefon (alerte, copia de siguranță, actualizări, setări schimbate, pornirea Pi-ului…), și după ce ai închis notificarea. Atinge una ca s-o deschizi.":

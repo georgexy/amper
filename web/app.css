@@ -854,3 +854,7 @@ body[data-look="casa"] nav.tabs { z-index: 6; }
 .cs-more { display: block; width: 100%; margin-top: 10px; border: 0; background: none; color: var(--cell); font-weight: 600; font-size: 14px; cursor: pointer; padding: 6px; }
 .cs-fail { position: absolute; left: 20px; right: 20px; top: 40%; z-index: 3; background: var(--panel); border-radius: 18px; padding: 16px; display: grid; gap: 6px; text-align: center; }
 .cs-fail span { color: var(--muted); font-size: 14px; }
+.cs-fail .cs-retry { justify-self: center; margin-top: 6px; }
+.cs-reset { position: absolute; right: 16px; bottom: calc(118px + env(safe-area-inset-bottom)); z-index: 3; width: 44px; height: 44px;
+  border-radius: 50%; border: 1px solid rgba(255,255,255,.25); background: rgba(14,26,34,.72); color: #fff; font-size: 22px;
+  line-height: 1; cursor: pointer; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }

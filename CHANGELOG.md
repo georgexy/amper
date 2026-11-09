@@ -2,6 +2,16 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.22 — 2026-11-09
+- Tema „Casă 3D”: casa se rotește cu un deget și se apropie / se mută cu două (ca o piesă într-un program CAD);
+  butonul ⟲ din dreapta jos o aduce la vederea de la început.
+- Tema „Casă 3D”: mesajul „Tema 3D nu merge pe acest ecran” nu mai apare la întâmplare. Scena se reface singură
+  dacă iPhone-ul a oprit grafica 3D (aplicația în fundal, memorie puțină), încearcă de câteva ori înainte de mesaj,
+  iar mesajul are acum butonul „Reîncearcă”.
+- Tema „Casă 3D”: cablurile merg acum pe pereți și pe acoperiș, cu colțuri rotunjite, nu prin acoperișul garajului:
+  de la panouri peste atic, între ferestrele etajului, pe acoperișul garajului și în jos în invertor; spre casă pe sub
+  streașina garajului, deasupra ușii; spre baterie pe perete, în lateralul modulelor.
+
 ## 1.0.0-beta.21 — 2026-11-09
 - Tema „Casă 3D”: pe celelalte ecrane (Bateriile, Setări etc.) pagina se poate derula din nou până jos, ca bara de
   meniu să nu mai acopere ultimele rânduri (de exemplu „Sănătatea celulelor”).
