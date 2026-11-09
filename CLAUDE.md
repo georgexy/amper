@@ -635,7 +635,6 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   0,47π, ținta limitată la insulă, damping); `onMove(true)` → butonul `.cs-reset` (⟲, `resetView()`); vederea
   aleasă rămâne la redimensionare; indicația (cheia `casaHint2`) spune și de rotire. Atingerea rămâne „tap” (< 8 px).
 
-## Jurnalul pe card, copia de siguranță explicată
 ## Jurnalul pe card, copia de siguranță explicată, toate notificările (1.0.0-beta.21, cerut 2026-11-09)
 - Motiv: pe 09.11 clona (00:17, după ~17 min, prin 4G) a eșuat, iar jurnalul era doar în RAM (Raspberry Pi OS:
   `/usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf`, Storage=volatile; fără rsyslog) → cauza pierdută.
