@@ -211,17 +211,44 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
   const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xcfe3f2, size: 0.35, fog: false }));
   scene.add(stars); nightObjs.push(stars);
 
-  // ---- fluxurile: un tub discret și particule luminoase pe el
+  // ---- fluxurile: cablurile merg pe pereți și pe acoperiș, ca niște trasee de cablu reale (segmente drepte,
+  // colțuri rotunjite, la ~10 cm de suprafețe), nu prin ziduri; pe ele, particulele luminoase.
+  // Garajul: pereți x 4,4…8,8, z −2,4…3,6, acoperiș sus la y 3,345 (margini x 8,95, z 3,75); invertorul pe
+  // peretele x = 8,8 (z −0,7…0,1, y 1,23…2,28); bateria lipită de același perete (z 1,22…2,17, sus la ~1,9).
+  const conduit = (pts, r = 0.25) => {
+    const P = pts.map((p) => new THREE.Vector3(...p)), path = new THREE.CurvePath();
+    let prev = P[0].clone();
+    const line = (a, b) => { if (a.distanceTo(b) > 1e-3) path.add(new THREE.LineCurve3(a, b)); };
+    for (let i = 1; i < P.length; i++) {
+      const cur = P[i];
+      if (i === P.length - 1) { line(prev, cur.clone()); break; }
+      const a = cur.clone().sub(P[i - 1]), b = P[i + 1].clone().sub(cur);
+      const ra = Math.min(r, a.length() / 2), rb = Math.min(r, b.length() / 2);
+      const p1 = cur.clone().sub(a.normalize().multiplyScalar(ra)), p2 = cur.clone().add(b.normalize().multiplyScalar(rb));
+      line(prev, p1);
+      path.add(new THREE.QuadraticBezierCurve3(p1, cur.clone(), p2));
+      prev = p2;
+    }
+    return path;
+  };
+  const IZ = INV.z, WX = 8.92, PZ = 0.35;                                   // fața invertorului / cablul pe peretele garajului
   const FLOW = {
-    pv: [[HX + 3.5, 7.0, HZ + 1.9], [HX + 4.9, 6.45, HZ + 3.0], [GX - 0.6, 3.45, GZ + 2.5], [GX + 2.2, 3.4, GZ - 0.9], [INV.x + 0.05, INV.y + 0.6, INV.z]],
-    bat: [[INV.x + 0.12, INV.y - 0.45, INV.z + 0.2], [INV.x + 0.25, 1.4, GZ + 0.2], [BAT.x, 1.95, BAT.z - 0.1]],
-    load: [[INV.x + 0.12, INV.y - 0.3, INV.z + 0.42], [GX + 2.28, 2.6, GZ + 2.4], [GX + 1.8, 2.7, GZ + 3.1], [GX - 2.1, 2.7, GZ + 3.1], [HX + 4.2, 2.2, HZ + 3.65], [HX + 2.4, 1.8, HZ + 3.62]],
-    grid: wirePts.map((v) => v.toArray()),
+    // de la panouri: peste atic, în jos pe lângă perete până pe acoperișul garajului, pe acoperiș până la margine,
+    // apoi în jos pe peretele garajului, în capul invertorului
+    // (pe la z 0,35: între cele două ferestre laterale ale etajului, z −2,4…0 și 0,8…3,2)
+    pv: conduit([[3.6, 6.55, PZ], [4.95, 6.55, PZ], [4.95, 6.98, PZ], [5.45, 6.98, PZ], [5.45, 3.43, PZ], [WX + 0.12, 3.43, PZ],
+                 [WX + 0.12, 2.75, PZ], [WX, 2.75, PZ], [WX, 2.75, IZ], [WX, INV.y + 0.53, IZ]]),
+    // spre baterie: din partea de jos a invertorului, pe perete, în lateralul turnului de module
+    bat: conduit([[WX, INV.y - 0.53, IZ - 0.25], [WX, 0.92, IZ - 0.25], [WX, 0.92, BAT.z - 0.5]], 0.2),
+    // spre casă: în sus pe perete, pe sub streașină până la colțul din față, pe fața garajului (deasupra ușii),
+    // apoi în peretele casei, deasupra intrării
+    load: conduit([[WX, INV.y - 0.53, IZ + 0.25], [WX, 1.1, IZ + 0.25], [WX, 1.1, IZ + 1.0], [WX, 2.8, IZ + 1.0], [WX, 2.8, GZ + 3.12], [GX - 2.2, 2.8, GZ + 3.12],
+                   [HX + 4.35, 2.8, GZ + 3.12], [HX + 4.35, 2.8, HZ + 3.56]]),
+    grid: new THREE.CatmullRomCurve3(wirePts),               // cablul aerian, cu săgeată
   };
   const flows = {};
   KIND = null;
-  for (const [k, pts] of Object.entries(FLOW)) {
-    const curve = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)), false, "centripetal");
+  for (const [k, curve] of Object.entries(FLOW)) {
     const tubeMat = new THREE.MeshBasicMaterial({ color: COL[k], transparent: true, opacity: 0.15, depthWrite: false });
     add(new THREE.TubeGeometry(curve, 120, 0.07, 8), tubeMat, 0, 0, 0, { cast: false, receive: false });
     const dots = [];
