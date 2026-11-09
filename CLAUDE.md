@@ -620,10 +620,37 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   schimbarea temei (eliberează WebGL). Noaptea = PV < 30 W și ora 18–7. Fără WebGL → `.cs-fail`.
 - Cerut explicit: NU trebuie să meargă pe Pi (kiosk); ținta e telefonul. Captură headless: Chromium cu
   `--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader`.
+- 1.0.0-beta.21: `body[data-view]` (setat în `show()`, implicit „now” în index.html); `padding-bottom: 0` doar pe
+  `body[data-look=casa][data-view=now]` — înainte era pe toate ecranele și bara de jos acoperea „Sănătatea celulelor”.
 - 1.0.0-beta.20 (cerut 2026-11-08): atingerea elementului/etichetei = fișa (ca înainte); `.cs-i` („i” pe etichetă,
   `CASA_GO`: bat → `packs`, pv și inv → `inverter`) deschide ecranul complet (a doua variantă a utilizatorului, după
   ce navigarea directă de la atingere a scos fișele). Fișa deschisă acoperă eticheta bateriei: „i” merge cu fișa închisă. Bilele fluxurilor: rază 0,12, culoare ×1,8 (sub pragul
   bloom-ului noaptea; ziua doar o strălucire slabă) — înainte ×5, „prea strălucitoare”.
+
+## Jurnalul pe card, copia de siguranță explicată, toate notificările (1.0.0-beta.21, cerut 2026-11-09)
+- Motiv: pe 09.11 clona (00:17, după ~17 min, prin 4G) a eșuat, iar jurnalul era doar în RAM (Raspberry Pi OS:
+  `/usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf`, Storage=volatile; fără rsyslog) → cauza pierdută.
+- `deploy/journald-amper.conf` → `/etc/systemd/journald.conf.d/50-amper.conf` (Storage=persistent, SystemMaxUse=200M,
+  SystemKeepFree=1G, MaxRetentionSec=1month; SyncIntervalSec neatins) prin `deploy/persistent-journal.sh` (idempotent;
+  /var/log/journal + /var/log/amper; restart journald + `journalctl --flush` doar la schimbare; `--no-restart` în
+  imagine). Apelat din install.sh și post-update.sh (Pi-urile existente îl primesc la actualizare);
+  build-image.sh verifică fișierul.
+- `deploy/backup.sh`: `log()` și stderr (exec + tee) → `/var/log/amper/backup.log` (rotație la pornire: ultimele 2000
+  de rânduri; `AMPER_LOG_DIR`). `run "pas" cmd…` (erorile comenzii în jurnal; la eșec `fail` scrie în `$REASONF`
+  „pas a eșuat: ultima linie de eroare”, fără data rclone; merge și din subshell-ul clonei), `retry` = `UPLOAD_TRIES`
+  (3) × `UPLOAD_WAIT` (300 s) pentru încărcările în Drive; rclone cu `--low-level-retries 30`. Notificarea de eșec =
+  „Copia de siguranță din <zi> a EȘUAT. <motive; …>. Jurnalul: …”, trimisă prin `runuser -u amper` (proprietarul
+  bazei). Textele în `amper/lang/en.json`. Testat cu comenzi simulate (rclone/sfdisk care pică), nu pe Pi.
+- `amper/update.py`: `_file_log("update.log")` (RotatingFileHandler 1 MB × 3, în main); `_run` și `_notify` scriu în
+  jurnal codul și stderr-ul comenzilor eșuate (înainte se pierdeau); notificările cu `--source update`.
+- Tabela `notifications` (ts, title, message, priority, url, source, channels): `Notifier.record` în `send` (textul deja
+  tradus; și fără niciun canal), `channels` actualizat în `_deliver`; `Notifier.db` legat de Engine. `cmd_notify`
+  (`--source`) scrie direct în bază (WAL, în paralel cu serviciul) doar dacă baza există; ca root, `_keep_db_owner`
+  dă înapoi fișierele -wal/-shm proprietarului. `cmd_notify` traduce acum textul (`i18n.tr`), ca `send` — înainte
+  mesajele copiei/actualizărilor plecau netraduse. Curățare în `maintenance_loop` (`NOTIFICATIONS_DAYS` 365).
+  API `GET /api/notifications?limit=&before=` (id) → `{items, more}`. UI: `#al-tabs` (Alerte | Toate notificările),
+  `#al-pane-notif`, `loadNotifs/renderNotifs`, „Mai vechi” (`#al-more`); atingerea = `openNotifUrl(url)` (comun cu
+  mesajul service worker-ului). Teste: `tests/test_notifications.py`.
 
 ## Limba aplicației (1.0.0-beta.14, în pregătire, cerut 2026-10-30; etapa 1 = ecranele)
 - Una pe Pi (decizia utilizatorului): overlay `language` (ro | en), `POST /api/language {lang}`, `/api/info.lang`.

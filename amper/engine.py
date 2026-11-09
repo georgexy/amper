@@ -14,6 +14,7 @@ from .models import InverterReading, PackReading
 from .notify import Notifier
 
 log = logging.getLogger(__name__)
+NOTIFICATIONS_DAYS = 365              # cât se păstrează notificările în Alerte → Notificări
 CELL_NOMINAL_V = 3.2      # V — celulă LiFePO4
 PACK_NOMINAL_V = 51.2     # V — pachet de 48 V (16 celule) când nu se știe numărul de celule
 
@@ -69,6 +70,8 @@ class Engine:
         self.cfg = cfg
         self.db = db or Database(cfg["database"])
         self.notifier = notifier or Notifier(cfg["notify"])
+        if self.notifier.db is None:
+            self.notifier.db = self.db                # fiecare notificare rămâne în Alerte → Notificări
         self.alerts = AlertManager(cfg["alerts"], self.db, self.notifier)
         self.devices: dict[str, DeviceState] = {}
         if cfg["database"] != ":memory:":
@@ -331,6 +334,10 @@ class Engine:
                 await asyncio.to_thread(self.db.rollup, self.cfg["raw_retention_days"])
             except Exception:
                 log.exception("eroare la agregarea datelor")
+            try:                                      # notificările salvate: un an (sunt puține rânduri)
+                await asyncio.to_thread(self.db.purge_notifications, int(time.time() - NOTIFICATIONS_DAYS * 86400))
+            except Exception:
+                log.exception("eroare la curățarea notificărilor")
             try:
                 from . import cell_health
                 if cell_health.weekly_due(self.db):

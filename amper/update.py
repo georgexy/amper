@@ -502,7 +502,9 @@ class Updater:
     # ---------- comenzi de sistem ----------
     @staticmethod
     def _run(*cmd: str) -> None:
-        subprocess.run(cmd, check=False, timeout=120, capture_output=True)
+        r = subprocess.run(cmd, check=False, timeout=120, capture_output=True, text=True, errors="replace")
+        if r.returncode != 0:                       # motivul rămâne în jurnal (și în /var/log/amper/update.log)
+            log.warning("%s → cod %s: %s", " ".join(cmd), r.returncode, (r.stderr or r.stdout or "").strip()[-500:])
 
     def _health(self, expect: str) -> bool:
         url = f"http://127.0.0.1:{self.port}/api/health"
@@ -536,9 +538,11 @@ class Updater:
     def _notify(msg: str, url: str = "/?v=update") -> None:
         """Notificările actualizărilor: titlul „Amper”; atinse, deschid Setări → Actualizări."""
         try:                              # ca utilizatorul amper (cheile Web Push, baza de date)
-            subprocess.run(["runuser", "-u", "amper", "--", "env", "PYTHONPATH=/opt/amper", "python3", "-m",
-                            "amper", "notify", "--title", "Amper", "--url", url, msg],
-                           timeout=60, capture_output=True)
+            r = subprocess.run(["runuser", "-u", "amper", "--", "env", "PYTHONPATH=/opt/amper", "python3", "-m",
+                                "amper", "notify", "--source", "update", "--title", "Amper", "--url", url, msg],
+                               timeout=60, capture_output=True, text=True, errors="replace")
+            if r.returncode != 0:
+                log.warning("notificarea nu a plecat: %s", (r.stderr or r.stdout or "").strip()[-300:])
         except Exception as e:
             log.warning("notificarea nu a plecat: %s", e)
 
@@ -929,7 +933,8 @@ def main(argv=None) -> None:
                    help="instalează acum ultima versiune, fără aplicație (cale de rezervă, prin SSH)")
     p.add_argument("--rollback", action="store_true", help="revine la versiunea anterioară, fără aplicație")
     args = p.parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+                        handlers=[logging.StreamHandler(), *_file_log("update.log")])
     up = Updater(load_config(args.config))
     if args.install or args.rollback:
         # Cale de rezervă dacă aplicația nu merge: aceleași verificări (semnătură, copia datelor, revenire automată).
@@ -958,6 +963,19 @@ def main(argv=None) -> None:
         log.warning("lipsește cheia publică (amper/update_key.py): actualizările se pot căuta, dar nu instala")
     up.start_local_api()
     up.loop()
+
+
+def _file_log(name: str) -> list:
+    """Jurnalul și pe fișier, în /var/log/amper (jurnalul sistemului se pierdea la repornire): ~1 MB × 3."""
+    from logging.handlers import RotatingFileHandler
+    d = os.environ.get("AMPER_LOG_DIR", "/var/log/amper")
+    try:
+        os.makedirs(d, exist_ok=True)
+        h = RotatingFileHandler(os.path.join(d, name), maxBytes=1 << 20, backupCount=2, encoding="utf-8")
+    except OSError:
+        return []                                   # fără drept de scriere (nu e root): doar jurnalul sistemului
+    h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    return [h]
 
 
 if __name__ == "__main__":

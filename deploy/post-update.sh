@@ -17,4 +17,6 @@ done
 for unit in amper-password-reset.service; do
   [ -f "/etc/systemd/system/$unit" ] && ! systemctl is-enabled -q "$unit" 2>/dev/null && systemctl enable "$unit" >/dev/null 2>&1
 done
+# jurnalul sistemului păstrat pe card (1.0.0-beta.21): idempotent, fără repornirea Pi-ului
+[ -f "$NEW/deploy/persistent-journal.sh" ] && bash "$NEW/deploy/persistent-journal.sh"
 exit 0

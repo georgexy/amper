@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="stylesheet" href="app.css">
 </head>
-<body>
+<body data-view="now">
   <div id="login" class="login" hidden>
     <h1 class="num login-h"><img class="logo" src="icon.svg" alt="">Amper</h1>
     <label for="pw">Parola aplicației</label>
@@ -436,10 +436,18 @@
 
     <!-- ====================== ALERTE ====================== -->
     <main id="view-alerts" class="wrap" hidden>
+      <div class="iv-tabs" id="al-tabs"><button data-t="alerts" class="on">Alerte</button><button data-t="notif">Toate notificările</button></div>
+      <div id="al-pane-alerts">
       <h2>Alerte active</h2>
       <div class="list" id="al-active"></div>
       <h2>Istoric alerte</h2>
       <div class="list" id="al-hist"></div>
+      </div>
+      <div id="al-pane-notif" hidden>
+        <p class="note">Tot ce a plecat pe telefon (alerte, copia de siguranță, actualizări, setări schimbate, pornirea Pi-ului…), și după ce ai închis notificarea. Atinge una ca s-o deschizi.</p>
+        <div class="list" id="al-notif"></div>
+        <p class="al-more"><button class="btn sm" id="al-more" hidden>Mai vechi</button></p>
+      </div>
       <p class="note">Notificările pe telefon se pornesc din Setări (rotița de sus) → Notificări.</p>
     </main>
 

@@ -2020,6 +2020,7 @@ function renderSheet() {
 $$("nav.tabs button").forEach((b) => (b.onclick = () => show(b.dataset.view)));
 function show(v) {
   state.view = v;
+  document.body.dataset.view = v;              // tema Casă 3D: fără spațiu jos doar pe „Acum”
   const tab = ["packs", "inverter", "bms", "cells", "report"].includes(v) ? "now" : v;      // se deschid din „Acum”
   $$("nav.tabs button").forEach((b) => b.dataset.view === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
   for (const k of ["now", "hist", "alerts", "packs", "inverter", "bms", "cells", "report", "settings"]) $("#view-" + k).hidden = v !== k;
@@ -2037,7 +2038,7 @@ function show(v) {
   if (v === "settings") { showPanel(null); renderSettingsMenu(); }
   window.scrollTo(0, 0);
   if (v === "hist") loadHistory();
-  if (v === "alerts") { loadAlerts(); markAlertsSeen(); }
+  if (v === "alerts") { loadAlerts(); markAlertsSeen(); if (notif.tab === "notif") loadNotifs(true); }
 }
 
 /* ------------------------------------------------------------------ ISTORIC */
@@ -2388,6 +2389,44 @@ async function loadAlerts() {
     <span class="t">${dayTime(x.ts_start)} – ${hhmm(x.ts_end)}</span></div>`).join("")
     : `<div class="empty">Nu au fost alerte până acum.</div>`;
 }
+
+/* ---------- Alerte → „Toate notificările”: tot ce a plecat pe telefon (tabela notifications) ---------- */
+const notif = { tab: "alerts", items: [], more: false, loading: false };
+const NOTIF_PRIO = { high: ["critical", "importantă"], default: ["", "normală"], low: ["low", "informativă"] };
+$$("#al-tabs button").forEach((b) => (b.onclick = () => {
+  notif.tab = b.dataset.t;
+  renderAlTabs();
+  if (notif.tab === "notif") loadNotifs(true);
+}));
+function renderAlTabs() {
+  $$("#al-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.t === notif.tab));
+  $("#al-pane-alerts").hidden = notif.tab !== "alerts";
+  $("#al-pane-notif").hidden = notif.tab !== "notif";
+}
+async function loadNotifs(fresh) {
+  if (notif.loading) return;
+  notif.loading = true;
+  try {
+    const last = notif.items[notif.items.length - 1];
+    const r = await api(`/api/notifications?limit=50${!fresh && last ? `&before=${last.id}` : ""}`);
+    notif.items = fresh ? r.items : notif.items.concat(r.items);
+    notif.more = r.more;
+    renderNotifs();
+  } catch (e) {
+    if (e.message !== "auth") $("#al-notif").innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+  } finally { notif.loading = false; }
+}
+function renderNotifs() {
+  $("#al-notif").innerHTML = notif.items.length ? notif.items.map((x) => {
+    const [cls, word] = NOTIF_PRIO[x.priority] || NOTIF_PRIO.default;
+    return `<button class="row nt ${cls}" data-url="${esc(x.url || "/?v=alerts")}">
+      <b>${esc(x.title || "Amper")}</b><span class="nt-msg">${esc(x.message)}</span>
+      <span class="t">${dayTime(x.ts)} · <span>${word}</span></span></button>`;
+  }).join("") : `<div class="empty">Nicio notificare până acum.</div>`;
+  $$("#al-notif .nt").forEach((el) => (el.onclick = () => openNotifUrl(el.dataset.url)));
+  $("#al-more").hidden = !notif.more;
+}
+$("#al-more").onclick = () => loadNotifs(false);
 
 /* ---------- notificări direct în aplicația Amper (Web Push) ---------- */
 const b64ToBytes = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - s.length % 4) % 4)), (c) => c.charCodeAt(0));
@@ -2882,13 +2921,15 @@ $("#su-back").onclick = () => {
 };
 
 /* atingerea unei notificări cu aplicația deja deschisă: service worker-ul trimite adresa */
-navigator.serviceWorker?.addEventListener("message", (e) => {
-  const u = String(e.data?.open || "");
-  if ($("#app").hidden) return;
+function openNotifUrl(u) {
   if (u.includes("v=alerts")) show("alerts");
   if (u.includes("v=update")) { show("settings"); showPanel("update"); }
   if (u.includes("v=cells")) show("cells");
   if (u.includes("v=night")) show("report");
+}
+navigator.serviceWorker?.addEventListener("message", (e) => {
+  if ($("#app").hidden) return;
+  openNotifUrl(String(e.data?.open || ""));
 });
 
 /* ---------- ecranul „Actualizez Amper”: cercul se umple după pașii serviciului de actualizare; cât Amper

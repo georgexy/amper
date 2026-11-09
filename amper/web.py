@@ -312,6 +312,17 @@ def make_app(engine) -> web.Application:
         rows = await asyncio.to_thread(engine.db.alerts, int(request.query.get("limit", 100)))
         return _json(dict(active=engine.alerts.active_list(), history=rows))
 
+    async def notifications(request):
+        """Toate notificările trimise (și cele care nu sunt alerte), cele mai noi întâi; `before` = id-ul
+        ultimei primite, pentru pagina următoare."""
+        try:
+            limit = max(1, min(200, int(request.query.get("limit", 50))))
+            before = int(request.query["before"]) if request.query.get("before") else None
+        except ValueError:
+            return _json({"error": "date invalide"}, 400)
+        rows = await asyncio.to_thread(engine.db.notifications, limit, before)
+        return _json(dict(items=rows, more=len(rows) == limit))
+
     async def test_notification(request):
         if not engine.notifier.enabled:
             return _json({"ok": False, "error": "Notificările nu sunt configurate (vezi notify în config.yaml)."})
@@ -1264,6 +1275,7 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/api/history/all", history_many)
     app.router.add_get("/api/energy", energy)
     app.router.add_get("/api/alerts", alerts)
+    app.router.add_get("/api/notifications", notifications)
     app.router.add_post("/api/test-notification", test_notification)
     app.router.add_get("/api/debug/{device}", debug)
     app.router.add_get("/api/inverter/settings", inverter_get)

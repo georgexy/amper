@@ -137,6 +137,11 @@ chown root:amper "$ETC/config.yaml"
 chmod 640 "$ETC/config.yaml"
 [ -f "$ETC/rclone.conf" ] && chown root:root "$ETC/rclone.conf" && chmod 600 "$ETC/rclone.conf"
 
+# ---------------- jurnalul sistemului pe card ----------------
+# Raspberry Pi OS îl ține doar în RAM (se pierde la repornire): îl păstrăm pe card, cu limită de mărime.
+say "Jurnalul sistemului păstrat pe card (cel mult 200 MB, o lună)"
+if [ "$IMAGE" -eq 1 ]; then bash "$SRC/deploy/persistent-journal.sh" --no-restart; else bash "$SRC/deploy/persistent-journal.sh"; fi
+
 # ---------------- serviciu ----------------
 say "Instalez serviciul (pornește singur la fiecare alimentare)"
 EXEC="/usr/bin/python3 -m amper run -c $ETC/config.yaml"
