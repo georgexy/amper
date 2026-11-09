@@ -10,17 +10,21 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 const COL = { pv: 0xffb627, bat: 0x3ddc84, load: 0xa98bff, grid: 0x45b4ff };
 
 export function supported() {
   try {
+    if (!window.WebGLRenderingContext) return false;
     const c = document.createElement("canvas");
-    return !!(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl")));
+    const gl = c.getContext("webgl2") || c.getContext("webgl");
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();   // eliberat imediat (iPhone: puține contexte WebGL)
+    return !!gl;
   } catch { return false; }
 }
 
-export function mount(host, { onPick = () => {}, onFrame = () => {} } = {}) {
+export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = () => {}, onMove = () => {} } = {}) {
   let W = host.clientWidth || 390, H = host.clientHeight || 700;
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -40,11 +44,27 @@ export function mount(host, { onPick = () => {}, onFrame = () => {} } = {}) {
 
   const camera = new THREE.PerspectiveCamera(37, W / H, 0.1, 300);
   const LOOK = new THREE.Vector3(0.6, 1.6, 1.2);
+  // rotire / apropiere / mutare cu degetele, ca o piesă într-un program CAD (cerut 2026-11-09):
+  // un deget = rotește, două degete = apropie/depărtează și mută; mouse: stânga rotește, rotița apropie, dreapta mută
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = 0.08;
+  controls.minDistance = 10; controls.maxDistance = 120;
+  controls.maxPolarAngle = Math.PI * 0.47;                        // nu coboară sub pământ
+  controls.screenSpacePanning = true;
+  controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+  let moved = false;
+  controls.addEventListener("start", () => { if (!moved) { moved = true; onMove(true); } });
+  controls.addEventListener("change", () => {                    // centrul rotirii rămâne pe insulă
+    const t = controls.target;
+    t.set(Math.max(-24, Math.min(24, t.x)), Math.max(0, Math.min(8, t.y)), Math.max(-24, Math.min(24, t.z)));
+  });
   const placeCamera = () => {
     // pe ecrane late, camera mai aproape; pe telefon (portret) mai departe, ca să încapă toată insula
     const f = Math.min(1.25, Math.max(0.78, 0.46 / (W / H)));
     camera.position.set(36 * f, 36 * f, 41 * f);
+    controls.target.copy(LOOK);
     camera.lookAt(LOOK);
+    controls.update();
   };
   placeCamera();
 
@@ -254,6 +274,8 @@ export function mount(host, { onPick = () => {}, onFrame = () => {} } = {}) {
   };
   renderer.domElement.addEventListener("pointerdown", onDown);
   renderer.domElement.addEventListener("pointerup", onUp);
+  const lost = (e) => { e.preventDefault(); alive = false; onLost(); };
+  renderer.domElement.addEventListener("webglcontextlost", lost);
 
   // ---- unde apare fiecare element pe ecran (pentru etichetele HTML)
   const ANCH = {
@@ -271,7 +293,8 @@ export function mount(host, { onPick = () => {}, onFrame = () => {} } = {}) {
     if (!w || !h || (w === W && h === H)) return;
     W = w; H = h;
     renderer.setSize(W, H); composer.setSize(W, H); bloom.resolution.set(W, H);
-    camera.aspect = W / H; camera.updateProjectionMatrix(); placeCamera();
+    camera.aspect = W / H; camera.updateProjectionMatrix();
+    if (!moved) placeCamera();                                    // vederea aleasă de utilizator rămâne
   };
   const ro = new ResizeObserver(resize); ro.observe(host);
 
@@ -291,6 +314,7 @@ export function mount(host, { onPick = () => {}, onFrame = () => {} } = {}) {
       });
     }
     ledMat.color.setHex(0x3ddc84).multiplyScalar(2 + 1.5 * Math.sin(t * 4));
+    controls.update();
     composer.render();
     onFrame(anchors());
   };
@@ -306,12 +330,15 @@ export function mount(host, { onPick = () => {}, onFrame = () => {} } = {}) {
       if (soc != null) batLeds.forEach((m, i) => m.color.set(soc > i * 25 + 5 ? 0x3ddc84 : 0x56656f));
     },
     anchors,
+    resetView() { moved = false; placeCamera(); onMove(false); },   // vederea de la început
     dispose() {
-      alive = false; cancelAnimationFrame(raf); ro.disconnect();
+      alive = false; cancelAnimationFrame(raf); ro.disconnect(); controls.dispose();
       renderer.domElement.removeEventListener("pointerdown", onDown);
       renderer.domElement.removeEventListener("pointerup", onUp);
       scene.traverse((o) => { o.geometry?.dispose(); (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m?.dispose?.()); });
-      composer.dispose?.(); pmrem.dispose(); renderer.dispose(); renderer.domElement.remove();
+      renderer.domElement.removeEventListener("webglcontextlost", lost);
+      composer.dispose?.(); pmrem.dispose(); renderer.dispose();
+      renderer.forceContextLoss(); renderer.domElement.remove();
     },
   };
 }

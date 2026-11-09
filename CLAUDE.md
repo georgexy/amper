@@ -626,7 +626,16 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `CASA_GO`: bat → `packs`, pv și inv → `inverter`) deschide ecranul complet (a doua variantă a utilizatorului, după
   ce navigarea directă de la atingere a scos fișele). Fișa deschisă acoperă eticheta bateriei: „i” merge cu fișa închisă. Bilele fluxurilor: rază 0,12, culoare ×1,8 (sub pragul
   bloom-ului noaptea; ziua doar o strălucire slabă) — înainte ×5, „prea strălucitoare”.
+- 1.0.0-beta.22 (cerut 2026-11-09): eroarea „Tema 3D nu merge” apărea la întâmplare pe iPhone. Cauze reparate:
+  `supported()` lăsa deschis contextul WebGL de test (acum `WEBGL_lose_context`), `dispose()` nu elibera contextul
+  (acum `renderer.forceContextLoss()`), contextul pierdut în fundal nu se refăcea (`webglcontextlost` → `onLost` →
+  `casaLost` reface scena), iar orice eșec al `import()`/WebGL era definitiv. Acum `casaMount` reîncearcă la
+  `CASA_RETRY` 1/3/8 s, apoi `.cs-fail` cu `.cs-retry`; `visibilitychange` → `casaRetry`; `leave()` golește starea.
+  Rotire ca în CAD: `OrbitControls` (un deget rotește, două = zoom + mutare; min 10, max 120, `maxPolarAngle`
+  0,47π, ținta limitată la insulă, damping); `onMove(true)` → butonul `.cs-reset` (⟲, `resetView()`); vederea
+  aleasă rămâne la redimensionare; indicația (cheia `casaHint2`) spune și de rotire. Atingerea rămâne „tap” (< 8 px).
 
+## Jurnalul pe card, copia de siguranță explicată
 ## Jurnalul pe card, copia de siguranță explicată, toate notificările (1.0.0-beta.21, cerut 2026-11-09)
 - Motiv: pe 09.11 clona (00:17, după ~17 min, prin 4G) a eșuat, iar jurnalul era doar în RAM (Raspberry Pi OS:
   `/usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf`, Storage=volatile; fără rsyslog) → cauza pierdută.
