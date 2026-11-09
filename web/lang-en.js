@@ -3,7 +3,14 @@
 "use strict";
 const EN = {
   // ---------- Alerte → Toate notificările
-  "Reîncearcă": "Retry", "Vederea inițială": "Initial view",
+  "Reîncearcă": "Retry", "Modelul casei": "House model",
+  "Vilă cu garaj": "Villa with garage", "Etaj în consolă, acoperiș plat, garaj": "Cantilevered upper floor, flat roof, garage",
+  "Hambar modern": "Modern barn", "Două ape, placare închisă, fronton vitrat": "Gable roof, dark cladding, glazed gable",
+  "Pavilion": "Pavilion", "Un nivel, acoperiș într-o apă plin de panouri": "Single storey, mono-pitch roof full of panels",
+  "Cuburi în consolă": "Cantilevered cubes", "Etaj peste carport, piscină": "Upper floor over the carport, pool",
+  "Casă cu curte": "Courtyard house", "În L, terasă interioară, carport solar": "L-shaped, inner terrace, solar carport",
+  "Cabană în A": "A-frame cabin", "Acoperiș până la pământ, fronton de sticlă": "Roof down to the ground, glass gable",
+  "Vederea inițială": "Initial view",
   "Atinge panourile, bateria sau casa pentru detalii. Rotește casa cu un deget, apropie cu două.": "Tap the panels, the battery or the house for details. Rotate the house with one finger, zoom with two.",
   "Toate notificările": "All notifications", "Mai vechi": "Older", "Nicio notificare până acum.": "No notifications yet.",
   "importantă": "important", "normală": "normal", "informativă": "informational",

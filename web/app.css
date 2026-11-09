@@ -804,6 +804,14 @@ small.warnc { color: var(--warn); }
 .k-g .sub, .c-it .s { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
 .k-g .sub b, .c-it .s b { color: var(--text); font-weight: 600; }
 .look .sw.flag { background: var(--panel-2); display: grid; place-items: center; }
+/* Teme → Casă 3D: modelele de casă, cu miniatură */
+.cm-h { font: 600 18px "Barlow Condensed", sans-serif; margin: 18px 2px 8px; }
+.cm-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.cm { display: grid; gap: 2px; padding: 8px 8px 10px; color: inherit; text-align: left; cursor: pointer; border: 2px solid transparent; }
+.cm img { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px; background: var(--panel-2); margin-bottom: 4px; }
+.cm b { font: 600 16px "Barlow Condensed", sans-serif; }
+.cm span { font-size: 12.5px; color: var(--muted); line-height: 1.25; }
+.cm[aria-pressed="true"] { border-color: var(--acc, #3DDC84); }
 .look .sw.flag svg { width: 30px; height: 20px; border-radius: 3px; display: block; }
 
 /* ---------- tema „Casă 3D” (casa3d.js): scena pe tot ecranul, antetul și bara de jos deasupra ---------- */
@@ -830,7 +838,8 @@ body[data-look="casa"] nav.tabs { z-index: 6; }
 .cs-tag b { display: block; font-size: 16px; line-height: 1; color: var(--text); }
 .cs-tag small { display: block; font-size: 10.5px; line-height: 1.15; color: var(--muted); }
 .cs-hint { position: absolute; left: 50%; bottom: calc(108px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 2;
-  font-size: 12px; color: rgba(231,239,243,.85); background: rgba(10,20,28,.6); padding: 6px 12px; border-radius: 14px; white-space: nowrap; }
+  font-size: 12px; color: rgba(231,239,243,.85); background: rgba(10,20,28,.6); padding: 6px 12px; border-radius: 14px;
+  width: max-content; max-width: calc(100% - 32px); text-align: center; line-height: 1.3; }
 .cs-sheet { position: absolute; left: 10px; right: 10px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 4; max-width: 520px; margin: 0 auto;
   background: rgba(23,38,50,.95); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border: 1px solid #2a4558;
   border-radius: 22px; padding: 14px 16px 12px; box-shadow: 0 -10px 40px rgba(0,0,0,.45);
