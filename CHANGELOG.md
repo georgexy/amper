@@ -3,12 +3,8 @@
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
 ## 1.0.0-beta.23 — în pregătire
-- Tema „Casă 3D”: cinci modele noi de casă, pe lângă vila cu garaj: hambar modern (două ape, placare închisă,
-  fronton vitrat), pavilion cu acoperiș într-o apă plin de panouri, cuburi în consolă cu carport și piscină, casă în L
-  cu curte interioară și carport solar, cabană în A. Se aleg din Setări → Teme → „Modelul casei” (apare când e
-  aleasă tema Casă 3D), fiecare cu miniatură. La toate, cablurile merg pe acoperiș și pe pereți până la invertor.
-- Tema „Casă 3D”: indicația de jos nu mai iese din ecran (se rupe pe două rânduri); reflexia soarelui pe panouri e
-  mai blândă.
+- Tema „Casă 3D”: indicația de jos nu mai iese din ecran pe telefon (se rupe pe două rânduri); reflexia soarelui pe
+  panouri e mai blândă.
 
 ## 1.0.0-beta.22 — 2026-11-09
 - Tema „Casă 3D”: casa se rotește cu un deget și se apropie / se mută cu două (ca o piesă într-un program CAD);

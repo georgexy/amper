@@ -804,14 +804,6 @@ small.warnc { color: var(--warn); }
 .k-g .sub, .c-it .s { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
 .k-g .sub b, .c-it .s b { color: var(--text); font-weight: 600; }
 .look .sw.flag { background: var(--panel-2); display: grid; place-items: center; }
-/* Teme → Casă 3D: modelele de casă, cu miniatură */
-.cm-h { font: 600 18px "Barlow Condensed", sans-serif; margin: 18px 2px 8px; }
-.cm-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-.cm { display: grid; gap: 2px; padding: 8px 8px 10px; color: inherit; text-align: left; cursor: pointer; border: 2px solid transparent; }
-.cm img { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px; background: var(--panel-2); margin-bottom: 4px; }
-.cm b { font: 600 16px "Barlow Condensed", sans-serif; }
-.cm span { font-size: 12.5px; color: var(--muted); line-height: 1.25; }
-.cm[aria-pressed="true"] { border-color: var(--acc, #3DDC84); }
 .look .sw.flag svg { width: 30px; height: 20px; border-radius: 3px; display: block; }
 
 /* ---------- tema „Casă 3D” (casa3d.js): scena pe tot ecranul, antetul și bara de jos deasupra ---------- */

@@ -609,31 +609,7 @@ const carduri = {
 const CASA_COL = { pv: "#FFB627", bat: "#3DDC84", load: "#A98BFF", grid: "#45B4FF", inv: "#C9D3DA" };
 const CASA_GO = { bat: "packs", pv: "inverter", inv: "inverter" };   // unde duce „i” de pe etichetă
 const CASA_IC = { pv: "sun", bat: "batt", load: "home", grid: "grid", inv: "inv" };
-const casa = { api: null, loading: false, failed: false, sel: null, h: null, hinted: false, model: "clasic" };
-/* modelele de casă (scena lor e în casa3d.js; miniaturile în web/casa/<id>.jpg) */
-const CASA_MODELS = {
-  clasic: ["Vilă cu garaj", "Etaj în consolă, acoperiș plat, garaj"],
-  hambar: ["Hambar modern", "Două ape, placare închisă, fronton vitrat"],
-  pavilion: ["Pavilion", "Un nivel, acoperiș într-o apă plin de panouri"],
-  cuburi: ["Cuburi în consolă", "Etaj peste carport, piscină"],
-  curte: ["Casă cu curte", "În L, terasă interioară, carport solar"],
-  cabana: ["Cabană în A", "Acoperiș până la pământ, fronton de sticlă"],
-};
-try {
-  const m = new URLSearchParams(location.search).get("casa") || localStorage.getItem("casaModel");
-  if (CASA_MODELS[m]) casa.model = m;
-} catch {}
-function casaSetModel(m) {
-  if (!CASA_MODELS[m] || m === casa.model) return;
-  casa.model = m;
-  savePref("casaModel", m);
-  if (drawnLook !== "casa") return;
-  casa.api?.dispose(); casa.api = null; casa.sel = null;          // scena se reface cu noul model
-  clearTimeout(casa.timer); casa.timer = 0; casa.tries = 0; casa.failed = false;
-  const root = $("#home"), r = root?.querySelector(".cs-reset");
-  if (r) r.hidden = true;
-  if (root) { casaSheet(); casaMount(root); }
-}
+const casa = { api: null, loading: false, failed: false, sel: null, h: null, hinted: false };
 const casaCell = (v, k, c = "") => `<div><b${c ? ` style="color:${c}"` : ""}>${v}</b><span>${k}</span></div>`;
 function casaInfo(kind, h) {
   const { b, ir, bp, today } = h;
@@ -709,7 +685,7 @@ async function casaMount(root) {
     const host = root.querySelector(".cs-host");
     if (!host || !host.isConnected) return;
     if (!m.supported()) throw new Error("webgl");
-    casa.api = m.mount(host, { model: casa.model, onPick: (k) => casaPick(k), onFrame: casaFrame, onLost: () => casaLost(root),
+    casa.api = m.mount(host, { onPick: (k) => casaPick(k), onFrame: casaFrame, onLost: () => casaLost(root),
       onMove: (on) => {
         const r = root.querySelector(".cs-reset");
         if (r) r.hidden = !on;
@@ -1348,14 +1324,6 @@ function renderLooks() {
     setLook(el.dataset.look); savePref("look", state.look); renderLooks();
     $("#set-teme-sub").textContent = `Acum: ${LOOKS[state.look].name}`;
   }));
-  // tema Casă 3D: alegerea modelului de casă
-  const box = $("#casa-models");
-  box.hidden = state.look !== "casa";
-  if (box.hidden) return;
-  $("#casa-list").innerHTML = Object.entries(CASA_MODELS).map(([k, [name, desc]]) => `
-    <button class="card cm" data-m="${k}" aria-pressed="${k === casa.model}">
-      <img src="casa/${k}.jpg" alt="" loading="lazy" width="320" height="240"><b>${name}</b><span>${desc}</span></button>`).join("");
-  $$("#casa-list .cm").forEach((el) => (el.onclick = () => { casaSetModel(el.dataset.m); renderLooks(); }));
 }
 /* Setări → Dispozitive conectate: Invertoare și BMS-uri (grupate după tip, în ordinea adresei), cu legătura și starea */
 const DEV_TYPE = { daly: "Daly", jk: "JK", sim_daly: "Daly (simulat)", seplos: "Seplos V2 (RS485)", pace: "PACE / Daren (RS485)", sim_seplos: "Seplos (simulat)",

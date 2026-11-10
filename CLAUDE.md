@@ -637,19 +637,10 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   Cablurile (cerut: „firul intră în acoperișul garajului”): `conduit(pts, r)` = segmente drepte + colțuri Bézier,
   la ~10 cm de suprafețe (coordonatele garajului/invertorului/bateriei în comentariul din scene.js); PV pe la
   z 0,35 (între ferestrele laterale), load pe sub streașină (y 2,8) până deasupra intrării, bat la y 0,92.
-
-- 1.0.0-beta.23 (cerut 2026-11-09: „4-5 modele noi, mai moderne”): modelele de casă. `scene.js`: piese comune
-  (`win`, `profileX` = profil (z, y) extrudat pe x, `gable` cu `pt(side, x, s)` pe pantă, `slopePanels`, `flatPanels`,
-  `inverter(wall, y, c, face)`, `battery`, `gridLine`, `tree/pine/bush/fence/car`, `glow/lamp`, `conduit`) și
-  `MODELS` = clasic | hambar | pavilion | cuburi | curte | cabana; fiecare construiește clădirea și întoarce
-  `{pv, bat, load` (punctele traseelor de cablu)`, wire, look, anch}`. `mount(host, {model})`, `MODEL_IDS`,
-  `setView(pos, target)` (pentru capturi). `app.js`: `CASA_MODELS` (nume + descriere), `casa.model` (localStorage
-  `casaModel`, sau `?casa=<id>`), `casaSetModel` (reface scena); Setări → Teme → `#casa-models` (`.cm`, miniaturi
-  `web/casa/<id>.jpg`, 480×360). Miniaturile și verificarea: o pagină mică ce montează `casa3d.js` (gazda cu
-  `position: absolute` — cu `fixed`, `offsetParent` e null și scena nu desenează) + Playwright cu swiftshader.
-  Model nou = funcție în `MODELS` + id în `MODEL_IDS` + rând în `CASA_MODELS` + texte în lang-en.js + miniatură
-  (testul `test_house_models_have_thumbnails_and_names`). Panourile: material mai mat (reflexia soarelui „ardea”
-  imaginea pe pantă), ramă neagră la cele din planul acoperișului. `.cs-hint` se rupe pe rânduri.
+- 1.0.0-beta.23: `.cs-hint` se rupe pe rânduri (ieșea din ecran în beta.22); `panelMat` mai mat. Cinci modele noi
+  de casă (hambar, pavilion, cuburi în consolă, casă cu curte, cabană în A, alese din Setări → Teme) au fost făcute
+  și RESPINSE de utilizator pe 2026-11-09 („nu îmi place niciuna, nu te mai chinui”) → scoase (commit db38798, anulat).
+  Nu mai propune modele de casă noi dacă nu cere.
 
 ## Jurnalul pe card, copia de siguranță explicată, toate notificările (1.0.0-beta.21, cerut 2026-11-09)
 - Motiv: pe 09.11 clona (00:17, după ~17 min, prin 4G) a eșuat, iar jurnalul era doar în RAM (Raspberry Pi OS:
