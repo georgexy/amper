@@ -309,6 +309,16 @@ h2 { font: 600 20px/1.2 "Barlow Condensed", sans-serif; margin: 26px 0 10px; }
 .list .row.nt.low { opacity: .75; }
 .list .row.nt .nt-msg { white-space: pre-line; overflow-wrap: anywhere; }
 .al-more { text-align: center; margin: 12px 0; }
+/* Setări → Copia de siguranță */
+.bk-card { display: grid; gap: 6px; padding: 14px; margin-bottom: 10px; }
+.bk-card span { font-size: 14px; color: var(--muted); }
+.bk-card span.bad { color: var(--alarm); }
+.bk-card.ok b { color: var(--charge); }
+.bk-card code { font-size: 12.5px; }
+.bk-card .btn { justify-self: start; text-decoration: none; color: inherit; }
+.bk-card textarea { font: 13px/1.35 ui-monospace, monospace; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--text); width: 100%; box-sizing: border-box; resize: vertical; }
+#set-backup > .btn, #bk-body > .btn { margin: 0 8px 10px 0; }
 /* Setări → Export pentru diagnostic */
 #ex-range { margin: 6px 0 10px; flex-wrap: wrap; }
 .ex-pick { display: grid; gap: 8px; margin-bottom: 8px; }

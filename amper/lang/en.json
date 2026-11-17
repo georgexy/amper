@@ -800,5 +800,19 @@
  "demontarea imaginii": "unmounting the image",
  "// exportul pentru diagnostic (diag_export.py)": "",
  "Perioada e prea scurtă.": "The period is too short.",
- "Cel mult # zile odată.": "At most # days at a time."
+ "Cel mult # zile odată.": "At most # days at a time.",
+ "// copia de siguranță legată din aplicație (backup_link.py)": "",
+ "rclone nu e instalat pe Pi ({}).": "rclone is not installed on the Pi ({}).",
+ "Pi-ul nu a putut porni legarea: {...}": "The Pi could not start the link: {...}",
+ "Pi-ul nu a putut cere adresa Google ({}).": "The Pi could not get the Google address ({}).",
+ "Adresa primită nu e de la Google.": "The address received is not from Google.",
+ "Adresa lipită nu e cea bună: trebuie să înceapă cu http://127.0.0.1:53682/ și să conțină code=. Copiaz-o din bara de sus a paginii care nu s-a deschis.": "The pasted address is not the right one: it must start with http://127.0.0.1:53682/ and contain code=. Copy it from the address bar of the page that did not open.",
+ "Legarea a expirat. Apasă din nou „Conectează Google Drive”.": "The link expired. Tap “Connect Google Drive” again.",
+ "Pi-ul nu a putut trimite codul la rclone ({}).": "The Pi could not pass the code to rclone ({}).",
+ "Google nu a dat acces: {...}. Încearcă din nou.": "Google did not grant access: {...}. Try again.",
+ "Răspunsul de la Google nu e valid. Încearcă din nou.": "Google's answer is not valid. Try again.",
+ "Legătura s-a salvat, dar Drive-ul nu răspunde: {...}": "The link was saved, but Drive does not answer: {...}",
+ "Google Drive nu e legat.": "Google Drive is not connected.",
+ "☁️ Copia de siguranță în Google Drive a fost legată din aplicație.": "☁️ The Google Drive backup was connected from the app.",
+ "☁️ Copia de siguranță în Google Drive a fost oprită din aplicație.": "☁️ The Google Drive backup was stopped from the app."
 }

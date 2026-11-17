@@ -262,6 +262,8 @@ class Updater:
         self.job: dict = {"state": "idle"}
         from .remote import Remote                    # acces de oriunde (Tailscale + Funnel), tot ca root
         self.remote = Remote(port=self.port)
+        from .backup_link import BackupLink
+        self.backup = BackupLink(etc_dir=self.etc_dir)       # copia de siguranță în Google Drive, legată din aplicație
         self.state = self._load_state()
         if self.state.get("channel") in ("stable", "beta"):     # ales din aplicație (Setări → Actualizări)
             self.channel = self.state["channel"]
@@ -854,6 +856,8 @@ class Updater:
                     return self._json({"error": "neautorizat"}, 403)
                 if self.path.startswith("/remote"):
                     return self._json(up.remote.status())
+                if self.path.startswith("/backup"):
+                    return self._json(up.backup.status())
                 return self._json(up.status())
 
             def do_POST(self):
@@ -872,6 +876,25 @@ class Updater:
                     else:
                         return self._json({"error": "necunoscut"}, 404)
                     return self._json(up.remote.status())
+                if self.path.startswith("/backup/"):
+                    from .backup_link import LinkError
+                    n = int(self.headers.get("Content-Length") or 0)
+                    try:
+                        body = json.loads(self.rfile.read(min(n, 8192)) or b"{}")
+                    except ValueError:
+                        body = {}
+                    try:
+                        if self.path.startswith("/backup/link"):
+                            return self._json(up.backup.start())
+                        if self.path.startswith("/backup/code"):
+                            return self._json(up.backup.finish(str(body.get("url") or "")))
+                        if self.path.startswith("/backup/now"):
+                            return self._json(up.backup.backup_now())
+                        if self.path.startswith("/backup/unlink"):
+                            return self._json(up.backup.unlink())
+                    except LinkError as e:
+                        return self._json({"error": str(e)}, 400)
+                    return self._json({"error": "necunoscut"}, 404)
                 if self.path.startswith("/channel"):
                     n = int(self.headers.get("Content-Length") or 0)
                     try:
