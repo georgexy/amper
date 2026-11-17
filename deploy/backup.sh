@@ -1,6 +1,6 @@
 #!/bin/bash
 # =====================================================================
-#  Copie de siguranță în Google Drive, folderul „back-up”:
+#  Copie de siguranță în cloud (Google Drive, OneDrive, Dropbox, pCloud, WebDAV, NAS/SMB — legat din aplicație), folderul „back-up”:
 #     back-up/back-up/  datele: config, istoricul (baza de date), legăturile Daly, Tailscale
 #                       (amper-date-AAAA-LL-ZZ.tar.gz, se păstrează ultimele 14)
 #     back-up/clona/    imaginea întregului card (amper-clona-AAAA-LL-ZZ.img.gz), O DATĂ PE SĂPTĂMÂNĂ
@@ -12,7 +12,7 @@
 #     sudo bash /opt/amper/deploy/backup.sh            # ca noaptea: datele + clona dacă e luni (sau dacă lipsește)
 #     sudo bash /opt/amper/deploy/backup.sh date       # doar datele
 #     sudo bash /opt/amper/deploy/backup.sh clona      # doar clona, acum
-#  Legătura cu Drive-ul: /etc/amper/rclone.conf (rclone, acces doar la fișierele create de el).
+#  Legătura: /etc/amper/rclone.conf + AMPER_BACKUP_REMOTE în /etc/amper/backup.env (Setări → Conectare → Copia de siguranță).
 #  Opțională: install.sh pornește amper-backup.timer doar dacă există /etc/amper/rclone.conf.
 #
 #  Jurnalul fiecărei rulări (mesajele și erorile comenzilor rclone/rsync/pigz/sfdisk…) rămâne și în
@@ -21,13 +21,15 @@
 set -uo pipefail
 
 WHAT="${1:-tot}"
+# remote-ul ales din aplicație (Setări → Copia de siguranță); systemd îl dă deja, la rularea de mână îl citim noi
+[ -z "${AMPER_BACKUP_REMOTE:-}" ] && [ -f /etc/amper/backup.env ] && . /etc/amper/backup.env
 # --low-level-retries: o cădere scurtă a internetului (router 4G) reia bucata întreruptă, nu tot fișierul
 RCLONE="rclone --config /etc/amper/rclone.conf --low-level-retries 30"
 REMOTE="${AMPER_BACKUP_REMOTE:-gdrive:back-up}"   # remote rclone + folder (opțional în /etc/amper/backup.env)
 KEEP_DATE=14
 KEEP_CLONA=1                 # doar cea mai nouă; cea veche se șterge definitiv după ce noua e urcată
 CLONA_DAY=1                  # ziua clonei (date +%u: 1 = luni, adică la 00:00 în noaptea de duminică spre luni)
-UPLOAD_TRIES="${AMPER_BACKUP_TRIES:-3}"   # încercări pentru încărcarea în Drive, la UPLOAD_WAIT secunde una de alta
+UPLOAD_TRIES="${AMPER_BACKUP_TRIES:-3}"   # încercări pentru încărcarea în cloud, la UPLOAD_WAIT secunde una de alta
 UPLOAD_WAIT="${AMPER_BACKUP_RETRY_WAIT:-300}"
 WORK=/var/tmp/amper-backup
 LOGDIR="${AMPER_LOG_DIR:-/var/log/amper}"
@@ -106,8 +108,8 @@ backup_date() {
   date '+%F %T' > "$t/data-copiei.txt"
   hostname >> "$t/data-copiei.txt"
   run "date: arhivarea" tar -czf "$out" -C "$t" . || return 1
-  retry "date: încărcarea în Drive" $RCLONE copyto "$out" "$REMOTE/back-up/$(basename "$out")" || return 1
-  log "date: încărcat $(du -h "$out" | cut -f1) → back-up/back-up/$(basename "$out")"
+  retry "date: încărcarea în cloud" $RCLONE copyto "$out" "$REMOTE/back-up/$(basename "$out")" || return 1
+  log "date: încărcat $(du -h "$out" | cut -f1) → ${REMOTE#*:}/back-up/$(basename "$out")"
   rm -rf "$t" "$out"
   prune back-up "$KEEP_DATE"
 }
@@ -126,6 +128,10 @@ backup_clona() (                # subshell: curățenia (trap EXIT) rămâne loc
   used_k="$(df --output=used -k / | tail -1)"
   root_mb=$(( used_k * 13 / 10 / 1024 + 1024 ))                 # folosit + 30% + 1 GB
   local need_k=$(( used_k + 2 * 1024 * 1024 ))
+  # OneDrive, pCloud, WebDAV nu primesc fișiere „din mers”: clona se comprimă întâi pe card (încă ~60% din folosit)
+  local rtype stream=1
+  rtype="$($RCLONE listremotes --long 2>/dev/null | awk -v r="${REMOTE%%:*}:" '$1 == r {print $2}')"
+  case "$rtype" in onedrive|pcloud|webdav) stream=0; need_k=$(( need_k + used_k * 6 / 10 )) ;; esac
   local avail_k; avail_k="$(df --output=avail -k /var/tmp | tail -1)"
   [ "$avail_k" -gt "$need_k" ] || { : > "$ERRF"; fail "clona: verificarea spațiului ($(( avail_k / 1024 )) MB liberi pe card, trebuie $(( need_k / 1024 )) MB)"; exit 1; }
 
@@ -156,18 +162,24 @@ backup_clona() (                # subshell: curățenia (trap EXIT) rămâne loc
   sync
   run "clona: demontarea imaginii" umount -R "$mnt" || exit 1
   losetup -d "$loop"
-  trap 'rm -f "$img"' EXIT
+  trap 'rm -f "$img" "$img.gz"' EXIT
 
   log "clona: imagine $(( $(stat -c %s "$img") / 1024 / 1024 )) MB, comprim și încarc…"
-  upload() { pigz -1 -c "$img" | $RCLONE rcat "$REMOTE/clona/$(basename "$img").gz"; }
-  retry "clona: încărcarea în Drive" upload || exit 1
-  log "clona: încărcat → back-up/clona/$(basename "$img").gz"
+  if [ "$stream" -eq 1 ]; then
+    upload() { pigz -1 -c "$img" | $RCLONE rcat "$REMOTE/clona/$(basename "$img").gz"; }
+  else
+    run "clona: comprimarea" sh -c 'pigz -1 -c "$1" > "$1.gz"' _ "$img" || exit 1
+    rm -f "$img"; img_gz="$img.gz"
+    upload() { $RCLONE copyto "$img_gz" "$REMOTE/clona/$(basename "$img_gz")"; }
+  fi
+  retry "clona: încărcarea în cloud" upload || exit 1
+  log "clona: încărcat → ${REMOTE#*:}/clona/$(basename "$img").gz"
   prune clona "$KEEP_CLONA" definitiv
 )
 
 # un rând de început pe rulare, ca rulările să se deosebească în fișier
 log "===== copia de siguranță ($WHAT) ====="
-[ -f /etc/amper/rclone.conf ] || { log "Google Drive nu e configurat"; notify "Copia NU s-a făcut: Google Drive nu e configurat (/etc/amper/rclone.conf)."; exit 1; }
+[ -f /etc/amper/rclone.conf ] || { log "copia nu e configurată"; notify "Copia NU s-a făcut: nu e legată la niciun serviciu (Setări → Conectare → Copia de siguranță)."; exit 1; }
 REASONS=()
 if [ "$WHAT" = tot ] || [ "$WHAT" = date ]; then
   log "copie date…"; : > "$REASONF"

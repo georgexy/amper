@@ -210,6 +210,9 @@
           <button class="card set-btn" data-panel="info"><span class="ic" style="--ic:var(--cell)">
             <svg viewBox="0 0 24 24" class="ai ai-info"><rect x="4" y="6" width="16" height="12" rx="2"/><path class="a-type" d="M8 10h8"/><path class="a-type a-type2" d="M8 14h5"/></svg></span>
             <span><b>Info</b><span id="set-info-sub">Pi-ul, rețeaua, porturile</span></span><i>›</i></button>
+          <button class="card set-btn" data-panel="export"><span class="ic" style="--ic:var(--sun)">
+            <svg viewBox="0 0 24 24" class="ai ai-update"><g class="a-drop"><path d="M12 4v11M7 10l5 5 5-5"/></g><path d="M5 20h14"/></svg></span>
+            <span><b>Export pentru diagnostic</b><span>Datele și jurnalele pe o perioadă, într-un fișier</span></span><i>›</i></button>
           <button class="card set-btn" id="set-wizard"><span class="ic" style="--ic:var(--charge)">
             <svg viewBox="0 0 24 24" class="ai ai-wizard"><path d="M4 6h16M4 12h10M4 18h7"/><circle class="a-slide" cx="18" cy="16" r="3"/></svg></span>
             <span><b>Ghid de configurare</b><span>Nume, parolă, dispozitive, capacități</span></span><i>›</i></button>
@@ -251,6 +254,24 @@
         <p class="note" id="notif-state"></p>
         <button class="btn" id="test-notif">Trimite o notificare de test</button>
         <p class="note" id="test-res"></p>
+      </section>
+
+      <section class="set-panel" id="set-export" hidden>
+        <div class="pk-top"><button class="back set-back" data-back="about" aria-label="Înapoi la Despre">‹</button><h2>Export pentru diagnostic</h2></div>
+        <p class="note">Un fișier .zip cu citirile bateriilor și ale invertorului, alertele, notificările, setările schimbate și
+          jurnalele Pi-ului pe perioada aleasă. Îl poți trimite celui care te ajută la depanare. Parolele, cheile, adresa
+          Tailscale și numele rețelelor WiFi nu intră în fișier.</p>
+        <div class="iv-tabs" id="ex-range">
+          <button data-h="1">Ultima oră</button><button data-h="24" class="on">Ultima zi</button><button data-h="72">3 zile</button>
+          <button data-h="168">7 zile</button><button data-h="pick">Aleg eu</button>
+        </div>
+        <div class="ex-pick" id="ex-pick" hidden>
+          <label>De la <input type="datetime-local" id="ex-from"></label>
+          <label>Până la <input type="datetime-local" id="ex-to"></label>
+        </div>
+        <p class="note" id="ex-sum"></p>
+        <button class="btn" id="ex-go">Descarcă</button>
+        <p class="note" id="ex-msg"></p>
       </section>
 
       <section class="set-panel" id="set-info" hidden>
@@ -319,7 +340,15 @@
           <button class="card set-btn" data-panel="share"><span class="ic" style="--ic:var(--charge)">
             <svg viewBox="0 0 24 24" class="ai ai-share"><circle class="a-node" cx="6" cy="12" r="2.5"/><circle class="a-node a-node2" cx="18" cy="6" r="2.5"/><circle class="a-node a-node3" cx="18" cy="18" r="2.5"/><path d="M8.2 10.9l7.6-3.8M8.2 13.1l7.6 3.8"/></svg></span>
             <span><b>Partajează Amper</b><span>Adresa pentru cei din casă</span></span><i>›</i></button>
+          <button class="card set-btn" data-panel="backup"><span class="ic" style="--ic:var(--acc)">
+            <svg viewBox="0 0 24 24" class="ai ai-update"><path d="M7 18a4 4 0 0 1-.6-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z"/><g class="a-drop"><path d="M12 10v6M9.5 13.5L12 16l2.5-2.5"/></g></svg></span>
+            <span><b>Copia de siguranță</b><span id="set-backup-sub">În cloud sau pe un NAS, în fiecare noapte</span></span><i>›</i></button>
         </div>
+      </section>
+
+      <section class="set-panel" id="set-backup" hidden>
+        <div class="pk-top"><button class="back set-back" data-back="conn" aria-label="Înapoi la Conectare">‹</button><h2>Copia de siguranță</h2></div>
+        <div id="bk-body"><p class="note">Citesc…</p></div>
       </section>
 
       <section class="set-panel" id="set-share" hidden>

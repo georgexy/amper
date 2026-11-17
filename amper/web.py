@@ -312,6 +312,42 @@ def make_app(engine) -> web.Application:
         rows = await asyncio.to_thread(engine.db.alerts, int(request.query.get("limit", 100)))
         return _json(dict(active=engine.alerts.active_list(), history=rows))
 
+    async def export(request):
+        """Setări → Despre → Export pentru diagnostic: un .zip cu citirile, evenimentele și jurnalele pe perioadă
+        (diag_export.py). În ambele ediții."""
+        from . import diag_export
+        try:
+            end = int(request.query.get("end") or time.time())
+            start = int(request.query["start"])
+        except (KeyError, ValueError):
+            return _json({"error": "date invalide"}, 400)
+        end = min(end, int(time.time()))
+        if end - start < 60:
+            return _json({"error": "Perioada e prea scurtă."}, 400)
+        if end - start > diag_export.MAX_DAYS * 86400 + 3600:
+            return _json({"error": f"Cel mult {diag_export.MAX_DAYS} zile odată."}, 400)
+        import tempfile
+        f = tempfile.TemporaryFile()
+        try:
+            system = await asyncio.to_thread(sysinfo.gather, engine)
+        except Exception:
+            system = None
+        await asyncio.to_thread(diag_export.build, engine, start, end, f, system)
+        size = f.tell()
+        f.seek(0)
+        resp = web.StreamResponse(headers={
+            "Content-Type": "application/zip", "Content-Length": str(size), "Cache-Control": "no-store",
+            "Content-Disposition": f'attachment; filename="{diag_export.filename(start, end)}"'})
+        await resp.prepare(request)
+        try:
+            while chunk := await asyncio.to_thread(f.read, 1 << 16):
+                await resp.write(chunk)
+        finally:
+            f.close()
+        await resp.write_eof()
+        log.info("export pentru diagnostic: %s → %s, %d KB (de la %s)", start, end, size // 1024, client_ip(request))
+        return resp
+
     async def notifications(request):
         """Toate notificările trimise (și cele care nu sunt alerte), cele mai noi întâi; `before` = id-ul
         ultimei primite, pentru pagina următoare."""
@@ -595,6 +631,26 @@ def make_app(engine) -> web.Application:
     async def remote_get(request):
         data, status = await update_api("GET", "/remote")
         return _json(remote_seen(data), status)
+
+    # ---------------- copia de siguranță în Google Drive (prin amper-update, root) ----------------
+    async def backup_get(request):
+        data, status = await update_api("GET", "/backup")
+        return _json(data, status)
+
+    async def backup_post(request):
+        action = request.match_info["action"]
+        body = await request.json() if request.can_read_body else {}
+        # legarea și oprirea copiei cer parola din nou; codul și „copie acum” merg cu sesiunea
+        if action in ("link", "form", "unlink") and (err := await confirm(request, body, "copie de siguranță")) is not None:
+            return err
+        fwd = {"code": {"url": body.get("url")}, "link": {"provider": body.get("provider")},
+               "form": {"provider": body.get("provider"), "fields": body.get("fields") or {}}}.get(action, {})
+        data, status = await update_api("POST", f"/backup/{action}", fwd)
+        if status == 200 and action in ("code", "form", "unlink"):
+            msg = (f"☁️ Copia de siguranță a fost legată din aplicație la {data.get('provider_name') or 'serviciul ales'}."
+                   if action != "unlink" else "☁️ Copia de siguranță a fost oprită din aplicație.")
+            engine.notifier.send(msg, title="Amper: copie de siguranță", url="/?v=alerts")
+        return _json(data, status)
 
     async def remote_login(request):
         body = await request.json() if request.can_read_body else {}
@@ -1276,6 +1332,7 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/api/energy", energy)
     app.router.add_get("/api/alerts", alerts)
     app.router.add_get("/api/notifications", notifications)
+    app.router.add_get("/api/export", export)
     app.router.add_post("/api/test-notification", test_notification)
     app.router.add_get("/api/debug/{device}", debug)
     app.router.add_get("/api/inverter/settings", inverter_get)
@@ -1326,6 +1383,8 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/api/update/status", update_status)
     app.router.add_post("/api/update/check", update_check)
     app.router.add_post("/api/update/download", update_download)
+    app.router.add_get("/api/backup", backup_get)
+    app.router.add_post(r"/api/backup/{action:link|code|form|now|unlink}", backup_post)
     app.router.add_get("/api/remote", remote_get)
     app.router.add_post("/api/remote/login", remote_login)
     app.router.add_post("/api/remote/funnel", remote_funnel)

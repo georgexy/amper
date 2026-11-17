@@ -309,6 +309,29 @@ h2 { font: 600 20px/1.2 "Barlow Condensed", sans-serif; margin: 26px 0 10px; }
 .list .row.nt.low { opacity: .75; }
 .list .row.nt .nt-msg { white-space: pre-line; overflow-wrap: anywhere; }
 .al-more { text-align: center; margin: 12px 0; }
+/* Setări → Copia de siguranță */
+.bk-card { display: grid; gap: 6px; padding: 14px; margin-bottom: 10px; }
+.bk-card span { font-size: 14px; color: var(--muted); }
+.bk-card span.bad { color: var(--alarm); }
+.bk-card.ok b { color: var(--charge); }
+.bk-card code { font-size: 12.5px; }
+.bk-card .btn { justify-self: start; text-decoration: none; color: inherit; }
+.bk-card textarea { font: 13px/1.35 ui-monospace, monospace; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--text); width: 100%; box-sizing: border-box; resize: vertical; }
+#set-backup > .btn, #bk-body > .btn { margin: 0 8px 10px 0; }
+.bk-h { font: 600 18px "Barlow Condensed", sans-serif; margin: 14px 2px 8px; }
+.list button.row.bk-prov { width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid var(--line);
+  color: inherit; font: inherit; cursor: pointer; }
+.list button.row.bk-prov:first-child { border-top: 0; }
+.list .row.bk-prov:active { background: var(--panel-2); }
+.list .row.bk-prov small { color: var(--muted); }
+.bk-f { display: grid; gap: 4px; font-size: 14px; color: var(--muted); }
+.bk-f input { font: inherit; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+/* Setări → Export pentru diagnostic */
+#ex-range { margin: 6px 0 10px; flex-wrap: wrap; }
+.ex-pick { display: grid; gap: 8px; margin-bottom: 8px; }
+.ex-pick label { display: grid; gap: 4px; font-size: 14px; color: var(--muted); }
+.ex-pick input { font: inherit; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
 .empty { padding: 18px 14px; color: var(--muted); }
 .btn { border: 1px solid var(--line); background: var(--panel); padding: 10px 16px; border-radius: 999px; cursor: pointer; font-weight: 500; }
 .btn:active { background: var(--panel-2); }
@@ -830,7 +853,8 @@ body[data-look="casa"] nav.tabs { z-index: 6; }
 .cs-tag b { display: block; font-size: 16px; line-height: 1; color: var(--text); }
 .cs-tag small { display: block; font-size: 10.5px; line-height: 1.15; color: var(--muted); }
 .cs-hint { position: absolute; left: 50%; bottom: calc(108px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 2;
-  font-size: 12px; color: rgba(231,239,243,.85); background: rgba(10,20,28,.6); padding: 6px 12px; border-radius: 14px; white-space: nowrap; }
+  font-size: 12px; color: rgba(231,239,243,.85); background: rgba(10,20,28,.6); padding: 6px 12px; border-radius: 14px;
+  width: max-content; max-width: calc(100% - 32px); text-align: center; line-height: 1.3; }
 .cs-sheet { position: absolute; left: 10px; right: 10px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 4; max-width: 520px; margin: 0 auto;
   background: rgba(23,38,50,.95); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border: 1px solid #2a4558;
   border-radius: 22px; padding: 14px 16px 12px; box-shadow: 0 -10px 40px rgba(0,0,0,.45);

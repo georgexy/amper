@@ -106,8 +106,9 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
     for (let i = 1; i < 6; i++) { g.beginPath(); g.moveTo(i * 256 / 6, 0); g.lineTo(i * 256 / 6, 416); g.stroke(); }
     for (let j = 1; j < 10; j++) { g.beginPath(); g.moveTo(0, j * 416 / 10); g.lineTo(256, j * 416 / 10); g.stroke(); } }
   const panTex = new THREE.CanvasTexture(pc); panTex.colorSpace = THREE.SRGBColorSpace; panTex.anisotropy = 8;
-  const panelMat = new THREE.MeshPhysicalMaterial({ map: panTex, roughness: 0.32, metalness: 0.15, clearcoat: 0.6,
-    clearcoatRoughness: 0.25, envMapIntensity: 0.55 });
+  // mat: reflexia soarelui pe panouri „ardea” imaginea din unele unghiuri
+  const panelMat = new THREE.MeshPhysicalMaterial({ map: panTex, roughness: 0.6, metalness: 0.05, clearcoat: 0.08,
+    clearcoatRoughness: 0.7, specularIntensity: 0.35, envMapIntensity: 0.6 });
 
   let KIND = null;
   const add = (geo, m, x, y, z, o = {}) => {

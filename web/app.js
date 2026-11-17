@@ -1649,10 +1649,12 @@ $("#pro-go").onclick = async () => {
 
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "lang", "notif", "daly", "devoff", "devadd", "excl", "info", "update", "uphist", "security", "remote", "auto", "about", "conn", "share", "wifi"])
+  for (const k of ["teme", "lang", "notif", "daly", "devoff", "devadd", "excl", "info", "update", "uphist", "security", "remote", "auto", "about", "conn", "share", "wifi", "export", "backup"])
     $("#set-" + k).hidden = k !== name;
   if (name === "about") renderEdition();
   if (name === "lang") renderLang();
+  if (name === "export") exRender();
+  if (name === "backup") loadBackup();
   if (name === "share") loadShare();
   if (name === "wifi") loadWifiNow();
   if (name === "auto") loadUserAlerts();
@@ -1670,6 +1672,158 @@ function showPanel(name) {
   window.scrollTo(0, 0);
 }
 $$(".set-btn[data-panel]").forEach((b) => (b.onclick = () => showPanel(b.dataset.panel)));
+
+/* Setări → Despre → Export pentru diagnostic: un .zip cu datele și jurnalele pe perioada aleasă (/api/export) */
+const ex = { h: "24" };
+const exLocal = (ts) => { const d = new Date(ts * 1000); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+function exRange() {
+  const now = Math.floor(Date.now() / 1000);
+  if (ex.h !== "pick") return [now - Number(ex.h) * 3600, now];
+  const a = Date.parse($("#ex-from").value), b = Date.parse($("#ex-to").value);
+  return [Math.floor(a / 1000), Math.floor(b / 1000)];
+}
+function exRender() {
+  $$("#ex-range button").forEach((b) => b.classList.toggle("on", b.dataset.h === ex.h));
+  $("#ex-pick").hidden = ex.h !== "pick";
+  if (ex.h === "pick" && !$("#ex-from").value) {
+    const now = Math.floor(Date.now() / 1000);
+    $("#ex-from").value = exLocal(now - 86400); $("#ex-to").value = exLocal(now);
+  }
+  const [a, b] = exRange();
+  const ok = a > 0 && b > a;
+  $("#ex-sum").textContent = ok ? `${dayTime(a)} – ${dayTime(b)}` : t("Alege începutul și sfârșitul perioadei.");
+  $("#ex-go").disabled = !ok;
+}
+$$("#ex-range button").forEach((b) => (b.onclick = () => { ex.h = b.dataset.h; exRender(); }));
+$("#ex-from").onchange = $("#ex-to").onchange = exRender;
+$("#ex-go").onclick = async () => {
+  const [a, b] = exRange(), go = $("#ex-go"), msg = $("#ex-msg");
+  if ((b - a) > 14 * 86400 + 3600) { msg.textContent = t("Cel mult 14 zile odată."); return; }
+  go.disabled = true;
+  msg.textContent = t("Pregătesc fișierul… (poate dura până la un minut)");
+  try {
+    const r = await fetch(`/api/export?start=${a}&end=${b}`, { credentials: "same-origin" });
+    if (r.status === 401) { showLogin(); return; }
+    if (!r.ok) { let j = {}; try { j = await r.json(); } catch {} throw new Error(j.error || `eroare ${r.status}`); }
+    const name = (r.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/)?.[1] || "amper-diagnostic.zip";
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob), link = document.createElement("a");
+    link.href = url; link.download = name; document.body.appendChild(link); link.click();
+    setTimeout(() => { URL.revokeObjectURL(url); link.parentNode?.removeChild(link); }, 60000);
+    msg.textContent = tf("Gata: {0} ({1} MB).", name, (blob.size / 1048576).toFixed(1));
+  } catch (e) {
+    msg.textContent = tf("Exportul nu a mers: {0}", e.message);
+  } finally { go.disabled = false; }
+};
+
+/* Setări → Conectare → Copia de siguranță: legarea la un serviciu de cloud / NAS din aplicație (amper-update, backup_link.py) */
+const bk = { data: null, busy: false, msg: "", pick: null };
+const BK_FIELDS = {
+  url: ["Adresa WebDAV", "https://cloud.exemplu.ro/remote.php/dav/files/utilizator", "url"],
+  host: ["Adresa NAS-ului", "192.168.1.10", "text"],
+  share: ["Folderul partajat", "backup", "text"],
+  user: ["Utilizator", "", "text"],
+  pass: ["Parola", "", "password"],
+  domain: ["Domeniu (de obicei gol)", "WORKGROUP", "text"],
+};
+async function loadBackup() {
+  try { bk.data = await api("/api/backup"); } catch (e) { if (e.message !== "auth") bk.data = { error: e.message }; }
+  renderBackup();
+}
+function bkLast(l) {
+  if (!l) return t("Nicio copie făcută până acum de pe acest Pi.");
+  if (l.state === "ok") return tf("Ultima copie: {0}, reușită.", l.end || l.at);
+  if (l.state === "running") return tf("O copie e în curs (începută la {0}).", l.at);
+  return tf("Ultima copie: {0}, EȘUATĂ: {1}", l.end || l.at, l.why || "");
+}
+function renderBackup() {
+  const d = bk.data || {}, box = $("#bk-body"), job = d.job || {};
+  if (d.error) { box.innerHTML = `<p class="note">${esc(d.error)}</p>`; return; }
+  const provs = d.providers || [], pick = provs.find((p) => p.id === bk.pick);
+  let h;
+  if (d.linked) {
+    h = `<div class="card bk-card ok"><b>${esc(tf("Legată la {0}", t(d.provider_name || "cloud")))}</b>
+        <span>${esc(t("Datele în fiecare noapte la 00:00 (ultimele 14), clona întregului card o dată pe săptămână (luni)."))}</span>
+        <span>${esc(tf("Folderul: {0}", (d.remote || "").replace(/^[^:]+:/, "")))}</span>
+        <span class="${d.last?.state === "failed" ? "bad" : ""}">${esc(bkLast(d.last))}</span>
+        ${d.timer ? "" : `<span class="bad">${esc(t("Copia de noapte e oprită."))}</span>`}</div>
+      <button class="btn" id="bk-now">Fă o copie acum</button>
+      <button class="btn danger" id="bk-unlink">Oprește copia de siguranță</button>`;
+  } else if (job.state === "waiting") {
+    h = `<div class="card bk-card"><b>${esc(tf("Pasul 1: permite accesul la {0}", job.name || ""))}</b>
+        <span>Deschide pagina de logare, alege contul și apasă „Continuă” / „Permite”. Amper folosește contul doar pentru copiile lui.</span>
+        <a class="btn" href="${esc(job.url)}" target="_blank" rel="noopener">Deschide pagina de logare</a></div>
+      <div class="card bk-card"><b>Pasul 2: adresa paginii care nu se deschide</b>
+        <span>După „Permite”, telefonul încearcă o pagină care începe cu <code>http://127.0.0.1:53682</code> sau
+          <code>http://localhost:53682</code> și dă eroare. E normal. Copiază adresa ei din bara de sus și lipește-o aici.</span>
+        <textarea id="bk-url" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="http://127.0.0.1:53682/?state=…&code=…"></textarea>
+        <button class="btn" id="bk-code">Gata</button></div>
+      <button class="btn" id="bk-cancel">Renunță</button>`;
+  } else if (pick && pick.kind === "form") {
+    h = `<div class="card bk-card"><b>${esc(t(pick.name))}</b>
+        <span>${esc(pick.id === "smb" ? t("Un NAS sau un calculator din casă cu un folder partajat în rețea. Copiile merg în subfolderul amper-back-up.")
+          : t("Nextcloud sau alt server WebDAV. În Nextcloud: Fișiere → Setări (jos, stânga) → adresa WebDAV. Copiile merg în folderul amper-back-up."))}</span>
+        ${pick.fields.map((f) => `<label class="bk-f">${esc(t(BK_FIELDS[f][0]))}<input id="bk-f-${f}" type="${BK_FIELDS[f][2]}"
+          autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(BK_FIELDS[f][1])}"></label>`).join("")}
+        <button class="btn" id="bk-form">Conectează</button></div>
+      <button class="btn" id="bk-back">‹ Alt serviciu</button>`;
+  } else {
+    h = `<div class="card bk-card"><b>Copia nu e legată</b>
+        <span>Leagă Pi-ul de un serviciu de cloud sau de un NAS din casă: în fiecare noapte trimite acolo datele (istoricul,
+          setările), iar o dată pe săptămână o clonă a întregului card (~1,5–2 GB). Dacă se strică cardul, scrii clona pe unul
+          nou și Pi-ul pornește ca înainte.</span>
+        ${d.last ? `<span>${esc(bkLast(d.last))}</span>` : ""}</div>
+      <h3 class="bk-h">Alege unde</h3>
+      <div class="list bk-list">${provs.map((p) => `<button class="row bk-prov" data-p="${p.id}"><b>${esc(t(p.name))}</b>
+        <small>${esc(p.kind === "oauth" ? tf("Cu contul tău · {0} gratuit", p.space) : t("Cu adresă, utilizator și parolă"))}</small></button>`).join("")}</div>`;
+  }
+  box.innerHTML = h + `<p class="note" id="bk-msg">${esc(bk.msg)}</p>`;
+  $("#set-backup-sub").textContent = d.linked ? tf("Legată la {0}", t(d.provider_name || "cloud")) : t("Nelegată");
+  const act = async (fn) => {
+    if (bk.busy) return;
+    bk.busy = true; bk.msg = t("Un moment…"); $("#bk-msg").textContent = bk.msg;
+    try { await fn(); } catch (e) { bk.msg = e.message; } finally { bk.busy = false; }
+    await loadBackup();
+  };
+  const post = async (path, body = {}, secure = false) => {
+    const { r, j } = secure ? await securePost(path, body) : await (async () => {
+      const r = await fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      return { r, j: await r.json().catch(() => ({})) };
+    })();
+    if (!r.ok) throw new Error(j.error || `eroare ${r.status}`);
+    return j;
+  };
+  $$(".bk-prov").forEach((el) => (el.onclick = () => {
+    const p = provs.find((x) => x.id === el.dataset.p);
+    bk.msg = "";
+    if (p.kind === "form") { bk.pick = p.id; renderBackup(); return; }
+    act(async () => {
+      const j = await post("/api/backup/link", { provider: p.id }, true);
+      bk.msg = "";
+      if (j.url) window.open(j.url, "_blank", "noopener");
+    });
+  }));
+  $("#bk-back") && ($("#bk-back").onclick = () => { bk.pick = null; bk.msg = ""; renderBackup(); });
+  $("#bk-form") && ($("#bk-form").onclick = () => act(async () => {
+    const fields = Object.fromEntries(pick.fields.map((f) => [f, $(`#bk-f-${f}`).value]));
+    await post("/api/backup/form", { provider: pick.id, fields }, true);
+    bk.pick = null;
+    bk.msg = t("Gata: copia de siguranță e legată. Prima copie se face la noapte, sau apasă „Fă o copie acum”.");
+  }));
+  $("#bk-code") && ($("#bk-code").onclick = () => act(async () => {
+    await post("/api/backup/code", { url: $("#bk-url").value });
+    bk.msg = t("Gata: copia de siguranță e legată. Prima copie se face la noapte, sau apasă „Fă o copie acum”.");
+  }));
+  $("#bk-cancel") && ($("#bk-cancel").onclick = () => { bk.data = { ...d, job: {} }; bk.msg = ""; renderBackup(); });
+  $("#bk-now") && ($("#bk-now").onclick = () => act(async () => {
+    await post("/api/backup/now");
+    bk.msg = t("Copia a pornit. Durează câteva minute (clona, dacă e luni sau nu există încă, mai mult). Rezultatul vine ca notificare dacă eșuează.");
+  }));
+  $("#bk-unlink") && ($("#bk-unlink").onclick = () => {
+    if (!confirm(t("Oprești copia de siguranță? Copiile deja făcute rămân unde sunt."))) return;
+    act(async () => { await post("/api/backup/unlink", {}, true); bk.msg = t("Copia de siguranță e oprită."); });
+  });
+}
 
 /* limba: una pe Pi (/api/language); telefonul o ține și local ca pagina să pornească direct în limba bună */
 function renderLang() {

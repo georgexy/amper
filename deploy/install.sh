@@ -51,6 +51,7 @@ apt-get install -y -qq rclone pigz rsync cloud-guest-utils >/dev/null || echo " 
 say "Creez utilizatorul de sistem 'amper' (cu acces la porturile seriale)"
 id amper >/dev/null 2>&1 || useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin amper
 usermod -aG dialout amper
+usermod -aG systemd-journal amper 2>/dev/null || true   # exportul pentru diagnostic citește jurnalul sistemului
 
 # Programul stă în /opt/amper-<versiune>, iar /opt/amper e o legătură către versiunea folosită
 # (așa o schimbă și actualizările din aplicație, cu revenire la cea anterioară).
