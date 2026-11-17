@@ -129,3 +129,95 @@ def test_last_run_from_log(tmp_path):
     last = b.last_run()
     assert last == {"at": "2026-11-17 00:00:01", "what": "tot", "state": "failed", "end": "2026-11-17 00:17:00",
                     "why": "clona: încărcarea în Drive a eșuat: no such host"}
+
+
+def _oauth(tmp_path, provider, login, graph=None):
+    """Legarea cu cont pentru un serviciu oarecare: rclone simulat, pagina de logare a serviciului."""
+    proc, calls = FakeProc(), []
+
+    def run(*a, timeout=60):
+        calls.append(a)
+        return types.SimpleNamespace(returncode=0, stdout="enabled" if "is-enabled" in a else "", stderr="")
+
+    def fetch(url, follow=True):
+        if url == AUTH and not follow:
+            return login
+        proc.deliver(True)
+        return "ok"
+    b = BackupLink(etc_dir=str(tmp_path / "etc"), log_dir=str(tmp_path / "log"), run=run, popen=lambda *a: proc,
+                   fetch=fetch, graph=graph)
+    return b, calls
+
+
+def test_onedrive_asks_for_the_drive(tmp_path):
+    seen = []
+    b, calls = _oauth(tmp_path, "onedrive", "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?x=1",
+                      graph=lambda tok: seen.append(tok) or {"id": "b!abc", "driveType": "personal"})
+    assert b.start("onedrive")["name"] == "OneDrive"
+    st = b.finish("http://localhost:53682/?code=M.C1&state=abc123")
+    text = (tmp_path / "etc" / "rclone.conf").read_text()
+    assert seen == ["ya29.x"] and "[cloud]" in text and "type = onedrive" in text
+    assert "drive_id = b!abc" in text and "drive_type = personal" in text
+    assert st["linked"] and st["provider"] == "onedrive" and st["provider_name"] == "OneDrive"
+    assert (tmp_path / "etc" / "backup.env").read_text() == "AMPER_BACKUP_REMOTE=cloud:back-up\n"
+
+
+def test_pcloud_keeps_the_eu_server(tmp_path):
+    b, _ = _oauth(tmp_path, "pcloud", "https://my.pcloud.com/oauth2/authorize?client_id=x")
+    b.start("pcloud")
+    b.finish("http://127.0.0.1:53682/?code=k&state=abc123&hostname=eapi.pcloud.com&locationid=2")
+    assert "hostname = eapi.pcloud.com" in (tmp_path / "etc" / "rclone.conf").read_text()
+
+
+def test_login_page_of_another_site_is_refused(tmp_path):
+    b, _ = _oauth(tmp_path, "dropbox", "https://evil.example/login")
+    with pytest.raises(LinkError, match="nu e a serviciului"):
+        b.start("dropbox")
+    with pytest.raises(LinkError, match="necunoscut"):
+        b.start("icloud")
+
+
+def _form(tmp_path, mkdir_rc=0):
+    calls = []
+
+    def run(*a, timeout=60):
+        calls.append(a)
+        if a[:2] == ("rclone", "obscure"):
+            return types.SimpleNamespace(returncode=0, stdout="OBSCURED\n", stderr="")
+        rc = mkdir_rc if "mkdir" in a else 0
+        return types.SimpleNamespace(returncode=rc, stdout="", stderr="" if rc == 0 else
+                                     "2026/11/17 10:00:00 ERROR : couldn't connect SMB: dial tcp: i/o timeout")
+    return BackupLink(etc_dir=str(tmp_path / "etc"), log_dir=str(tmp_path / "log"), run=run), calls
+
+
+def test_webdav_nextcloud(tmp_path):
+    b, calls = _form(tmp_path)
+    with pytest.raises(LinkError, match="https://"):
+        b.link_form("webdav", {"url": "cloud.exemplu.ro"})
+    st = b.link_form("webdav", {"url": "https://cloud.exemplu.ro/remote.php/dav/files/ion", "user": "ion",
+                                "pass": "parola-secreta"})
+    text = (tmp_path / "etc" / "rclone.conf").read_text()
+    assert "vendor = nextcloud" in text and "pass = OBSCURED" in text and "parola-secreta" not in text
+    assert st["linked"] and st["provider"] == "webdav" and st["remote"] == "cloud:amper-back-up"
+    assert ("systemctl", "enable", "--now", "amper-backup.timer") in calls
+
+
+def test_smb_that_does_not_answer_restores_the_old_link(tmp_path):
+    b, _ = _form(tmp_path)
+    b.link_form("webdav", {"url": "https://dav.exemplu.ro/", "user": "a", "pass": "b"})
+    before = (tmp_path / "etc" / "rclone.conf").read_text(), (tmp_path / "etc" / "backup.env").read_text()
+    bad, _ = _form(tmp_path, mkdir_rc=1)
+    with pytest.raises(LinkError, match="Legătura nu merge: couldn.t connect SMB: dial tcp"):
+        bad.link_form("smb", {"host": "smb://192.168.1.10/", "share": "/backup/", "user": "u", "pass": "p"})
+    assert ((tmp_path / "etc" / "rclone.conf").read_text(), (tmp_path / "etc" / "backup.env").read_text()) == before
+    with pytest.raises(LinkError, match="NAS"):
+        bad.link_form("smb", {"host": "", "share": "x"})
+
+
+def test_smb_remote_path(tmp_path):
+    b, _ = _form(tmp_path)
+    st = b.link_form("smb", {"host": "smb://192.168.1.10/", "share": "/backup/", "user": "u", "pass": "p",
+                             "domain": ""})
+    text = (tmp_path / "etc" / "rclone.conf").read_text()
+    assert "host = 192.168.1.10" in text and "domain" not in text
+    assert st["remote"] == "cloud:backup/amper-back-up" and st["provider_name"].startswith("NAS")

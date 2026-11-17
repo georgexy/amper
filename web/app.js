@@ -1716,8 +1716,16 @@ $("#ex-go").onclick = async () => {
   } finally { go.disabled = false; }
 };
 
-/* Setări → Conectare → Copia de siguranță: legarea Google Drive din aplicație (amper-update, backup_link.py) */
-const bk = { data: null, busy: false, msg: "" };
+/* Setări → Conectare → Copia de siguranță: legarea la un serviciu de cloud / NAS din aplicație (amper-update, backup_link.py) */
+const bk = { data: null, busy: false, msg: "", pick: null };
+const BK_FIELDS = {
+  url: ["Adresa WebDAV", "https://cloud.exemplu.ro/remote.php/dav/files/utilizator", "url"],
+  host: ["Adresa NAS-ului", "192.168.1.10", "text"],
+  share: ["Folderul partajat", "backup", "text"],
+  user: ["Utilizator", "", "text"],
+  pass: ["Parola", "", "password"],
+  domain: ["Domeniu (de obicei gol)", "WORKGROUP", "text"],
+};
 async function loadBackup() {
   try { bk.data = await api("/api/backup"); } catch (e) { if (e.message !== "auth") bk.data = { error: e.message }; }
   renderBackup();
@@ -1731,35 +1739,46 @@ function bkLast(l) {
 function renderBackup() {
   const d = bk.data || {}, box = $("#bk-body"), job = d.job || {};
   if (d.error) { box.innerHTML = `<p class="note">${esc(d.error)}</p>`; return; }
+  const provs = d.providers || [], pick = provs.find((p) => p.id === bk.pick);
   let h;
   if (d.linked) {
-    h = `<div class="card bk-card ok"><b>Legată la Google Drive</b>
+    h = `<div class="card bk-card ok"><b>${esc(tf("Legată la {0}", t(d.provider_name || "cloud")))}</b>
         <span>${esc(t("Datele în fiecare noapte la 00:00 (ultimele 14), clona întregului card o dată pe săptămână (luni)."))}</span>
-        <span>${esc(tf("Folderul din Drive: {0}", (d.remote || "").replace(/^gdrive:/, "")))}</span>
+        <span>${esc(tf("Folderul: {0}", (d.remote || "").replace(/^[^:]+:/, "")))}</span>
         <span class="${d.last?.state === "failed" ? "bad" : ""}">${esc(bkLast(d.last))}</span>
         ${d.timer ? "" : `<span class="bad">${esc(t("Copia de noapte e oprită."))}</span>`}</div>
       <button class="btn" id="bk-now">Fă o copie acum</button>
-      <button class="btn danger" id="bk-unlink">Oprește copia în Google Drive</button>`;
+      <button class="btn danger" id="bk-unlink">Oprește copia de siguranță</button>`;
   } else if (job.state === "waiting") {
-    h = `<div class="card bk-card"><b>Pasul 1: permite accesul</b>
-        <span>Deschide Google, alege contul și apasă „Continuă” / „Permite”. Amper vede doar fișierele pe care le face el.</span>
-        <a class="btn" href="${esc(job.url)}" target="_blank" rel="noopener">Deschide Google</a></div>
+    h = `<div class="card bk-card"><b>${esc(tf("Pasul 1: permite accesul la {0}", job.name || ""))}</b>
+        <span>Deschide pagina de logare, alege contul și apasă „Continuă” / „Permite”. Amper folosește contul doar pentru copiile lui.</span>
+        <a class="btn" href="${esc(job.url)}" target="_blank" rel="noopener">Deschide pagina de logare</a></div>
       <div class="card bk-card"><b>Pasul 2: adresa paginii care nu se deschide</b>
-        <span>După „Permite”, telefonul încearcă o pagină care începe cu <code>http://127.0.0.1:53682</code> și dă eroare. E normal.
-          Copiază adresa ei din bara de sus și lipește-o aici.</span>
+        <span>După „Permite”, telefonul încearcă o pagină care începe cu <code>http://127.0.0.1:53682</code> sau
+          <code>http://localhost:53682</code> și dă eroare. E normal. Copiază adresa ei din bara de sus și lipește-o aici.</span>
         <textarea id="bk-url" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="http://127.0.0.1:53682/?state=…&code=…"></textarea>
         <button class="btn" id="bk-code">Gata</button></div>
       <button class="btn" id="bk-cancel">Renunță</button>`;
+  } else if (pick && pick.kind === "form") {
+    h = `<div class="card bk-card"><b>${esc(t(pick.name))}</b>
+        <span>${esc(pick.id === "smb" ? t("Un NAS sau un calculator din casă cu un folder partajat în rețea. Copiile merg în subfolderul amper-back-up.")
+          : t("Nextcloud sau alt server WebDAV. În Nextcloud: Fișiere → Setări (jos, stânga) → adresa WebDAV. Copiile merg în folderul amper-back-up."))}</span>
+        ${pick.fields.map((f) => `<label class="bk-f">${esc(t(BK_FIELDS[f][0]))}<input id="bk-f-${f}" type="${BK_FIELDS[f][2]}"
+          autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(BK_FIELDS[f][1])}"></label>`).join("")}
+        <button class="btn" id="bk-form">Conectează</button></div>
+      <button class="btn" id="bk-back">‹ Alt serviciu</button>`;
   } else {
     h = `<div class="card bk-card"><b>Copia nu e legată</b>
-        <span>Leagă Pi-ul de Google Drive-ul tău: în fiecare noapte trimite acolo datele (istoricul, setările), iar o dată pe
-          săptămână o clonă a întregului card. Dacă se strică cardul, scrii clona pe unul nou și Pi-ul pornește ca înainte.</span>
-        <span>Amper are acces doar la fișierele făcute de el în Drive, nu la restul.</span>
+        <span>Leagă Pi-ul de un serviciu de cloud sau de un NAS din casă: în fiecare noapte trimite acolo datele (istoricul,
+          setările), iar o dată pe săptămână o clonă a întregului card (~1,5–2 GB). Dacă se strică cardul, scrii clona pe unul
+          nou și Pi-ul pornește ca înainte.</span>
         ${d.last ? `<span>${esc(bkLast(d.last))}</span>` : ""}</div>
-      <button class="btn" id="bk-link">Conectează Google Drive</button>`;
+      <h3 class="bk-h">Alege unde</h3>
+      <div class="list bk-list">${provs.map((p) => `<button class="row bk-prov" data-p="${p.id}"><b>${esc(t(p.name))}</b>
+        <small>${esc(p.kind === "oauth" ? tf("Cu contul tău · {0} gratuit", p.space) : t("Cu adresă, utilizator și parolă"))}</small></button>`).join("")}</div>`;
   }
   box.innerHTML = h + `<p class="note" id="bk-msg">${esc(bk.msg)}</p>`;
-  $("#set-backup-sub").textContent = d.linked ? t("Legată la Google Drive") : t("Nelegată");
+  $("#set-backup-sub").textContent = d.linked ? tf("Legată la {0}", t(d.provider_name || "cloud")) : t("Nelegată");
   const act = async (fn) => {
     if (bk.busy) return;
     bk.busy = true; bk.msg = t("Un moment…"); $("#bk-msg").textContent = bk.msg;
@@ -1774,14 +1793,26 @@ function renderBackup() {
     if (!r.ok) throw new Error(j.error || `eroare ${r.status}`);
     return j;
   };
-  $("#bk-link") && ($("#bk-link").onclick = () => act(async () => {
-    const j = await post("/api/backup/link", {}, true);
+  $$(".bk-prov").forEach((el) => (el.onclick = () => {
+    const p = provs.find((x) => x.id === el.dataset.p);
     bk.msg = "";
-    if (j.url) window.open(j.url, "_blank", "noopener");
+    if (p.kind === "form") { bk.pick = p.id; renderBackup(); return; }
+    act(async () => {
+      const j = await post("/api/backup/link", { provider: p.id }, true);
+      bk.msg = "";
+      if (j.url) window.open(j.url, "_blank", "noopener");
+    });
+  }));
+  $("#bk-back") && ($("#bk-back").onclick = () => { bk.pick = null; bk.msg = ""; renderBackup(); });
+  $("#bk-form") && ($("#bk-form").onclick = () => act(async () => {
+    const fields = Object.fromEntries(pick.fields.map((f) => [f, $(`#bk-f-${f}`).value]));
+    await post("/api/backup/form", { provider: pick.id, fields }, true);
+    bk.pick = null;
+    bk.msg = t("Gata: copia de siguranță e legată. Prima copie se face la noapte, sau apasă „Fă o copie acum”.");
   }));
   $("#bk-code") && ($("#bk-code").onclick = () => act(async () => {
     await post("/api/backup/code", { url: $("#bk-url").value });
-    bk.msg = t("Gata: copia în Google Drive e legată. Prima copie se face la noapte, sau apasă „Fă o copie acum”.");
+    bk.msg = t("Gata: copia de siguranță e legată. Prima copie se face la noapte, sau apasă „Fă o copie acum”.");
   }));
   $("#bk-cancel") && ($("#bk-cancel").onclick = () => { bk.data = { ...d, job: {} }; bk.msg = ""; renderBackup(); });
   $("#bk-now") && ($("#bk-now").onclick = () => act(async () => {
@@ -1789,8 +1820,8 @@ function renderBackup() {
     bk.msg = t("Copia a pornit. Durează câteva minute (clona, dacă e luni sau nu există încă, mai mult). Rezultatul vine ca notificare dacă eșuează.");
   }));
   $("#bk-unlink") && ($("#bk-unlink").onclick = () => {
-    if (!confirm(t("Oprești copia de siguranță în Google Drive? Copiile deja făcute rămân în Drive."))) return;
-    act(async () => { await post("/api/backup/unlink", {}, true); bk.msg = t("Copia în Google Drive e oprită."); });
+    if (!confirm(t("Oprești copia de siguranță? Copiile deja făcute rămân unde sunt."))) return;
+    act(async () => { await post("/api/backup/unlink", {}, true); bk.msg = t("Copia de siguranță e oprită."); });
   });
 }
 

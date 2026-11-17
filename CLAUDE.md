@@ -346,7 +346,7 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
 - Înainte de `amper scan` / `amper read <id>`, oprește serviciul (portul serial e exclusiv).
 - Actualizare cod (până la actualizările din GitHub): copiezi folderul `amper` pe Pi, apoi
   `sudo bash ~/amper/deploy/install.sh` (păstrează config-ul și baza de date; autoconfig doar pentru porturile REPLACE).
-- Copia în Google Drive (`deploy/backup.sh`) e opțională: timerul pornește doar dacă există `/etc/amper/rclone.conf`;
+- Copia de siguranță (`deploy/backup.sh`) e opțională: timerul pornește doar dacă există `/etc/amper/rclone.conf`;
   folderul se schimbă cu `AMPER_BACKUP_REMOTE` în `/etc/amper/backup.env` (implicit `gdrive:back-up`).
 - Teste: `python -m pytest`; demo: `python -m amper simulate --hours 48`.
 - Preferință utilizator: nu face modificări nesolicitate. Propune-le și aplică doar ce cere.
@@ -654,14 +654,21 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   e-mailuri, numele rețelelor WiFi (profilurile nmcli + SSID-ul curent). MAC-urile BMS rămân (cerut).
   UI: Setări → Despre → `#set-export` (`ex`, `exRender`, descărcare prin fetch → blob → `<a download>`).
   Utilizatorul a respins încărcarea automată în GitHub/Drive: doar descărcare pe telefon.
-- `amper/backup_link.py` (în amper-update, root; `up.backup`, API `/backup`, `/backup/link|code|now|unlink`;
-  web `/api/backup`, POST `/api/backup/{action}`, link/unlink cer `app_password`): `rclone authorize drive <base64url
-  fără „=” {"scope":"drive.file"}> --auth-no-open-browser` → linkul `http://127.0.0.1:53682/auth?state=…`, cerut pe Pi
+- `amper/backup_link.py` (în amper-update, root; `up.backup`, API `/backup`, `/backup/link|form|code|now|unlink`;
+  web `/api/backup`, POST `/api/backup/{action}`, link/form/unlink cer `app_password`). `PROVIDERS` (cerut 2026-11-17,
+  „toate”): OAuth drive (secțiunea `gdrive`, scope drive.file), onedrive (+ `drive_id/drive_type` din Graph /me/drive),
+  dropbox, pcloud (+ `hostname` din adresa lipită, conturile UE); formular webdav (url/user/pass, vendor nextcloud după
+  `/remote.php/dav`, remote `cloud:amper-back-up`) și smb (host/share/user/pass/domain, `cloud:<share>/amper-back-up`);
+  parolele prin `rclone obscure`. Remote-ul ales → `/etc/amper/backup.env` (`AMPER_BACKUP_REMOTE`); dacă `mkdir` pică,
+  conf + env vechi puse la loc. backup.sh: onedrive/pcloud/webdav nu au rcat → clona comprimată întâi pe card
+  (+60% spațiu), apoi `copyto`. iCloud imposibil (fără API). Fluxul OAuth: `rclone authorize <tip> [base64url
+  fără „=” {"scope":"drive.file"}] --auth-no-open-browser` → linkul `http://127.0.0.1:53682/auth?state=…`, cerut pe Pi
   fără redirecționare → adresa Google (307) deschisă pe telefon; după „Permite” telefonul nu poate deschide
   `http://127.0.0.1:53682/?state=&code=` → utilizatorul lipește adresa → Pi-ul o cere local → rclone dă cheia între
   `--->` și `<---End paste` → `/etc/amper/rclone.conf` (600, cel vechi → `.old`) → `rclone mkdir <remote>` (test) →
   `systemctl enable --now amper-backup.timer`. Starea: `last_run` din `/var/log/amper/backup.log`. Verificat cu rclone
-  1.60.1 real până la Google (și un cod greșit → „invalid_grant”); NEVERIFICAT: consimțământul cu un cont real pe iPhone.
+  1.60.1 real până la pagina de logare a celor 4 servicii OAuth (și un cod greșit → „invalid_grant”); NEVERIFICAT:
+  consimțământul cu un cont real pe iPhone, OneDrive Graph, pCloud UE, un server WebDAV/SMB real.
   UI: Setări → Conectare → `#set-backup` (`loadBackup/renderBackup`). Notificare ☁️ la legare/oprire.
 
 ## Jurnalul pe card, copia de siguranță explicată, toate notificările (1.0.0-beta.21, cerut 2026-11-09)

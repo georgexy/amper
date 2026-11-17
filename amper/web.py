@@ -640,13 +640,15 @@ def make_app(engine) -> web.Application:
     async def backup_post(request):
         action = request.match_info["action"]
         body = await request.json() if request.can_read_body else {}
-        # legarea și dezlegarea Drive-ului cer parola din nou; codul și „copie acum” merg cu sesiunea
-        if action in ("link", "unlink") and (err := await confirm(request, body, "copie de siguranță")) is not None:
+        # legarea și oprirea copiei cer parola din nou; codul și „copie acum” merg cu sesiunea
+        if action in ("link", "form", "unlink") and (err := await confirm(request, body, "copie de siguranță")) is not None:
             return err
-        data, status = await update_api("POST", f"/backup/{action}", {"url": body.get("url")} if action == "code" else {})
-        if status == 200 and action in ("code", "unlink"):
-            msg = "☁️ Copia de siguranță în Google Drive a fost legată din aplicație." if action == "code" else \
-                "☁️ Copia de siguranță în Google Drive a fost oprită din aplicație."
+        fwd = {"code": {"url": body.get("url")}, "link": {"provider": body.get("provider")},
+               "form": {"provider": body.get("provider"), "fields": body.get("fields") or {}}}.get(action, {})
+        data, status = await update_api("POST", f"/backup/{action}", fwd)
+        if status == 200 and action in ("code", "form", "unlink"):
+            msg = (f"☁️ Copia de siguranță a fost legată din aplicație la {data.get('provider_name') or 'serviciul ales'}."
+                   if action != "unlink" else "☁️ Copia de siguranță a fost oprită din aplicație.")
             engine.notifier.send(msg, title="Amper: copie de siguranță", url="/?v=alerts")
         return _json(data, status)
 
@@ -1382,7 +1384,7 @@ def make_app(engine) -> web.Application:
     app.router.add_post("/api/update/check", update_check)
     app.router.add_post("/api/update/download", update_download)
     app.router.add_get("/api/backup", backup_get)
-    app.router.add_post(r"/api/backup/{action:link|code|now|unlink}", backup_post)
+    app.router.add_post(r"/api/backup/{action:link|code|form|now|unlink}", backup_post)
     app.router.add_get("/api/remote", remote_get)
     app.router.add_post("/api/remote/login", remote_login)
     app.router.add_post("/api/remote/funnel", remote_funnel)

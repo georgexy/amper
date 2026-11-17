@@ -885,7 +885,10 @@ class Updater:
                         body = {}
                     try:
                         if self.path.startswith("/backup/link"):
-                            return self._json(up.backup.start())
+                            return self._json(up.backup.start(str(body.get("provider") or "drive")))
+                        if self.path.startswith("/backup/form"):
+                            return self._json(up.backup.link_form(str(body.get("provider") or ""),
+                                                                  body.get("fields") or {}))
                         if self.path.startswith("/backup/code"):
                             return self._json(up.backup.finish(str(body.get("url") or "")))
                         if self.path.startswith("/backup/now"):

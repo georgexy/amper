@@ -7,8 +7,9 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
   și descarci un fișier .zip cu citirile bateriilor și ale invertorului, alertele, notificările, setările schimbate,
   jurnalele Pi-ului și un rezumat (inclusiv golurile din date). Îl poți trimite celui care te ajută la depanare.
   Parolele, cheile, adresa Tailscale și numele rețelelor WiFi nu intră în fișier.
-- Setări → Conectare → „Copia de siguranță”: legi Pi-ul de Google Drive direct din aplicație (Amper are acces doar la
-  fișierele lui), vezi când a fost ultima copie și dacă a reușit, faci o copie pe loc sau oprești copia.
+- Setări → Conectare → „Copia de siguranță”: legi Pi-ul direct din aplicație la Google Drive, OneDrive, Dropbox,
+  pCloud, Nextcloud (WebDAV) sau un NAS din casă (folder partajat SMB); vezi când a fost ultima copie și dacă a
+  reușit, faci o copie pe loc sau oprești copia.
 - Tema „Casă 3D”: indicația de jos nu mai iese din ecran pe telefon (se rupe pe două rânduri); reflexia soarelui pe
   panouri e mai blândă.
 
