@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.23 — în pregătire
+## 1.0.0-beta.23 — 2026-11-17
 - Setări → Despre → „Export pentru diagnostic”: alegi perioada (ultima oră, ultima zi, 3 zile, 7 zile sau aleasă de tine)
   și descarci un fișier .zip cu citirile bateriilor și ale invertorului, alertele, notificările, setările schimbate,
   jurnalele Pi-ului și un rezumat (inclusiv golurile din date). Îl poți trimite celui care te ajută la depanare.
