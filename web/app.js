@@ -1649,10 +1649,11 @@ $("#pro-go").onclick = async () => {
 
 function showPanel(name) {
   $("#set-menu").hidden = !!name;
-  for (const k of ["teme", "lang", "notif", "daly", "devoff", "devadd", "excl", "info", "update", "uphist", "security", "remote", "auto", "about", "conn", "share", "wifi"])
+  for (const k of ["teme", "lang", "notif", "daly", "devoff", "devadd", "excl", "info", "update", "uphist", "security", "remote", "auto", "about", "conn", "share", "wifi", "export"])
     $("#set-" + k).hidden = k !== name;
   if (name === "about") renderEdition();
   if (name === "lang") renderLang();
+  if (name === "export") exRender();
   if (name === "share") loadShare();
   if (name === "wifi") loadWifiNow();
   if (name === "auto") loadUserAlerts();
@@ -1670,6 +1671,49 @@ function showPanel(name) {
   window.scrollTo(0, 0);
 }
 $$(".set-btn[data-panel]").forEach((b) => (b.onclick = () => showPanel(b.dataset.panel)));
+
+/* Setări → Despre → Export pentru diagnostic: un .zip cu datele și jurnalele pe perioada aleasă (/api/export) */
+const ex = { h: "24" };
+const exLocal = (ts) => { const d = new Date(ts * 1000); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+function exRange() {
+  const now = Math.floor(Date.now() / 1000);
+  if (ex.h !== "pick") return [now - Number(ex.h) * 3600, now];
+  const a = Date.parse($("#ex-from").value), b = Date.parse($("#ex-to").value);
+  return [Math.floor(a / 1000), Math.floor(b / 1000)];
+}
+function exRender() {
+  $$("#ex-range button").forEach((b) => b.classList.toggle("on", b.dataset.h === ex.h));
+  $("#ex-pick").hidden = ex.h !== "pick";
+  if (ex.h === "pick" && !$("#ex-from").value) {
+    const now = Math.floor(Date.now() / 1000);
+    $("#ex-from").value = exLocal(now - 86400); $("#ex-to").value = exLocal(now);
+  }
+  const [a, b] = exRange();
+  const ok = a > 0 && b > a;
+  $("#ex-sum").textContent = ok ? `${dayTime(a)} – ${dayTime(b)}` : t("Alege începutul și sfârșitul perioadei.");
+  $("#ex-go").disabled = !ok;
+}
+$$("#ex-range button").forEach((b) => (b.onclick = () => { ex.h = b.dataset.h; exRender(); }));
+$("#ex-from").onchange = $("#ex-to").onchange = exRender;
+$("#ex-go").onclick = async () => {
+  const [a, b] = exRange(), go = $("#ex-go"), msg = $("#ex-msg");
+  if ((b - a) > 14 * 86400 + 3600) { msg.textContent = t("Cel mult 14 zile odată."); return; }
+  go.disabled = true;
+  msg.textContent = t("Pregătesc fișierul… (poate dura până la un minut)");
+  try {
+    const r = await fetch(`/api/export?start=${a}&end=${b}`, { credentials: "same-origin" });
+    if (r.status === 401) { showLogin(); return; }
+    if (!r.ok) { let j = {}; try { j = await r.json(); } catch {} throw new Error(j.error || `eroare ${r.status}`); }
+    const name = (r.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/)?.[1] || "amper-diagnostic.zip";
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob), link = document.createElement("a");
+    link.href = url; link.download = name; document.body.appendChild(link); link.click();
+    setTimeout(() => { URL.revokeObjectURL(url); link.parentNode?.removeChild(link); }, 60000);
+    msg.textContent = tf("Gata: {0} ({1} MB).", name, (blob.size / 1048576).toFixed(1));
+  } catch (e) {
+    msg.textContent = tf("Exportul nu a mers: {0}", e.message);
+  } finally { go.disabled = false; }
+};
 
 /* limba: una pe Pi (/api/language); telefonul o ține și local ca pagina să pornească direct în limba bună */
 function renderLang() {

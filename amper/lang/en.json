@@ -797,5 +797,8 @@
  "montarea partiției de pornire": "mounting the boot partition",
  "copierea sistemului (rsync)": "copying the system (rsync)",
  "copierea partiției de pornire (rsync)": "copying the boot partition (rsync)",
- "demontarea imaginii": "unmounting the image"
+ "demontarea imaginii": "unmounting the image",
+ "// exportul pentru diagnostic (diag_export.py)": "",
+ "Perioada e prea scurtă.": "The period is too short.",
+ "Cel mult # zile odată.": "At most # days at a time."
 }

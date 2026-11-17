@@ -309,6 +309,11 @@ h2 { font: 600 20px/1.2 "Barlow Condensed", sans-serif; margin: 26px 0 10px; }
 .list .row.nt.low { opacity: .75; }
 .list .row.nt .nt-msg { white-space: pre-line; overflow-wrap: anywhere; }
 .al-more { text-align: center; margin: 12px 0; }
+/* Setări → Export pentru diagnostic */
+#ex-range { margin: 6px 0 10px; flex-wrap: wrap; }
+.ex-pick { display: grid; gap: 8px; margin-bottom: 8px; }
+.ex-pick label { display: grid; gap: 4px; font-size: 14px; color: var(--muted); }
+.ex-pick input { font: inherit; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
 .empty { padding: 18px 14px; color: var(--muted); }
 .btn { border: 1px solid var(--line); background: var(--panel); padding: 10px 16px; border-radius: 999px; cursor: pointer; font-weight: 500; }
 .btn:active { background: var(--panel-2); }

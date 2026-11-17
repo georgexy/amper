@@ -3,7 +3,15 @@
 "use strict";
 const EN = {
   // ---------- Alerte → Toate notificările
-  "Reîncearcă": "Retry", "Vederea inițială": "Initial view",
+  "Reîncearcă": "Retry",
+  "Export pentru diagnostic": "Diagnostic export", "Datele și jurnalele pe o perioadă, într-un fișier": "Data and logs for a period, in one file",
+  "Un fișier .zip cu citirile bateriilor și ale invertorului, alertele, notificările, setările schimbate și jurnalele Pi-ului pe perioada aleasă. Îl poți trimite celui care te ajută la depanare. Parolele, cheile, adresa Tailscale și numele rețelelor WiFi nu intră în fișier.":
+    "A .zip file with the battery and inverter readings, alerts, notifications, changed settings and the Pi's logs for the chosen period. You can send it to whoever helps you troubleshoot. Passwords, keys, the Tailscale address and WiFi network names are left out.",
+  "Ultima oră": "Last hour", "Ultima zi": "Last day",
+  "Alege începutul și sfârșitul perioadei.": "Choose the start and end of the period.", "Cel mult 14 zile odată.": "At most 14 days at a time.",
+  "Pregătesc fișierul… (poate dura până la un minut)": "Preparing the file… (may take up to a minute)",
+  "Gata: {0} ({1} MB).": "Done: {0} ({1} MB).", "Exportul nu a mers: {0}": "The export failed: {0}",
+  "Vederea inițială": "Initial view",
   "Atinge panourile, bateria sau casa pentru detalii. Rotește casa cu un deget, apropie cu două.": "Tap the panels, the battery or the house for details. Rotate the house with one finger, zoom with two.",
   "Toate notificările": "All notifications", "Mai vechi": "Older", "Nicio notificare până acum.": "No notifications yet.",
   "importantă": "important", "normală": "normal", "informativă": "informational",
