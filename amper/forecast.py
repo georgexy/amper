@@ -99,19 +99,22 @@ def weather(db, s: dict, fetch=_fetch, now: float | None = None, allow_fetch: bo
     except ValueError:
         c = {}
     same = c.get("lat") == s["lat"] and c.get("lon") == s["lon"]
-    if same and now - c.get("at", 0) < REFRESH_S:
+    if same and "code" in c and now - c.get("at", 0) < REFRESH_S:     # "code": prognoza cu ploaie/ninsoare (beta.25)
         return c
     if not allow_fetch:
         if same and now - c.get("at", 0) < STALE_S:
             return c
         raise RuntimeError("fără prognoză descărcată")
-    q = dict(latitude=s["lat"], longitude=s["lon"], hourly="shortwave_radiation,cloud_cover",
+    q = dict(latitude=s["lat"], longitude=s["lon"], hourly="shortwave_radiation,cloud_cover,weather_code,precipitation,snowfall,snow_depth",
              past_days=PAST_DAYS, forecast_days=3, timezone="GMT", timeformat="unixtime")
     try:
         d = fetch(f"{API}?{urllib.parse.urlencode(q)}")
         h = d["hourly"]
+        none = [None] * len(h["time"])
         c = dict(lat=s["lat"], lon=s["lon"], at=now, time=h["time"], rad=h["shortwave_radiation"],
-                 cloud=h.get("cloud_cover") or [None] * len(h["time"]))
+                 cloud=h.get("cloud_cover") or none, code=h.get("weather_code") or none,
+                 precip=h.get("precipitation") or none, snowfall=h.get("snowfall") or none,
+                 snow_depth=h.get("snow_depth") or none)
         db.set_meta(CACHE, json.dumps(c))
         return c
     except Exception as e:
@@ -360,8 +363,26 @@ def pv_days(db, day_from: str, day_to: str, now: float | None = None) -> dict | 
                 approx=cal["approx"])
 
 
+# codurile WMO ale Open-Meteo → ce se vede în casa 3D
+FOG_CODES = {45, 48}
+SNOW_CODES = {71, 73, 75, 77, 85, 86}
+RAIN_CODES = {51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82}
+STORM_CODES = {95, 96, 99}
+
+
+def _ramp(v: float, pts: list[tuple]) -> float:
+    """Interpolare liniară pe puncte (x, y), plafonată la capete."""
+    if v <= pts[0][0]:
+        return pts[0][1]
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        if v <= x1:
+            return y0 + (y1 - y0) * (v - x0) / (x1 - x0)
+    return pts[-1][1]
+
+
 def sky_now(db, now: float | None = None) -> dict:
-    """Norii de acum (%) și radiația, pentru casa 3D. Fără localitate sau prognoză: {}."""
+    """Vremea de acum pentru casa 3D: nori (%), radiație, `kind` (clear | rain | snow | fog | storm), `intensity`
+    0–1 (după mm/h sau cm/h), zăpada depusă (cm). Fără localitate sau prognoză: {}."""
     now = now or time.time()
     s = settings(db)
     if s["lat"] is None:
@@ -370,5 +391,21 @@ def sky_now(db, now: float | None = None) -> dict:
         w = weather(db, s, now=now, allow_fetch=False)
     except RuntimeError:
         return {}
-    r, c = _by_hour(w).get(int(now // 3600 * 3600), (None, None))
-    return dict(cloud=c, rad=r)
+    end = int(now // 3600 * 3600) + 3600                 # valorile orei în curs (Open-Meteo: ora care se termină)
+    try:
+        i = w["time"].index(end)
+    except ValueError:
+        return {}
+    get = lambda k: (w.get(k) or [None] * len(w["time"]))[i]
+    code, precip, snowfall, depth = get("code"), get("precip") or 0, get("snowfall") or 0, get("snow_depth") or 0
+    kind, inten = "clear", 0.0
+    if code in STORM_CODES:
+        kind, inten = "storm", max(0.6, _ramp(precip, [(0, 0.6), (5, 0.9), (10, 1)]))
+    elif code in SNOW_CODES or (snowfall > 0.05 and code not in RAIN_CODES):
+        kind, inten = "snow", _ramp(snowfall, [(0, 0.2), (0.3, 0.35), (1, 0.65), (2.5, 1)])
+    elif code in RAIN_CODES or precip >= 0.1:
+        kind, inten = "rain", _ramp(precip, [(0, 0.15), (0.5, 0.3), (2, 0.55), (5, 0.85), (10, 1)])
+    elif code in FOG_CODES:
+        kind, inten = "fog", 1.0
+    return dict(cloud=get("cloud"), rad=get("rad"), code=code, kind=kind, intensity=round(inten, 2),
+                precip=precip, snow_cm=round(depth * 100, 1))

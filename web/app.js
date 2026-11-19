@@ -756,9 +756,13 @@ casa.update = (root, h) => {
   // norii de acum, din prognoza meteo salvată pe Pi (cerut 2026-11-19); cerut din nou la 10 minute
   if (!casa.skyAt || Date.now() - casa.skyAt > 600000) {
     casa.skyAt = Date.now();
-    api("/api/sky").then((r) => { casa.cloud = r.cloud ?? null; casa.api?.set({ cloud: casa.cloud }); }).catch(() => {});
+    api("/api/sky").then((r) => {
+      casa.cloud = r.cloud ?? null;
+      casa.wx = { kind: r.kind || "clear", intensity: r.intensity || 0, snow_cm: r.snow_cm || 0 };   // ploaie, ninsoare, ceață, furtună
+      casa.api?.set({ cloud: casa.cloud, weather: casa.wx });
+    }).catch(() => {});
   }
-  casa.api?.set({ night: pv < 30 && (hr >= 18 || hr < 7), soc: h.b.soc, cloud: casa.cloud ?? null,
+  casa.api?.set({ night: pv < 30 && (hr >= 18 || hr < 7), soc: h.b.soc, cloud: casa.cloud ?? null, weather: casa.wx,
     flows: { pv: pv > 20 ? 1 : 0, bat: bp > 20 ? 1 : bp < -20 ? -1 : 0, load: ld > 20 ? 1 : 0, grid: ac > 20 ? 1 : 0 } });
   if (casa.sel) casaSheet();
   casaMount(root);

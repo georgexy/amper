@@ -11,6 +11,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 const COL = { pv: 0xffb627, bat: 0x3ddc84, load: 0xa98bff, grid: 0x45b4ff };
 
@@ -300,49 +301,67 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
   const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xcfe3f2, size: 0.35, fog: false }));
   scene.add(stars); nightObjs.push(stars);
 
-  // ---- norii (cerut 2026-11-19: „când e înnorat afară, să fie înnorat și acolo”): grămezi de sfere turtite, în
-  // spatele și în stânga insulei (nu între cameră și casă), câți după acoperirea cerului din prognoză; se mișcă încet
+  // ---- norii (cerute 2026-11-19: „când e înnorat afară, să fie înnorat și acolo”, apoi „norii pe tot cerul”):
+  // câte un nor = sfere turtite unite într-o singură formă (o desenare); trei grupuri, câți apar din fiecare după
+  // acoperirea cerului din prognoză:
+  //  - `field`: stratul de sus, peste toată zona (până la 170 m), la 30–46 m: se vede când ridici privirea spre cer;
+  //  - `ring`: spre orizont (120–190 m), mai jos: cerul plin de nori când privești în depărtare;
+  //  - `spots`: cei din vederea de la început (deasupra pădurii), puși pe raza camerei prin locuri goale de pe ecran.
+  // Un nor ajuns pe ecran în dreptul casei sau prea aproape de cameră se estompează, ca să nu o acopere.
   const cloudMat = M({ color: 0xffffff, roughness: 1, flatShading: true, transparent: true, opacity: 0.94 });
   const puff = new THREE.IcosahedronGeometry(1, 2);
-  const clouds = [];
   const rnd = (() => { let x = 7; return () => ((x = (x * 16807) % 2147483647) / 2147483647); })();   // aceeași formă mereu
-  // unde stau norii: puncte de pe ecranul de la început (coordonate -1…1, y în sus) care nu sunt peste casă; norul e
-  // pus pe raza din cameră prin acel punct, la înălțimea `Y` (m) — sus, deasupra pădurii și a străzii, deci deasupra
-  // pământului și nu în fața casei. Mărimea crește cu distanța, ca toți să pară cam la fel de mari.
-  // Ordinea = ordinea în care apar când cerul se acoperă (alternativ sus / jos / laturi)
-  // Doar în partea de sus (deasupra pădurii): mai jos ar sta între cameră și casă. Peste curte și stradă se văd
-  // doar umbrele lor pe pământ (mai jos, `shadows`).
+  const cloudGeo = () => {
+    const n = 5 + Math.floor(rnd() * 4), len = 4 + rnd() * 3.5, parts = [];
+    for (let j = 0; j < n; j++) {
+      const r = 1.25 + rnd() * 1.2, g = puff.clone();
+      g.scale(r * 1.25, r * 0.72, r);
+      g.translate((j / (n - 1) - 0.5) * len, rnd() * 1.1 + (1 - Math.abs(j / (n - 1) - 0.5) * 2) * 1.0, (rnd() - 0.5) * 2.6);
+      parts.push(g);
+    }
+    return mergeGeometries(parts);
+  };
+  const SHAPES = Array.from({ length: 8 }, cloudGeo);
+  const clouds = { spots: [], field: [], ring: [] };
+  const newCloud = (group, pos, scale, data = {}) => {
+    const m = new THREE.Mesh(SHAPES[Math.floor(rnd() * SHAPES.length)], cloudMat.clone());
+    m.position.copy(pos); m.scale.setScalar(scale); m.rotation.y = rnd() * Math.PI * 2;
+    m.castShadow = false; m.receiveShadow = false; m.visible = false;
+    m.userData = { speed: 0.4 + rnd() * 0.5, ...data };
+    scene.add(m); clouds[group].push(m);
+    return m;
+  };
+  for (let i = 0; i < 46; i++) {
+    const r = 20 + Math.sqrt(rnd()) * 150, th = rnd() * Math.PI * 2;
+    newCloud("field", new THREE.Vector3(Math.cos(th) * r, 30 + rnd() * 16, Math.sin(th) * r), 1.6 + rnd() * 1.4);
+  }
+  for (let i = 0; i < 18; i++) {
+    const r = 120 + rnd() * 70, th = (i / 18) * Math.PI * 2 + rnd() * 0.25;
+    newCloud("ring", new THREE.Vector3(Math.cos(th) * r, 14 + rnd() * 12, Math.sin(th) * r), 2.6 + rnd() * 1.6);
+  }
+  // locuri goale de pe ecranul de la început (coordonate -1…1, y în sus), deasupra pădurii; norul stă pe raza din
+  // cameră prin acel punct, la înălțimea `Y` (m)
   const SPOTS = [[-0.62, 0.72, 16], [0.45, 0.7, 16], [0.92, 0.45, 15], [-0.92, 0.5, 15], [-0.05, 0.8, 17], [0.85, 0.78, 16],
                  [0.15, 0.63, 18], [-0.3, 0.68, 18], [0.62, 0.6, 17], [-0.75, 0.62, 16]];
   camera.updateMatrixWorld();
   const camRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
   for (const [nx, ny, Y] of SPOTS) {
-    const g = new THREE.Group();
-    const cm = cloudMat.clone();                                     // fiecare nor se poate estompa separat
-    const n = 5 + Math.floor(rnd() * 4), len = 4 + rnd() * 3.5;
-    for (let j = 0; j < n; j++) {
-      const m = new THREE.Mesh(puff, cm);
-      const r = 1.25 + rnd() * 1.2;
-      m.scale.set(r * 1.25, r * 0.72, r);
-      m.position.set((j / (n - 1) - 0.5) * len, rnd() * 1.1 + (1 - Math.abs(j / (n - 1) - 0.5) * 2) * 1.0, (rnd() - 0.5) * 2.6);
-      g.add(m);
-    }
     const dir = new THREE.Vector3(nx, ny, 0.5).unproject(camera).sub(camera.position).normalize();
     const d = Math.min(140, (Y - camera.position.y) / Math.min(-0.05, dir.y));
-    g.scale.setScalar(Math.max(0.45, Math.min(1.6, d / 55)));
-    g.userData = { base: camera.position.clone().add(dir.multiplyScalar(d)), amp: 1.5 + rnd() * 2, w: 0.05 + rnd() * 0.05,
-                   ph: rnd() * 6.28 };
-    g.lookAt(camera.position.x, g.userData.base.y, camera.position.z);   // partea lată spre cameră
-    g.visible = false;
-    g.userData.mat = cm;
-    scene.add(g); clouds.push(g);
+    const base = camera.position.clone().add(dir.multiplyScalar(d));
+    const m = newCloud("spots", base, Math.max(0.45, Math.min(1.6, d / 55)),
+                       { base, amp: 1.5 + rnd() * 2, w: 0.05 + rnd() * 0.05, ph: rnd() * 6.28 });
+    m.lookAt(camera.position.x, base.y, camera.position.z);
   }
-  // plutesc încet stânga–dreapta (fără salturi)
-  const placeCloud = (g, t = 0) => {
-    const u = g.userData;
-    g.position.copy(u.base).addScaledVector(camRight, u.amp * Math.sin(t * u.w + u.ph));
+  const allClouds = [...clouds.spots, ...clouds.field, ...clouds.ring];
+  // vântul: norii de sus și de la orizont trec încet spre dreapta (și o iau de la capăt), cei din vederea de la
+  // început doar se legănă (fără salturi)
+  const moveCloud = (m, t, dt) => {
+    const u = m.userData;
+    if (u.base) { m.position.copy(u.base).addScaledVector(camRight, u.amp * Math.sin(t * u.w + u.ph)); return; }
+    m.position.x += u.speed * dt;
+    if (m.position.x > 190) m.position.x -= 380;
   };
-  clouds.forEach((g) => placeCloud(g));
   // umbrele norilor pe pământ: pete întunecate care trec încet peste curte și stradă (doar ziua, cu cer parțial
   // noros; pe cer acoperit soarele nu mai face umbre)
   const shadows = [];
@@ -357,6 +376,77 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
     scene.add(sh); shadows.push(sh);
   }
   let shadowAlpha = 0;
+
+  // ---- ploaia și ninsoarea (cerute 2026-11-19): particule într-un volum de 180 × 60 × 180 m care urmează locul la
+  // care te uiți; mișcarea e calculată pe placa video (shader), deci o singură desenare. Câte se văd = intensitatea.
+  const PW = 180, PH = 60;
+  const precipGeo = (n, line) => {
+    const pos = new Float32Array(n * (line ? 6 : 3)), end = new Float32Array(n * (line ? 2 : 1)), seed = new Float32Array(n * (line ? 2 : 1));
+    for (let i = 0; i < n; i++) {
+      const x = rnd() * PW, y = rnd() * PH, z = rnd() * PW, sd = rnd();
+      for (let k = 0; k < (line ? 2 : 1); k++) {
+        const j = i * (line ? 2 : 1) + k;
+        pos.set([x, y, z], j * 3); end[j] = k; seed[j] = sd;
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    g.setAttribute("aEnd", new THREE.BufferAttribute(end, 1));
+    g.setAttribute("aSeed", new THREE.BufferAttribute(seed, 1));
+    return g;
+  };
+  const precipUniforms = () => ({ uTime: { value: 0 }, uCenter: { value: new THREE.Vector3() }, uOpacity: { value: 0.5 },
+                                  uColor: { value: new THREE.Color(0xc8d6e4) }, uFade: { value: 100 } });
+  // poziția: împachetată în cutia din jurul centrului (picăturile rămân pe loc în lume, cutia le urmează privirea)
+  const WRAP = `vec3 wrapPos(vec3 p, float fall) {
+      float x = mod(p.x - uCenter.x + ${PW / 2}.0, ${PW}.0) + uCenter.x - ${PW / 2}.0;
+      float z = mod(p.z - uCenter.z + ${PW / 2}.0, ${PW}.0) + uCenter.z - ${PW / 2}.0;
+      float y = mod(p.y - fall, ${PH}.0);
+      return vec3(x, y, z); }`;
+  const rainMat = new THREE.ShaderMaterial({
+    uniforms: precipUniforms(), transparent: true, depthWrite: false,
+    vertexShader: `uniform float uTime; uniform vec3 uCenter; attribute float aEnd; attribute float aSeed; varying float vD;
+      ${WRAP}
+      void main() {
+        vec3 w = wrapPos(position, uTime * (17.0 + aSeed * 6.0));
+        w.y -= aEnd * (0.9 + aSeed * 0.5); w.x += aEnd * 0.18;            // dâră scurtă, ușor înclinată de vânt
+        w.y = max(w.y, 0.0);
+        vec4 mv = viewMatrix * vec4(w, 1.0); vD = -mv.z;
+        gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform vec3 uColor; uniform float uOpacity; uniform float uFade; varying float vD;
+      void main() { gl_FragColor = vec4(uColor, uOpacity * (1.0 - smoothstep(uFade * 0.5, uFade, vD))); }`,
+  });
+  const snowMat = new THREE.ShaderMaterial({
+    uniforms: { ...precipUniforms(), uSize: { value: 0.16 * renderer.getPixelRatio() * H } }, transparent: true, depthWrite: false,
+    vertexShader: `uniform float uTime; uniform vec3 uCenter; uniform float uSize; attribute float aSeed; varying float vD;
+      ${WRAP}
+      void main() {
+        vec3 w = wrapPos(position, uTime * (1.1 + aSeed * 0.7));
+        w.x += sin(uTime * 0.7 + aSeed * 40.0) * 0.6; w.z += cos(uTime * 0.5 + aSeed * 30.0) * 0.5;   // fulgii plutesc
+        vec4 mv = viewMatrix * vec4(w, 1.0); vD = -mv.z;
+        gl_PointSize = clamp(uSize * (0.6 + aSeed * 0.8) / vD, 1.0, 14.0);
+        gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform vec3 uColor; uniform float uOpacity; uniform float uFade; varying float vD;
+      void main() { float r = length(gl_PointCoord - 0.5); if (r > 0.5) discard;
+        gl_FragColor = vec4(uColor, uOpacity * smoothstep(0.5, 0.2, r) * (1.0 - smoothstep(uFade * 0.5, uFade, vD))); }`,
+  });
+  const RAIN_MAX = 14000, SNOW_MAX = 9000;
+  const rain = new THREE.LineSegments(precipGeo(RAIN_MAX, true), rainMat);
+  const snow = new THREE.Points(precipGeo(SNOW_MAX, false), snowMat);
+  for (const o of [rain, snow]) { o.frustumCulled = false; o.visible = false; o.renderOrder = 3; scene.add(o); }
+  // fulgerele (la furtună): un trăsnet în zare și lumina care sare pe toată scena câteva zecimi de secundă
+  const boltMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xdfeaff).multiplyScalar(3), fog: false });
+  const bolt = new THREE.Mesh(new THREE.BufferGeometry(), boltMat); bolt.visible = false; scene.add(bolt);
+  let storm = 0, flashAt = 0, flashT = -1;
+  const strike = (t) => {
+    const th = Math.random() * Math.PI * 2, r = 70 + Math.random() * 60, pts = [];
+    let x = Math.cos(th) * r, z = Math.sin(th) * r;
+    for (let y = 48; y > 0; y -= 4 + Math.random() * 4) { pts.push(new THREE.Vector3(x, y, z)); x += (Math.random() - 0.5) * 6; z += (Math.random() - 0.5) * 6; }
+    pts.push(new THREE.Vector3(x, 0, z));
+    bolt.geometry.dispose();
+    bolt.geometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0), 40, 0.35, 5);
+    flashT = t;
+  };
 
   // ---- fluxurile: cablurile merg pe pereți și pe acoperiș, ca niște trasee de cablu reale (segmente drepte,
   // colțuri rotunjite, la ~10 cm de suprafețe), nu prin ziduri; pe ele, particulele luminoase.
@@ -413,48 +503,77 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
 
-  // ---- zi / noapte și cerul (senin … acoperit): `cloud` 0–1 din prognoza meteo
+  // ---- zi / noapte și vremea: `cloud` 0–1 (acoperirea cerului) și `wx` = {kind: clear|rain|snow|fog|storm,
+  // intensity 0–1, snow_cm: zăpada depusă} din prognoza meteo
   const mix = (a, b, f) => new THREE.Color(a).lerp(new THREE.Color(b), f);
   const SKY = {
-    day: [["#2d6f9e", "#7fb4d6", "#cfe2ec"], ["#7b8893", "#a2adb5", "#c9cfd3"]],
-    night: [["#071019", "#0d2030", "#14283a"], ["#0b0f13", "#141b21", "#1b232a"]],
+    day: [["#2d6f9e", "#7fb4d6", "#cfe2ec"], ["#7b8893", "#a2adb5", "#c9cfd3"], ["#3e464d", "#5b646b", "#7e878d"]],
+    night: [["#071019", "#0d2030", "#14283a"], ["#0b0f13", "#141b21", "#1b232a"], ["#050709", "#0a0e11", "#0f1418"]],
   };
-  let night = null, cloud = -1, fogOver = 0;
-  const applySky = (n, c) => {
-    if (night === n && Math.abs(cloud - c) < 0.02) return;
+  // zăpada depusă: cât se albește fiecare material (drumul și trotuarul mai puțin: sunt curățate / se topește)
+  const SNOWY = [[mat.grass, 1], [mat.field, 1], [mat.forest, 1], [mat.roof, 0.95], [mat.tile, 0.9], [mat.garage, 0.3],
+                 [mat.conifer, 0.45], [mat.leaf, 0.35], [mat.leaf2, 0.35], [mat.stone, 0.7], [mat.walk, 0.6], [mat.asphalt, 0.3],
+                 [mat.soil, 0.9], [mat.car, 0.25]];
+  const WET = [[mat.asphalt, 0.62], [mat.walk, 0.78], [mat.stone, 0.8], [mat.field, 0.88], [mat.grass, 0.88], [mat.roof, 0.8]];
+  let night = null, cloud = -1, fogOver = 0, wxKey = "", fogDense = 0, hemiBase = 0.8;
+  let wx = { kind: "clear", intensity: 0, snow_cm: 0 };
+  const applySky = (n, c, w = wx) => {
+    const key = `${n}|${c.toFixed(2)}|${w.kind}|${(+w.intensity || 0).toFixed(2)}|${(+w.snow_cm || 0).toFixed(1)}`;
+    if (key === wxKey) return;
     const dayChanged = night !== n;
-    night = n; cloud = c;
-    const over = Math.min(1, Math.max(0, (c - 0.2) / 0.75));              // sub 20 % = senin, peste 95 % = acoperit
-    const [clear, grey] = SKY[n ? "night" : "day"];
+    wxKey = key; night = n; cloud = c; wx = w;
+    const wet = w.kind === "rain" || w.kind === "storm";
+    const falling = wet || w.kind === "snow";
+    // ploaia / ninsoarea / furtuna = cer acoperit de tot, mai închis cu cât e mai puternică
+    const over = falling ? 1 : Math.min(1, Math.max(0, (c - 0.2) / 0.75));   // sub 20 % = senin, peste 95 % = acoperit
+    const dark = w.kind === "storm" ? 0.75 : wet ? 0.25 + 0.45 * w.intensity : w.kind === "snow" ? 0.1 : 0;
+    const [clear, grey, black] = SKY[n ? "night" : "day"];
     const g = sky.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 256);
-    [0, 0.55, 1].forEach((p, i) => gr.addColorStop(p, "#" + mix(clear[i], grey[i], over).getHexString()));
+    [0, 0.55, 1].forEach((p, i) => gr.addColorStop(p, "#" + mix(clear[i], grey[i], over).lerp(new THREE.Color(black[i]), dark).getHexString()));
     g.fillStyle = gr; g.fillRect(0, 0, 4, 256); skyTex.needsUpdate = true;
-    scene.fog.color.copy(n ? mix(0x0d2030, 0x161d23, over) : mix(0xbcd6e4, 0xb4bcc1, over));
+    fogDense = w.kind === "fog" ? 1 : falling ? 0.35 + 0.4 * w.intensity : 0;
+    scene.fog.color.copy(n ? mix(0x0d2030, 0x161d23, over) : mix(0xbcd6e4, w.kind === "fog" ? 0xc9cdd0 : 0xb4bcc1, over))
+      .lerp(new THREE.Color(n ? 0x0b0e11 : 0x8a9298), dark * 0.6);
     if (dayChanged) {
-      for (const [m, col] of Object.values(n ? NIGHT : DAY)) m.color.set(col);
       mat.glass.emissiveIntensity = n ? 1.15 : 0;
       hemi.color.set(n ? 0x4a6a9a : 0xdfeefe); hemi.groundColor.set(n ? 0x0b1410 : 0x4d6b3a);
       sun.color.set(n ? 0x9fb8ff : 0xfff1d6);
-      renderer.toneMappingExposure = n ? 0.9 : 0.92;
       bloom.strength = n ? 0.5 : 0.7; bloom.threshold = n ? 2.2 : 1.6;
       nightObjs.forEach((o) => (o.visible = n));
       streetLamps.forEach((l) => (l.material = n ? lampOn : lampOff));
     }
+    renderer.toneMappingExposure = (n ? 0.9 : 0.92) * (1 - 0.25 * dark);
+    // culorile: zi/noapte, apoi ude (mai închise, drumul lucios) sau albite de zăpadă
+    for (const [m, col] of Object.values(n ? NIGHT : DAY)) m.color.set(col);
+    const snowAmt = Math.min(1, (+w.snow_cm || 0) / 6);
+    for (const [m, f] of WET) m.color.multiplyScalar(wet && !snowAmt ? 1 - (1 - f) * (0.5 + 0.5 * w.intensity) : 1);
+    mat.asphalt.roughness = wet && !snowAmt ? 0.35 : 0.95; mat.walk.roughness = wet && !snowAmt ? 0.5 : 0.95;
+    for (const [m, f] of SNOWY) m.color.lerp(new THREE.Color(n ? 0x7a8592 : 0xf2f5f8), snowAmt * f);
     // cu cerul acoperit: soarele aproape dispare (umbre slabe), lumina vine difuz de peste tot
-    sun.intensity = n ? 0.35 * (1 - 0.7 * over) : 2.3 * (1 - 0.72 * over);
+    sun.intensity = (n ? 0.35 * (1 - 0.7 * over) : 2.3 * (1 - 0.72 * over)) * (1 - 0.5 * dark);
     sun.shadow.radius = 4 + 10 * over;
-    hemi.intensity = n ? 0.35 : 0.8 + 0.35 * over;
-    scene.environmentIntensity = n ? 0.15 : 0.55 - 0.1 * over;
-    stars.visible = n && c < 0.6;
-    const nShadow = n ? 0 : Math.round(c * shadows.length);
+    hemiBase = hemi.intensity = (n ? 0.35 : 0.8 + 0.35 * over) * (1 - 0.35 * dark);
+    scene.environmentIntensity = (n ? 0.15 : 0.55 - 0.1 * over) * (1 - 0.4 * dark);
+    stars.visible = n && c < 0.6 && !falling;
+    const nShadow = n || falling ? 0 : Math.round(c * shadows.length);
     shadows.forEach((sh, i) => (sh.visible = i < nShadow));
     shadowAlpha = n ? 0 : 0.2 * (1 - Math.min(1, Math.max(0, (over - 0.6) / 0.35)));   // acoperit de tot: fără umbre
-    const shown = c < 0.1 ? 0 : Math.round(2 + c * (clouds.length - 2));
-    clouds.forEach((cl, i) => (cl.visible = i < shown));
-    cloudMat.color.copy(n ? mix(0x4a5660, 0x343d45, over) : mix(0xffffff, 0x9ea6ad, over));
+    const cov = falling ? 1 : c;
+    for (const grp of Object.values(clouds)) {
+      const shown = cov < 0.1 ? 0 : Math.round(Math.max(1, cov * grp.length));
+      grp.forEach((cl, i) => (cl.visible = i < shown));
+    }
+    cloudMat.color.copy(n ? mix(0x4a5660, 0x343d45, over) : mix(0xffffff, 0x9ea6ad, over)).lerp(new THREE.Color(n ? 0x1c2227 : 0x5c646b), dark);
     cloudMat.opacity = 0.9 + 0.08 * over;
-    clouds.forEach((cl) => cl.userData.mat.color.copy(cloudMat.color));
+    allClouds.forEach((cl) => cl.material.color.copy(cloudMat.color));
     fogOver = over;
+    // ploaia / ninsoarea: câte particule se desenează și cât de vizibile sunt
+    rain.visible = wet; snow.visible = w.kind === "snow";
+    rain.geometry.setDrawRange(0, Math.round(RAIN_MAX * (0.15 + 0.85 * w.intensity)) * 2);
+    snow.geometry.setDrawRange(0, Math.round(SNOW_MAX * (0.2 + 0.8 * w.intensity)));
+    rainMat.uniforms.uColor.value.set(n ? 0x6f7f8f : 0xc8d6e4); rainMat.uniforms.uOpacity.value = n ? 0.35 : 0.42;
+    snowMat.uniforms.uColor.value.set(n ? 0xaab4c0 : 0xffffff); snowMat.uniforms.uOpacity.value = n ? 0.7 : 0.95;
+    storm = w.kind === "storm" ? Math.max(0.6, +w.intensity || 0) : 0;
   };
   applySky(false, 0);
 
@@ -513,20 +632,29 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
       });
     }
     ledMat.color.setHex(0x3ddc84).multiplyScalar(2 + 1.5 * Math.sin(t * 4));
-    // ceața începe dincolo de casă, oricât de departe e camera (altfel, depărtată, imaginea se spăla)
+    const dt = Math.min(0.1, t - (frame.last ?? t)); frame.last = t;
+    // ceața începe dincolo de casă, oricât de departe e camera (altfel, depărtată, imaginea se spăla); la ceață
+    // adevărată / ploaie deasă se apropie
     const dist = camera.position.distanceTo(controls.target);
-    scene.fog.near = dist + 10 - 18 * fogOver; scene.fog.far = dist + 80 - 25 * fogOver;
-    // un nor care ajunge pe ecran în dreptul casei (camera rotită) se estompează, ca să nu o acopere
+    scene.fog.near = Math.max(4, dist + 10 - 18 * fogOver - (dist + 2) * 0.85 * fogDense);
+    scene.fog.far = dist + 80 - 25 * fogOver - 52 * fogDense;
+    // norii: un nor care ajunge pe ecran în dreptul casei sau prea aproape de cameră se estompează
     const home = tmpV.copy(controls.target).project(camera);
-    for (const cl of clouds) if (cl.visible) {
-      placeCloud(cl, t);
+    for (const cl of allClouds) if (cl.visible) {
+      moveCloud(cl, t, dt);
       const p = tmpV2.copy(cl.position).project(camera);
       const r = Math.hypot(p.x - home.x, (p.y - home.y) * 0.8);
-      const f = p.z > 1 ? 0 : Math.min(1, Math.max(0, (r - 0.45) / 0.3));
-      cl.userData.mat.opacity = cloudMat.opacity * f;
-      cl.userData.mat.depthWrite = f > 0.99;
+      const near = Math.min(1, Math.max(0, (cl.position.distanceTo(camera.position) - 14) / 16));
+      const f = (p.z > 1 ? 1 : Math.min(1, Math.max(0, (r - 0.45) / 0.3))) * near;
+      cl.material.opacity = cloudMat.opacity * f;
+      cl.material.depthWrite = f > 0.99;
     }
-    const dt = Math.min(0.1, t - (frame.last ?? t)); frame.last = t;
+    for (const m of [rainMat, snowMat]) { m.uniforms.uTime.value = t; m.uniforms.uCenter.value.copy(controls.target); m.uniforms.uFade.value = dist + 60; }
+    // fulgerele: din când în când, la furtună; o licărire dublă de ~0,3 s
+    if (storm && t > flashAt) { strike(t); flashAt = t + 3 + Math.random() * 9 * (1.6 - storm); }
+    const ft = t - flashT, flash = flashT >= 0 && ft < 0.35 ? (ft < 0.08 || (ft > 0.16 && ft < 0.26) ? 1 : 0.35) : 0;
+    bolt.visible = flash > 0.5;
+    hemi.intensity = hemiBase + flash * 2.6;
     for (const sh of shadows) if (sh.visible) {                   // trec încet spre dreapta; la margini se estompează
       sh.position.x += sh.userData.speed * dt;
       if (sh.position.x > 45) sh.position.x = -45;
@@ -541,8 +669,10 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
   return {
     // night: true/false; flows: {pv, bat, load, grid} = 1 (spre invertor/consumator), -1 (invers), 0 (oprit); soc 0–100;
     // cloud: acoperirea cerului 0–100 % (prognoza meteo; null = necunoscută → senin)
-    set({ night: n, flows: fl = {}, soc, cloud: c } = {}) {
-      if (n !== undefined || c !== undefined) applySky(n !== undefined ? !!n : !!night, c != null ? c / 100 : Math.max(0, cloud));
+    // weather: {kind: clear|rain|snow|fog|storm, intensity 0–1, snow_cm} (prognoza meteo, `/api/sky`)
+    set({ night: n, flows: fl = {}, soc, cloud: c, weather: w } = {}) {
+      if (n !== undefined || c !== undefined || w !== undefined)
+        applySky(n !== undefined ? !!n : !!night, c != null ? c / 100 : Math.max(0, cloud), w || wx);
       for (const [k, d] of Object.entries(fl)) if (flows[k]) {
         flows[k].dir = d; flows[k].tubeMat.opacity = d ? 0.45 : 0.12;
       }

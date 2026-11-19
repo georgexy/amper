@@ -149,4 +149,36 @@ def test_chart_forecast_and_sky_come_from_the_cache_only(tmp_path):
     tomorrow = time.strftime("%Y-%m-%d", time.localtime(NOW + DAY))
     days = forecast.pv_days(db, "2026-11-10", tomorrow, NOW)["days"]
     assert tomorrow in days and days[tomorrow] > 20
-    assert forecast.sky_now(db, NOW) == {"cloud": 10, "rad": 0.0}
+    sky = forecast.sky_now(db, NOW)
+    assert sky["cloud"] == 10 and sky["rad"] == 0.0 and sky["kind"] == "clear" and sky["snow_cm"] == 0
+
+
+@pytest.mark.parametrize("code,precip,snowfall,depth,kind,lo,hi", [
+    (0, 0, 0, 0, "clear", 0, 0), (61, 0.4, 0, 0, "rain", 0.2, 0.35), (65, 8, 0, 0, "rain", 0.85, 1),
+    (51, 0.1, 0, 0, "rain", 0.1, 0.25), (73, 0.5, 0.8, 0.12, "snow", 0.5, 0.65), (45, 0, 0, 0, "fog", 1, 1),
+    (95, 6, 0, 0, "storm", 0.9, 1), (3, 0.3, 0, 0, "rain", 0.2, 0.3)])
+def test_weather_kinds_for_the_3d_house(tmp_path, code, precip, snowfall, depth, kind, lo, hi):
+    db = make_db(tmp_path, NOW)
+    s = forecast.save_settings(db, {"lat": 45.65, "lon": 25.6})
+    h0 = int(NOW // 3600 * 3600)
+
+    def fetch(url):
+        assert "weather_code" in url and "snow_depth" in url
+        times = list(range(h0 - 2 * 3600, h0 + 6 * 3600, 3600))
+        n = len(times)
+        return {"hourly": {"time": times, "shortwave_radiation": [0] * n, "cloud_cover": [100] * n,
+                           "weather_code": [code] * n, "precipitation": [precip] * n, "snowfall": [snowfall] * n,
+                           "snow_depth": [depth] * n}}
+    forecast.weather(db, s, fetch, NOW)
+    sky = forecast.sky_now(db, NOW)
+    assert sky["kind"] == kind and lo <= sky["intensity"] <= hi and sky["snow_cm"] == pytest.approx(depth * 100)
+
+
+def test_old_cache_without_rain_is_refreshed(tmp_path):
+    """Pi-urile care au prognoza salvată de beta.24 (fără ploaie/ninsoare) o cer din nou la prima ocazie."""
+    db = make_db(tmp_path, NOW)
+    s = forecast.save_settings(db, {"lat": 45.65, "lon": 25.6})
+    db.set_meta(forecast.CACHE, json.dumps(dict(lat=45.65, lon=25.6, at=NOW, time=[], rad=[], cloud=[])))
+    calls = []
+    forecast.weather(db, s, fake_fetch(NOW, calls=calls), NOW + 60)
+    assert len(calls) == 1
