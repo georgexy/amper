@@ -290,10 +290,18 @@ def make_app(engine) -> web.Application:
                     out[d] = dict(kind=kind, rows=[], error=str(e))
             return out
         series = await asyncio.to_thread(read)
+        # producția preconizată (prognoza meteo × panourile învățate), cu o bucată în viitor pe intervalele scurte
+        from . import forecast
+        ahead = 3 * 3600 if hours <= 6 else 12 * 3600 if hours <= 24 else 24 * 3600 if hours <= 168 else 0
+        try:
+            pv_fc = await asyncio.to_thread(forecast.pv_series, engine.db, start, end + ahead)
+        except Exception as e:
+            log.warning("preconizarea pe grafic: %s", e)
+            pv_fc = None
         ms = int((time.monotonic() - t0) * 1000)
         if ms > 1500:
             log.warning("istoricul (%s h, %d dispozitive) a durat %.1f s", hours, len(ids), ms / 1000)
-        return _json(dict(start=start, end=end, series=series, ms=ms))
+        return _json(dict(start=start, end=end, series=series, ms=ms, pv_forecast=pv_fc))
 
     async def energy(request):
         inv = [k for k, v in engine.devices.items() if v.driver.kind == "inverter"]
@@ -306,7 +314,15 @@ def make_app(engine) -> web.Application:
             parts = [await asyncio.to_thread(engine.db.energy_range, k, min(start, end), max(start, end)) for k in inv]
         else:
             parts = [await asyncio.to_thread(engine.db.energy, k, int(request.query.get("days", 30))) for k in inv]
-        return _json(dict(rows=sum_energy(parts)))
+        fc = None
+        if start and end:                     # producția preconizată pe zile (și mâine, dacă intervalul ține până azi)
+            from . import forecast
+            try:
+                tomorrow = time.strftime("%Y-%m-%d", time.localtime(time.time() + 86400))
+                fc = await asyncio.to_thread(forecast.pv_days, engine.db, min(start, end), max(max(start, end), tomorrow))
+            except Exception as e:
+                log.warning("preconizarea pe zile: %s", e)
+        return _json(dict(rows=sum_energy(parts), forecast=fc))
 
     async def alerts(request):
         rows = await asyncio.to_thread(engine.db.alerts, int(request.query.get("limit", 100)))
@@ -1255,6 +1271,45 @@ def make_app(engine) -> web.Application:
         rep = await asyncio.to_thread(battery_report.build, engine.db, pack_names(), start, end, invs)
         return _json(i18n.report(rep))
 
+    # ---------------- prognoza și capacitatea reală (ambele ediții) ----------------
+    from . import capacity, forecast
+
+    async def forecast_get(request):
+        rep = await asyncio.to_thread(forecast.build, engine.db, engine.bank())
+        if isinstance(rep.get("advice"), dict):
+            rep["advice"]["text"] = i18n.tr(rep["advice"]["text"])
+        return _json(rep)
+
+    async def forecast_places(request):
+        try:
+            res = await asyncio.to_thread(forecast.places, request.query.get("q", ""),
+                                          lang="en" if i18n.lang() == "en" else "ro")
+        except Exception as e:
+            return _json({"error": f"Căutarea nu merge acum ({e})."}, 502)
+        return _json({"places": res})
+
+    async def forecast_settings(request):
+        body = await request.json()
+        try:
+            s = await asyncio.to_thread(forecast.save_settings, engine.db,
+                                        {k: body[k] for k in ("lat", "lon", "place", "min_soc", "notify") if k in body})
+        except (TypeError, ValueError) as e:
+            return _json({"error": str(e) or "valoare greșită"}, 400)
+        return _json({"ok": True, "settings": s})
+
+    async def sky_get(request):
+        """Norii de acum, pentru tema Casă 3D (din prognoza salvată, fără internet)."""
+        return _json(await asyncio.to_thread(forecast.sky_now, engine.db))
+
+    async def capacity_get(request):
+        packs = engine.pack_info()
+        await asyncio.to_thread(capacity.scan, engine.db, packs)
+        res = await asyncio.to_thread(capacity.analyze, engine.db, packs)
+        prog = await asyncio.to_thread(capacity.progress, engine.db, packs)
+        for m in res["modules"]:
+            m["progress"] = prog.get(m["id"])
+        return _json(res)
+
     async def reports_reset(request):
         """Pi mutat la altă instalație: rapoartele (nopții / pe perioadă) pornesc de acum; datele rămân în istoric."""
         body = await request.json()
@@ -1359,6 +1414,11 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/api/night-report", night_get)
     app.router.add_post("/api/night-report/notify", night_notify)
     app.router.add_get("/api/battery-report", battery_report_get)
+    app.router.add_get("/api/forecast", forecast_get)
+    app.router.add_get("/api/forecast/places", forecast_places)
+    app.router.add_post("/api/forecast/settings", forecast_settings)
+    app.router.add_get("/api/capacity", capacity_get)
+    app.router.add_get("/api/sky", sky_get)
     app.router.add_get("/api/wifi/scan", wifi_scan)
     app.router.add_get("/api/wifi/status", wifi_status)
     app.router.add_post("/api/wifi/connect", wifi_connect)

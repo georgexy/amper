@@ -48,7 +48,7 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
   // un deget = rotește, două degete = apropie/depărtează și mută; mouse: stânga rotește, rotița apropie, dreapta mută
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true; controls.dampingFactor = 0.08;
-  controls.minDistance = 10; controls.maxDistance = 120;
+  controls.minDistance = 10; controls.maxDistance = 95;
   controls.maxPolarAngle = Math.PI * 0.47;                        // nu coboară sub pământ
   controls.screenSpacePanning = true;
   controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
@@ -91,12 +91,19 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
     leaf: M({ color: 0x5fa35a, roughness: 0.9, flatShading: true }), leaf2: M({ color: 0x7cc06c, roughness: 0.9, flatShading: true }),
     trunk: M({ color: 0x7a5236, roughness: 0.9 }), pole: M({ color: 0x7d8790, roughness: 0.6, metalness: 0.3 }),
     garage: M({ color: 0x9aa4ac, roughness: 0.5, metalness: 0.4 }),
+    field: M({ color: 0x7aa95f, roughness: 1 }), forest: M({ color: 0x5b8547, roughness: 1 }),
+    asphalt: M({ color: 0x3b4046, roughness: 0.95 }), walk: M({ color: 0xc9c6bf, roughness: 0.95 }),
+    paint: M({ color: 0xf2f2ee, roughness: 0.8 }), conifer: M({ color: 0x3f7a4a, roughness: 0.9, flatShading: true }),
+    car: M({ color: 0xb8432f, roughness: 0.35, metalness: 0.5 }), tile: M({ color: 0x9b4a35, roughness: 0.85 }),
   };
   const DAY = {}, NIGHT = {};
   const tone = (m, day, night) => { DAY[m.uuid] = [m, day]; NIGHT[m.uuid] = [m, night]; };
   tone(mat.plaster, 0xf3f1ec, 0xb9bec2); tone(mat.plaster2, 0xe2e3e0, 0x9aa1a7); tone(mat.grass, 0x86b86a, 0x23402c);
   tone(mat.soil, 0xb9a58a, 0x2a2723); tone(mat.stone, 0xd9d6cf, 0x6d7175); tone(mat.leaf, 0x5fa35a, 0x2e5a3c);
   tone(mat.leaf2, 0x7cc06c, 0x3a6e4a); tone(mat.garage, 0x9aa4ac, 0x4a525a); tone(mat.glass, 0x1d3b52, 0xffc477);
+  tone(mat.field, 0x7aa95f, 0x1f3a28); tone(mat.forest, 0x5b8547, 0x172c1e); tone(mat.asphalt, 0x3b4046, 0x15181b);
+  tone(mat.walk, 0xc9c6bf, 0x4e5154); tone(mat.paint, 0xf2f2ee, 0x6a6c6e); tone(mat.conifer, 0x3f7a4a, 0x173323);
+  tone(mat.tile, 0x9b4a35, 0x3b2019); tone(mat.car, 0xb8432f, 0x4a1d15);
 
   // panourile: textură cu celule
   const pc = document.createElement("canvas"); pc.width = 256; pc.height = 416;
@@ -120,8 +127,9 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
   const box = (w, h, d, m, x, y, z, o) => add(new THREE.BoxGeometry(w, h, d), m, x, y, z, o);
   const rbox = (w, h, d, r, m, x, y, z, o) => add(new RoundedBoxGeometry(w, h, d, 4, r), m, x, y, z, o);
 
-  // ---- terenul: o insulă cu margini rotunjite, alee și terasă
-  rbox(24, 1.2, 19, 0.5, mat.soil, 1, -0.62, 0.5, { cast: false });
+  // ---- terenul: un câmp mare care se pierde în ceață (cerut 2026-11-19: „să nu văd sub pământ”), curtea cu gazon,
+  // alee și terasă; strada, vecinii și pădurea sunt mai jos („împrejurimile”)
+  add(new THREE.CircleGeometry(260, 72), mat.field, 0, 0, 0, { cast: false, rot: [-Math.PI / 2, 0, 0] });
   rbox(23.6, 0.3, 18.6, 0.4, mat.grass, 1, -0.05, 0.5, { cast: false });
   box(2.2, 0.06, 6.5, mat.stone, 2.0, 0.12, 6.4, { cast: false });
   box(10.2, 0.1, 2.0, mat.stone, -0.3, 0.12, 4.3, { cast: false });
@@ -194,6 +202,82 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
   for (let i = 0; i < 18; i++) box(0.08, 0.55, 0.08, mat.white, -10.5 + i * 0.75, 0.38, 9.4, { cast: false });
   box(13.0, 0.06, 0.06, mat.white, -4.1, 0.55, 9.4, { cast: false });
 
+  // ---- împrejurimile (cerute 2026-11-19): strada din față, vecinii de peste drum, pădurea din spate
+  const rng = (() => { let x = 11; return () => ((x = (x * 16807) % 2147483647) / 2147483647); })();   // mereu la fel
+  const SZ = 14.6;                                                      // mijlocul străzii
+  box(320, 0.04, 6.2, mat.asphalt, 0, 0.02, SZ, { cast: false });
+  box(320, 0.14, 1.9, mat.walk, 0, 0.07, SZ - 4.05, { cast: false });   // trotuarul nostru
+  box(320, 0.14, 1.9, mat.walk, 0, 0.07, SZ + 4.05, { cast: false });
+  {                                                                      // linia punctată din mijloc
+    const n = 80, dash = new THREE.InstancedMesh(new THREE.BoxGeometry(2.2, 0.02, 0.14), mat.paint, n), m4 = new THREE.Matrix4();
+    for (let i = 0; i < n; i++) dash.setMatrixAt(i, m4.makeTranslation(-158 + i * 4, 0.05, SZ));
+    scene.add(dash);
+  }
+  box(3.4, 0.05, 6.3, mat.stone, GX - 0.1, 0.11, 6.75, { cast: false });  // aleea garajului, până la trotuar
+  box(2.2, 0.05, 1.2, mat.stone, 2.0, 0.11, 10.1, { cast: false });       // aleea casei, până la trotuar
+  // o mașină parcată pe aleea garajului
+  rbox(1.8, 0.62, 4.2, 0.22, mat.car, GX - 0.1, 0.55, 7.4);
+  rbox(1.6, 0.55, 2.2, 0.22, mat.car, GX - 0.1, 1.08, 7.2);
+  box(1.5, 0.42, 0.06, mat.glass, GX - 0.1, 1.1, 8.3, { cast: false }); box(1.5, 0.42, 0.06, mat.glass, GX - 0.1, 1.1, 6.1, { cast: false });
+  for (const [dx, dz] of [[-0.9, 6.0], [0.9, 6.0], [-0.9, 8.8], [0.9, 8.8]])
+    add(new THREE.CylinderGeometry(0.34, 0.34, 0.24, 14), mat.dark, GX - 0.1 + dx, 0.34, dz, { rot: [0, 0, Math.PI / 2] });
+  // felinarele străzii (noaptea se aprind; doar cele două din dreptul casei luminează cu adevărat)
+  const lampOn = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffe0a8).multiplyScalar(3) });
+  const streetLamps = [];
+  for (const x of [-34, -14, 18, 38]) {
+    add(new THREE.CylinderGeometry(0.07, 0.1, 4.6, 8), mat.pole, x, 2.3, SZ - 3.4);
+    box(0.08, 0.08, 1.2, mat.pole, x, 4.55, SZ - 2.85);
+    streetLamps.push(add(new THREE.BoxGeometry(0.34, 0.1, 0.5), lampOn, x, 4.48, SZ - 2.3, { cast: false }));
+  }
+  // vecinii de peste drum: case simple cu acoperiș în două ape, gazon, gard viu și copaci
+  const roofGeo = new THREE.CylinderGeometry(1, 1, 1, 3, 1);           // prismă triunghiulară
+  const roofBasis = new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0));
+  const neighbor = (x, z, w, d, h, wall) => {
+    const m = M({ color: wall, roughness: 0.92 }); tone(m, wall, new THREE.Color(wall).multiplyScalar(0.55).getHex());
+    rbox(w + 3, 0.12, d + 6, 0.2, mat.grass, x, 0.04, z, { cast: false });
+    box(w, h, d, m, x, h / 2, z);
+    // prisma: axa (y local) de-a lungul casei (x), vârful triunghiului (z local) în sus; baza = adâncimea casei
+    const sz = (0.42 * d) / 1.5;
+    const r = add(roofGeo, mat.tile, x, h + 0.5 * sz, z);
+    r.quaternion.setFromRotationMatrix(roofBasis);
+    r.scale.set((d / 2 + 0.35) / 0.866, w + 0.6, sz);
+    for (let i = 0; i < Math.floor(w / 2.6); i++) box(1.1, 1.2, 0.06, mat.glass, x - w / 2 + 1.4 + i * 2.6, h * 0.55, z - d / 2 - 0.03, { cast: false });
+    box(1.0, 2.0, 0.06, mat.wood, x + w / 2 - 1.3, 1.0, z - d / 2 - 0.03, { cast: false });
+    box(w + 2.6, 0.9, 0.6, mat.leaf, x, 0.45, z - d / 2 - 2.6, { cast: false });       // gard viu spre stradă
+  };
+  neighbor(-26, 27, 9, 7, 3.2, 0xe9dfcc); neighbor(-6, 28, 8, 7.5, 3.0, 0xdbe3e6); neighbor(14, 27, 10, 7, 3.4, 0xf1e7d6);
+  neighbor(34, 28, 8, 7, 3.0, 0xd3dccf);
+  for (const [x, z, sc] of [[-36, 24, 1.2], [-16, 25, 1.0], [4, 24, 1.1], [24, 25, 0.9], [43, 24, 1.15], [-17, 33, 1.3], [26, 34, 1.2]])
+    tree(x, z, sc);
+  // pădurea din spate (și pe laturi, mai rară): conifere și foioase, ca instanțe (o singură desenare pe tip)
+  add(new THREE.PlaneGeometry(220, 80), mat.forest, 0, 0.01, -52, { cast: false, rot: [-Math.PI / 2, 0, 0] });
+  {
+    const spots = [];
+    for (let i = 0; i < 900 && spots.length < 340; i++) {
+      const x = -110 + rng() * 220, z = -95 + rng() * 85;
+      const inside = z > -13 && x > -16 && x < 18;                      // curtea și imediat în spatele ei rămân libere
+      const sides = z > -13 && (x < -16 || x > 18);
+      if (inside || z > 6 || (sides && rng() < 0.75) || (z > -16 && rng() < 0.5)) continue;
+      spots.push([x, z, 0.75 + rng() * 0.7, rng()]);
+    }
+    const coneG = new THREE.ConeGeometry(1.5, 4.6, 7), trunkG = new THREE.CylinderGeometry(0.16, 0.22, 1.4, 6);
+    const crownG = new THREE.IcosahedronGeometry(1.6, 1);
+    const con = spots.filter((p) => p[3] < 0.7), dec = spots.filter((p) => p[3] >= 0.7);
+    const cones = new THREE.InstancedMesh(coneG, mat.conifer, con.length), crowns = new THREE.InstancedMesh(crownG, mat.leaf, dec.length);
+    const trunks = new THREE.InstancedMesh(trunkG, mat.trunk, spots.length);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3(), col = new THREE.Color();
+    con.forEach(([x, z, sc], i) => {
+      cones.setMatrixAt(i, m4.compose(pv.set(x, 1.2 * sc + 2.3 * sc, z), q, sv.set(sc, sc, sc)));
+      cones.setColorAt(i, col.setHSL(0.36 + rng() * 0.05, 0.35, 0.72 + rng() * 0.28));
+    });
+    dec.forEach(([x, z, sc], i) => {
+      crowns.setMatrixAt(i, m4.compose(pv.set(x, 1.4 * sc + 1.3 * sc, z), q, sv.set(sc, sc * 0.9, sc)));
+      crowns.setColorAt(i, col.setHSL(0.27 + rng() * 0.08, 0.4, 0.8 + rng() * 0.2));
+    });
+    spots.forEach(([x, z, sc], i) => trunks.setMatrixAt(i, m4.compose(pv.set(x, 0.7 * sc, z), q, sv.set(sc, sc, sc))));
+    for (const im of [cones, crowns, trunks]) { im.castShadow = false; im.receiveShadow = false; scene.add(im); }
+  }
+
   // ---- noaptea: lumina din casă, felinarele de pe alee, stelele
   const nightObjs = [];
   for (const [x, y, z] of [[HX + 0.6, 1.6, HZ + 5.2], [HX - 2.2, 4.7, HZ + 5.4], [HX + 6.2, 4.7, HZ + 0.4]]) {
@@ -206,11 +290,73 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
     const l = new THREE.PointLight(0xffc77a, 3, 3.5, 1.8); l.position.set(3.4, 0.9, z); scene.add(l);
     nightObjs.push(l, bulb);
   }
+  for (const x of [-14, 18]) {
+    const l = new THREE.PointLight(0xffd9a0, 9, 11, 1.6); l.position.set(x, 4.2, SZ - 2.3); scene.add(l); nightObjs.push(l);
+  }
+  const lampOff = M({ color: 0x8a8f94, roughness: 0.5 });
   const starGeo = new THREE.BufferGeometry(), sp = [];
   for (let i = 0; i < 300; i++) sp.push(-30 + (Math.random() - 0.5) * 120, 20 + Math.random() * 50, -40 + (Math.random() - 0.5) * 60);
   starGeo.setAttribute("position", new THREE.Float32BufferAttribute(sp, 3));
   const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xcfe3f2, size: 0.35, fog: false }));
   scene.add(stars); nightObjs.push(stars);
+
+  // ---- norii (cerut 2026-11-19: „când e înnorat afară, să fie înnorat și acolo”): grămezi de sfere turtite, în
+  // spatele și în stânga insulei (nu între cameră și casă), câți după acoperirea cerului din prognoză; se mișcă încet
+  const cloudMat = M({ color: 0xffffff, roughness: 1, flatShading: true, transparent: true, opacity: 0.94 });
+  const puff = new THREE.IcosahedronGeometry(1, 2);
+  const clouds = [];
+  const rnd = (() => { let x = 7; return () => ((x = (x * 16807) % 2147483647) / 2147483647); })();   // aceeași formă mereu
+  // unde stau norii: puncte de pe ecranul de la început (coordonate -1…1, y în sus) care nu sunt peste casă; norul e
+  // pus pe raza din cameră prin acel punct, la înălțimea `Y` (m) — sus, deasupra pădurii și a străzii, deci deasupra
+  // pământului și nu în fața casei. Mărimea crește cu distanța, ca toți să pară cam la fel de mari.
+  // Ordinea = ordinea în care apar când cerul se acoperă (alternativ sus / jos / laturi)
+  // Doar în partea de sus (deasupra pădurii): mai jos ar sta între cameră și casă. Peste curte și stradă se văd
+  // doar umbrele lor pe pământ (mai jos, `shadows`).
+  const SPOTS = [[-0.62, 0.72, 16], [0.45, 0.7, 16], [0.92, 0.45, 15], [-0.92, 0.5, 15], [-0.05, 0.8, 17], [0.85, 0.78, 16],
+                 [0.15, 0.63, 18], [-0.3, 0.68, 18], [0.62, 0.6, 17], [-0.75, 0.62, 16]];
+  camera.updateMatrixWorld();
+  const camRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+  for (const [nx, ny, Y] of SPOTS) {
+    const g = new THREE.Group();
+    const cm = cloudMat.clone();                                     // fiecare nor se poate estompa separat
+    const n = 5 + Math.floor(rnd() * 4), len = 4 + rnd() * 3.5;
+    for (let j = 0; j < n; j++) {
+      const m = new THREE.Mesh(puff, cm);
+      const r = 1.25 + rnd() * 1.2;
+      m.scale.set(r * 1.25, r * 0.72, r);
+      m.position.set((j / (n - 1) - 0.5) * len, rnd() * 1.1 + (1 - Math.abs(j / (n - 1) - 0.5) * 2) * 1.0, (rnd() - 0.5) * 2.6);
+      g.add(m);
+    }
+    const dir = new THREE.Vector3(nx, ny, 0.5).unproject(camera).sub(camera.position).normalize();
+    const d = Math.min(140, (Y - camera.position.y) / Math.min(-0.05, dir.y));
+    g.scale.setScalar(Math.max(0.45, Math.min(1.6, d / 55)));
+    g.userData = { base: camera.position.clone().add(dir.multiplyScalar(d)), amp: 1.5 + rnd() * 2, w: 0.05 + rnd() * 0.05,
+                   ph: rnd() * 6.28 };
+    g.lookAt(camera.position.x, g.userData.base.y, camera.position.z);   // partea lată spre cameră
+    g.visible = false;
+    g.userData.mat = cm;
+    scene.add(g); clouds.push(g);
+  }
+  // plutesc încet stânga–dreapta (fără salturi)
+  const placeCloud = (g, t = 0) => {
+    const u = g.userData;
+    g.position.copy(u.base).addScaledVector(camRight, u.amp * Math.sin(t * u.w + u.ph));
+  };
+  clouds.forEach((g) => placeCloud(g));
+  // umbrele norilor pe pământ: pete întunecate care trec încet peste curte și stradă (doar ziua, cu cer parțial
+  // noros; pe cer acoperit soarele nu mai face umbre)
+  const shadows = [];
+  for (let i = 0; i < 8; i++) {
+    const m = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthWrite: false });
+    const sh = new THREE.Mesh(new THREE.CircleGeometry(1, 28), m);
+    sh.rotation.x = -Math.PI / 2;
+    sh.scale.set(5 + rnd() * 5, 3.5 + rnd() * 3, 1);
+    sh.position.set(-40 + i * 10 + rnd() * 6, 0.16, -18 + rnd() * 36);
+    sh.renderOrder = 2; sh.visible = false;
+    sh.userData.speed = 0.5 + rnd() * 0.4;
+    scene.add(sh); shadows.push(sh);
+  }
+  let shadowAlpha = 0;
 
   // ---- fluxurile: cablurile merg pe pereți și pe acoperiș, ca niște trasee de cablu reale (segmente drepte,
   // colțuri rotunjite, la ~10 cm de suprafețe), nu prin ziduri; pe ele, particulele luminoase.
@@ -267,26 +413,50 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
 
-  // ---- zi / noapte
-  let night = null;
-  const setNight = (n) => {
-    if (night === n) return;
-    night = n;
-    const g = sky.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 256);
-    if (n) { gr.addColorStop(0, "#071019"); gr.addColorStop(0.55, "#0d2030"); gr.addColorStop(1, "#14283a"); }
-    else { gr.addColorStop(0, "#2d6f9e"); gr.addColorStop(0.55, "#7fb4d6"); gr.addColorStop(1, "#cfe2ec"); }
-    g.fillStyle = gr; g.fillRect(0, 0, 4, 256); skyTex.needsUpdate = true;
-    scene.fog.color.set(n ? 0x0d2030 : 0xbcd6e4);
-    for (const [m, c] of Object.values(n ? NIGHT : DAY)) m.color.set(c);
-    mat.glass.emissiveIntensity = n ? 1.15 : 0;
-    hemi.color.set(n ? 0x4a6a9a : 0xdfeefe); hemi.groundColor.set(n ? 0x0b1410 : 0x4d6b3a); hemi.intensity = n ? 0.35 : 0.8;
-    sun.color.set(n ? 0x9fb8ff : 0xfff1d6); sun.intensity = n ? 0.35 : 2.3;
-    scene.environmentIntensity = n ? 0.15 : 0.55;
-    renderer.toneMappingExposure = n ? 0.9 : 0.92;
-    bloom.strength = n ? 0.5 : 0.7; bloom.threshold = n ? 2.2 : 1.6;
-    nightObjs.forEach((o) => (o.visible = n));
+  // ---- zi / noapte și cerul (senin … acoperit): `cloud` 0–1 din prognoza meteo
+  const mix = (a, b, f) => new THREE.Color(a).lerp(new THREE.Color(b), f);
+  const SKY = {
+    day: [["#2d6f9e", "#7fb4d6", "#cfe2ec"], ["#7b8893", "#a2adb5", "#c9cfd3"]],
+    night: [["#071019", "#0d2030", "#14283a"], ["#0b0f13", "#141b21", "#1b232a"]],
   };
-  setNight(false);
+  let night = null, cloud = -1, fogOver = 0;
+  const applySky = (n, c) => {
+    if (night === n && Math.abs(cloud - c) < 0.02) return;
+    const dayChanged = night !== n;
+    night = n; cloud = c;
+    const over = Math.min(1, Math.max(0, (c - 0.2) / 0.75));              // sub 20 % = senin, peste 95 % = acoperit
+    const [clear, grey] = SKY[n ? "night" : "day"];
+    const g = sky.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 256);
+    [0, 0.55, 1].forEach((p, i) => gr.addColorStop(p, "#" + mix(clear[i], grey[i], over).getHexString()));
+    g.fillStyle = gr; g.fillRect(0, 0, 4, 256); skyTex.needsUpdate = true;
+    scene.fog.color.copy(n ? mix(0x0d2030, 0x161d23, over) : mix(0xbcd6e4, 0xb4bcc1, over));
+    if (dayChanged) {
+      for (const [m, col] of Object.values(n ? NIGHT : DAY)) m.color.set(col);
+      mat.glass.emissiveIntensity = n ? 1.15 : 0;
+      hemi.color.set(n ? 0x4a6a9a : 0xdfeefe); hemi.groundColor.set(n ? 0x0b1410 : 0x4d6b3a);
+      sun.color.set(n ? 0x9fb8ff : 0xfff1d6);
+      renderer.toneMappingExposure = n ? 0.9 : 0.92;
+      bloom.strength = n ? 0.5 : 0.7; bloom.threshold = n ? 2.2 : 1.6;
+      nightObjs.forEach((o) => (o.visible = n));
+      streetLamps.forEach((l) => (l.material = n ? lampOn : lampOff));
+    }
+    // cu cerul acoperit: soarele aproape dispare (umbre slabe), lumina vine difuz de peste tot
+    sun.intensity = n ? 0.35 * (1 - 0.7 * over) : 2.3 * (1 - 0.72 * over);
+    sun.shadow.radius = 4 + 10 * over;
+    hemi.intensity = n ? 0.35 : 0.8 + 0.35 * over;
+    scene.environmentIntensity = n ? 0.15 : 0.55 - 0.1 * over;
+    stars.visible = n && c < 0.6;
+    const nShadow = n ? 0 : Math.round(c * shadows.length);
+    shadows.forEach((sh, i) => (sh.visible = i < nShadow));
+    shadowAlpha = n ? 0 : 0.2 * (1 - Math.min(1, Math.max(0, (over - 0.6) / 0.35)));   // acoperit de tot: fără umbre
+    const shown = c < 0.1 ? 0 : Math.round(2 + c * (clouds.length - 2));
+    clouds.forEach((cl, i) => (cl.visible = i < shown));
+    cloudMat.color.copy(n ? mix(0x4a5660, 0x343d45, over) : mix(0xffffff, 0x9ea6ad, over));
+    cloudMat.opacity = 0.9 + 0.08 * over;
+    clouds.forEach((cl) => cl.userData.mat.color.copy(cloudMat.color));
+    fogOver = over;
+  };
+  applySky(false, 0);
 
   // ---- atingerea: raza din cameră → prima piesă cu „tip”
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
@@ -328,6 +498,7 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
 
   let raf = 0, alive = true;
   const clock = new THREE.Clock();
+  const tmpV = new THREE.Vector3(), tmpV2 = new THREE.Vector3();
   const frame = () => {
     if (!alive) return;
     raf = requestAnimationFrame(frame);
@@ -342,6 +513,25 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
       });
     }
     ledMat.color.setHex(0x3ddc84).multiplyScalar(2 + 1.5 * Math.sin(t * 4));
+    // ceața începe dincolo de casă, oricât de departe e camera (altfel, depărtată, imaginea se spăla)
+    const dist = camera.position.distanceTo(controls.target);
+    scene.fog.near = dist + 10 - 18 * fogOver; scene.fog.far = dist + 80 - 25 * fogOver;
+    // un nor care ajunge pe ecran în dreptul casei (camera rotită) se estompează, ca să nu o acopere
+    const home = tmpV.copy(controls.target).project(camera);
+    for (const cl of clouds) if (cl.visible) {
+      placeCloud(cl, t);
+      const p = tmpV2.copy(cl.position).project(camera);
+      const r = Math.hypot(p.x - home.x, (p.y - home.y) * 0.8);
+      const f = p.z > 1 ? 0 : Math.min(1, Math.max(0, (r - 0.45) / 0.3));
+      cl.userData.mat.opacity = cloudMat.opacity * f;
+      cl.userData.mat.depthWrite = f > 0.99;
+    }
+    const dt = Math.min(0.1, t - (frame.last ?? t)); frame.last = t;
+    for (const sh of shadows) if (sh.visible) {                   // trec încet spre dreapta; la margini se estompează
+      sh.position.x += sh.userData.speed * dt;
+      if (sh.position.x > 45) sh.position.x = -45;
+      sh.material.opacity = shadowAlpha * (1 - Math.pow(Math.abs(sh.position.x) / 45, 4));
+    }
     controls.update();
     composer.render();
     onFrame(anchors());
@@ -349,9 +539,10 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
   frame();
 
   return {
-    // night: true/false; flows: {pv, bat, load, grid} = 1 (spre invertor/consumator), -1 (invers), 0 (oprit); soc 0–100
-    set({ night: n, flows: fl = {}, soc } = {}) {
-      if (n !== undefined) setNight(!!n);
+    // night: true/false; flows: {pv, bat, load, grid} = 1 (spre invertor/consumator), -1 (invers), 0 (oprit); soc 0–100;
+    // cloud: acoperirea cerului 0–100 % (prognoza meteo; null = necunoscută → senin)
+    set({ night: n, flows: fl = {}, soc, cloud: c } = {}) {
+      if (n !== undefined || c !== undefined) applySky(n !== undefined ? !!n : !!night, c != null ? c / 100 : Math.max(0, cloud));
       for (const [k, d] of Object.entries(fl)) if (flows[k]) {
         flows[k].dir = d; flows[k].tubeMat.opacity = d ? 0.45 : 0.12;
       }

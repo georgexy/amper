@@ -73,6 +73,11 @@ CREATE TABLE IF NOT EXISTS cell_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, device TEXT NOT NULL, kind TEXT NOT NULL, vals TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS ix_cell_events_ts ON cell_events(ts);
 
+-- capacitatea reală (capacity.py): o descărcare de la plin până aproape de gol = o măsurătoare (Ah) pe modul
+CREATE TABLE IF NOT EXISTS capacity_events (
+    device TEXT NOT NULL, t_full INTEGER NOT NULL, ts INTEGER NOT NULL, ah REAL NOT NULL, soc_low REAL NOT NULL,
+    cap REAL NOT NULL, method TEXT NOT NULL, PRIMARY KEY(device, t_full));
+
 -- securitate: încercările de logare și browserele care s-au logat (pentru „dispozitiv nou conectat”)
 CREATE TABLE IF NOT EXISTS login_log (ts INTEGER NOT NULL, ip TEXT, ok INTEGER NOT NULL, ua TEXT, note TEXT);
 CREATE TABLE IF NOT EXISTS login_devices (
@@ -198,6 +203,20 @@ class Database:
         with self.lock:
             return [dict(r) for r in self.conn.execute(
                 "SELECT ts, device, kind, vals, meta FROM cell_events WHERE ts >= ? ORDER BY ts", (since,))]
+
+    def save_capacity(self, ev: dict) -> None:
+        with self.lock:
+            self.conn.execute("INSERT OR REPLACE INTO capacity_events (device, t_full, ts, ah, soc_low, cap, method) "
+                              "VALUES (:device, :t_full, :ts, :ah, :soc_low, :cap, :method)", ev)
+
+    def capacity_events(self, since: int = 0) -> list[dict]:
+        with self.lock:
+            return [dict(r) for r in self.conn.execute(
+                "SELECT * FROM capacity_events WHERE ts >= ? ORDER BY ts", (since,))]
+
+    def clear_capacity(self) -> None:
+        with self.lock:
+            self.conn.execute("DELETE FROM capacity_events")
 
     def purge_cell_events(self, before: int) -> None:
         with self.lock:
@@ -367,10 +386,10 @@ class Database:
                             o[k] = max(o[k] or r[k], r[k])
         return out
 
-    def pack_series(self, start: int, end: int) -> list[dict]:
+    def pack_series(self, start: int, end: int,
+                    cols: str = "ts, device, current, soc, remaining_ah, cell_delta, temp_max") -> list[dict]:
         """Bateriile pe o perioadă oricât de lungă: mediile la 5 minute (`dt` 300 s), plus citirile brute de după
-        ultima medie (ultima oră). Pentru raportul pe perioadă (Ah, SOC min/max, cicluri)."""
-        cols = "ts, device, current, soc, remaining_ah, cell_delta, temp_max"
+        ultima medie (ultima oră). Pentru raportul pe perioadă (Ah, SOC min/max, cicluri) și capacitatea reală."""
         with self.lock:
             last = self.conn.execute("SELECT MAX(ts) FROM pack_5m").fetchone()[0]
             rows = [dict(r, dt=AGG_SECONDS) for r in self.conn.execute(
@@ -383,6 +402,39 @@ class Database:
             r["dt"] = min(60, r["ts"] - prev.get(r["device"], r["ts"] - 10))
             prev[r["device"]] = r["ts"]
         return rows + tail
+
+    def hourly(self, start: int, end: int) -> dict[int, dict]:
+        """Pe ore (începutul orei, secunde): PV și consum adunate pe toate invertoarele (media orei, W) și SOC-ul
+        mediu al modulelor. Din mediile la 5 minute + citirile brute de după ele. Pentru prognoză."""
+        out: dict[int, dict] = {}
+        with self.lock:
+            for kind, cols in (("inverter", "AVG(pv_power) pv, AVG(load_power) load, AVG(ac_in_power) ac_in"),
+                               ("pack", "AVG(soc) soc")):
+                last = self.conn.execute(f"SELECT MAX(ts) FROM {kind}_5m").fetchone()[0]
+                split = max(start, (last + AGG_SECONDS) if last is not None else start)
+                rows = self.conn.execute(
+                    f"SELECT (ts / 3600) * 3600 h, device, {cols}, COUNT(*) n FROM {kind}_5m "
+                    "WHERE ts >= ? AND ts < ? GROUP BY h, device "
+                    f"UNION ALL SELECT (ts / 3600) * 3600 h, device, {cols}, 0 n FROM {kind}_samples "
+                    "WHERE ts >= ? AND ts < ? GROUP BY h, device", (start, split, split, end)).fetchall()
+                seen: dict[tuple, bool] = {}
+                for r in rows:
+                    key = (r["h"], r["device"])
+                    if key in seen:             # aceeași oră și din medii, și din brute: rămâne prima
+                        continue
+                    seen[key] = True
+                    o = out.setdefault(r["h"], {})
+                    if kind == "inverter":
+                        for c in ("pv", "load", "ac_in"):
+                            if r[c] is not None:
+                                o[c] = o.get(c, 0.0) + r[c]
+                    elif r["soc"] is not None:
+                        o.setdefault("socs", []).append(r["soc"])
+        for o in out.values():
+            socs = o.pop("socs", None)
+            if socs:
+                o["soc"] = sum(socs) / len(socs)
+        return out
 
     def pack_detail(self, start: int, end: int) -> dict:
         """Din citirile brute (ultimele 14 zile): diferența maximă a celulelor, MOSFET-urile oprite, pauzele de

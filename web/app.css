@@ -882,3 +882,42 @@ body[data-look="casa"] nav.tabs { z-index: 6; }
 .cs-reset { position: absolute; right: 16px; bottom: calc(118px + env(safe-area-inset-bottom)); z-index: 3; width: 44px; height: 44px;
   border-radius: 50%; border: 1px solid rgba(255,255,255,.25); background: rgba(14,26,34,.72); color: #fff; font-size: 22px;
   line-height: 1; cursor: pointer; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+
+/* Prognoză și generator (1.0.0-beta.24) */
+.fc-chart { width: 100%; height: 170px; display: block; margin: 12px 0 4px; background: var(--panel); border-radius: 14px; }
+.fc-pv { fill: var(--sun); opacity: .45; }
+.fc-area { fill: var(--charge); opacity: .12; }
+.fc-line { fill: none; stroke: var(--charge); stroke-width: 2.2; vector-effect: non-scaling-stroke; }
+.fc-lim { stroke: var(--alarm); stroke-width: 1.2; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
+.fc-mid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.fc-tx { fill: var(--muted); font-size: 10.5px; }
+.fc-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 12px; color: var(--muted); margin: 0 2px 10px; }
+.fc-legend span { width: 14px; height: 4px; border-radius: 2px; margin-left: 6px; }
+.fc-legend span:first-child { margin-left: 0; }
+.fc-legend .l1 { background: var(--charge); } .fc-legend .l2 { background: var(--sun); opacity: .7; height: 9px; }
+.fc-legend .l3 { background: repeating-linear-gradient(90deg, var(--alarm) 0 5px, transparent 5px 9px); height: 2px; }
+.nr-t td.bad { color: var(--alarm); }
+.fc-set { margin-top: 18px; }
+.fc-set h3 { font: 600 18px "Barlow Condensed", sans-serif; margin: 0 2px 8px; }
+.fc-place { display: flex; align-items: center; gap: 10px; background: var(--panel); border-radius: 14px; padding: 10px 14px; }
+.fc-place span { color: var(--muted); font-size: 14px; } .fc-place b { flex: 1; min-width: 0; }
+.fc-place .btn { margin: 0; }
+.fc-search { margin: 8px 0; display: grid; gap: 8px; }
+.fc-search input { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+.list button.row.fc-pick { width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid var(--line); color: inherit;
+  font: inherit; cursor: pointer; display: grid; gap: 2px; }
+.list button.row.fc-pick:first-child { border-top: 0; }
+.list .row.fc-pick small { color: var(--muted); }
+.fc-set .row-check { margin-top: 8px; border-radius: 14px; }
+.fc-set select { font: inherit; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
+
+/* Capacitatea reală */
+.cap-big { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 2px 0 6px; }
+.cap-big b { font: 700 30px "Barlow Condensed", sans-serif; }
+.cap-p, .cap-wait p { color: var(--muted); font-size: 13.5px; line-height: 1.4; margin: 0 0 8px; }
+.cap-wait b { display: block; margin-bottom: 4px; }
+.cap-months { display: grid; gap: 5px; padding-bottom: 10px; }
+.cap-months div { display: grid; grid-template-columns: 56px 1fr 34px; align-items: center; gap: 8px; font-size: 12.5px; }
+.cap-months span { color: var(--muted); } .cap-months b { text-align: right; }
+.cap-months i { display: block; height: 8px; border-radius: 4px; background: var(--charge); opacity: .8; }
+.chart .legend span.fc-lg::before { background: none; height: 0; border-top: 2px dashed var(--c); }

@@ -671,6 +671,48 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   consimțământul cu un cont real pe iPhone, OneDrive Graph, pCloud UE, un server WebDAV/SMB real.
   UI: Setări → Conectare → `#set-backup` (`loadBackup/renderBackup`). Notificare ☁️ la legare/oprire.
 
+## Prognoză și generator + capacitatea reală (1.0.0-beta.24, în pregătire, cerute 2026-11-19)
+- Imaginea SD a fost testată de utilizator pe un Pi nou (beta, 2026-11-19): „a mers foarte bine”.
+- `amper/forecast.py`: setări în meta `forecast` (place/lat/lon/min_soc 20/notify), cache vreme în meta
+  `forecast_weather` (2 h, folosit încă 24 h la eroare). Open-Meteo `shortwave_radiation` (medie pe ora care SE
+  TERMINĂ la ora din listă; `timeformat=unixtime`, `past_days=14`, `forecast_days=3`); geocoding pentru localitate.
+  `db.hourly` = PV/consum adunate pe invertoare + SOC mediu pe ore. `calibrate`: mediana PV/radiație în orele cu
+  ≥ 150 W/m² și SOC < 95 % (cu bateria plină PV-ul e tăiat); < 12 ore → `approx` (p90 din toate orele cu soare),
+  nimic → `no_pv` (prognoza fără panouri, fără notificare). `load_profile` = media pe ora din zi. `project` 48 h
+  (INV_EFF 0,92 consumul, CHG_EFF 0,97, PV plafonat la max văzut × 1,15) de la `bank.kwh`/`capacity_kwh`.
+  `advice` (need/ok) + `need_kwh`; `check` din maintenance_loop: o notificare ⛅ pe zi dacă sub prag în 24 h,
+  url `/?v=forecast`. API `GET /api/forecast`, `GET /api/forecast/places?q=`, `POST /api/forecast/settings` (doar
+  cookie). UI: `#fc-row` (Bateriile, primul rând), `view-forecast` (`loadForecast`, `fcChart` SVG, `#fc-set`).
+  Mediul de lucru al lui Claude: hosturile Open-Meteo adăugate în rețea; IP-ul comun dă uneori „Daily API request
+  limit exceeded” (pe Pi nu, fiecare are IP-ul lui).
+- `amper/capacity.py`: plin (celula max ≥ 3,44 V sau SOC ≥ 99,5 cu max ≥ 3,40) → Ah scoși (net) pe `pack_series`
+  (5 min + brute) → ancora de jos din TENSIUNE: „rest” (|I| ≤ 5 % C și media celulelor ≤ 3,21 V → `OCV` tabel)
+  sau „knee” (celula min ≤ 2,95 V → 2 %); cap = Ah / (1 − SOC rămas); doar ≥ 50 % din capacitate, 40–130 %
+  plauzibil, fără pauze > 15 min, fără BMS cu ≥ 20 % citiri 0 A. Tabela `capacity_events` (PRIMARY KEY device,
+  t_full). `scan` incremental (meta `capacity_scan`, 3 zile suprapunere) din maintenance_loop și la GET; respectă
+  `reports_since`. `analyze` (mediana ultimelor 3, pe luni, % din capacitatea din BMS), `progress` (ultima încărcare
+  completă, cel mai jos de atunci). `Engine.pack_info()`. API `GET /api/capacity`. UI `#cap-row`, `view-capacity`.
+  NEVERIFICATE pe date reale: pragurile și tabelul OCV, calibrarea PV (panouri înclinate vs. radiație orizontală).
+- Cerute tot pe 2026-11-19: preconizarea pe grafice + vremea în Casă 3D. Doar din cache (`weather(...,
+  allow_fetch=False)`; `check` din maintenance_loop ține vremea la zi și cu notificarea oprită). `pv_model` (ținut în
+  `_MODEL` pe oră), `pv_series` → `/api/history/all.pv_forecast` (+3 h / +12 h / +24 h în viitor pentru 6 h / 24 h /
+  7 zile), `pv_days` → `/api/energy.forecast` (zile întregi; mâine adăugată în grafic dacă intervalul ține până azi),
+  `sky_now` → `GET /api/sky` {cloud, rad}. `lineChart`: seriile `dash` + `fill: false`, linia „acum”, legenda dă
+  valoarea de acum; `barChart`: seriile `outline` (contur punctat peste bara seriei `of`).
+  Casă 3D: `set({cloud})` 0–100 → `applySky(night, cloud)` (cer/ceață amestecate senin→cenușiu peste 20 %, soarele
+  ×(1−0,72·acoperire), umbre moi, stele ascunse peste 60 %); 14 nori (`SPOTS` = locuri goale de pe ecranul de la
+  început, puși pe raza camerei la 58–86 m, adică dincolo de insulă), câți apar = 2 + acoperire × 12, plutesc
+  sinusoidal. `app.js` cere `/api/sky` la 10 min (`casa.cloud`).
+- Tot 2026-11-19 („să nu văd sub pământ”, „stradă în față, pădure în spate”): insula (rbox de pământ) înlocuită cu
+  `CircleGeometry(260)` (`mat.field`), gazonul curții rămâne; strada la z 14,6 (asfalt 6,2 m, trotuare, linie punctată
+  instanțiată), alei până la trotuar, mașină pe aleea garajului, 4 felinare (x −34/−14/18/38, lumini doar la −14 și 18),
+  4 case vecine peste drum (z ~27, acoperiș = prismă `CylinderGeometry(…,3)` cu `roofBasis`), pădure instanțiată
+  (`InstancedMesh` conifere/foioase/trunchiuri, ~340, z < −13, fără umbre) pe `mat.forest`; `maxDistance` 95.
+  Norii: doar `SPOTS` din partea de sus a ecranului, la înălțimea `Y` pe raza camerei (mai jos acopereau casa); fiecare
+  cu materialul lui, estompat când ajunge pe ecran în dreptul casei (camera rotită). Umbrele norilor: 8 pete negre
+  transparente pe pământ, trec spre dreapta, doar ziua și sub cer acoperit de tot. Ceața urmează distanța camerei
+  (`fog.near = dist + 10`), altfel la depărtare se spăla imaginea.
+
 ## Jurnalul pe card, copia de siguranță explicată, toate notificările (1.0.0-beta.21, cerut 2026-11-09)
 - Motiv: pe 09.11 clona (00:17, după ~17 min, prin 4G) a eșuat, iar jurnalul era doar în RAM (Raspberry Pi OS:
   `/usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf`, Storage=volatile; fără rsyslog) → cauza pierdută.

@@ -278,6 +278,20 @@ class Engine:
     def device_names(self) -> dict[str, str]:
         return {k: st.cfg.get("name", k) for k, st in self.devices.items()}
 
+    def pack_info(self) -> dict[str, dict]:
+        """Modulele legate: nume, capacitatea din config/BMS (Ah) și numărul de celule (capacitatea reală)."""
+        out = {}
+        for k, st in self.devices.items():
+            if st.driver.kind != "pack" or not st.connected:
+                continue
+            rated = st.cfg.get("capacity_ah") or getattr(st.reading, "capacity_ah", None)
+            out[k] = dict(name=st.cfg.get("name", k), rated=float(rated) if rated else None,
+                          cells=round(st.nominal_voltage() / CELL_NOMINAL_V))
+        return out
+
+    def bank(self) -> dict:
+        return self.snapshot()["bank"]
+
     def connected_days(self) -> float:
         return float(self.cfg.get("connected_days") or 5)
 
@@ -344,6 +358,16 @@ class Engine:
                     await asyncio.to_thread(cell_health.weekly, self.db, self.notifier, self.device_names())
             except Exception:
                 log.exception("eroare la analiza săptămânală a celulelor")
+            try:
+                from . import capacity
+                await asyncio.to_thread(capacity.scan, self.db, self.pack_info())
+            except Exception:
+                log.exception("eroare la măsurarea capacității")
+            try:
+                from . import forecast
+                await asyncio.to_thread(forecast.check, self.db, self.notifier, self.bank())
+            except Exception:
+                log.exception("eroare la prognoză")
             try:
                 from . import night_report
                 packs = {k: n for k, n in self.device_names().items() if self.devices[k].driver.kind == "pack"}

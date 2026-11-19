@@ -832,5 +832,22 @@
  "☁️ Copia de siguranță a fost oprită din aplicație.": "☁️ The backup was stopped from the app.",
  "comprimarea": "compressing",
  "copia nu e legată": "the backup is not connected",
- "NAS / folder partajat (SMB)": "NAS / shared folder (SMB)"
+ "NAS / folder partajat (SMB)": "NAS / shared folder (SMB)",
+ "Bateria e sub # % acum. Pornește generatorul: ca să rămână peste prag îi lipsesc cam # kWh.": "The battery is below # % now. Start the generator: it needs about # kWh to stay above the threshold.",
+ "Bateria ajunge sub # % azi la #:#. Pornește generatorul {}: îi lipsesc cam # kWh.": "The battery goes below # % today at #:#. Start the generator {}: it needs about # kWh.",
+ "Bateria ajunge sub # % mâine la #:#. Pornește generatorul {}: îi lipsesc cam # kWh.": "The battery goes below # % tomorrow at #:#. Start the generator {}: it needs about # kWh.",
+ "Bateria ajunge sub # % poimâine la #:#. Pornește generatorul {}: îi lipsesc cam # kWh.": "The battery goes below # % the day after tomorrow at #:#. Start the generator {}: it needs about # kWh.",
+ "acum": "now",
+ "până la ora #:#": "by #:#",
+ "până la ora #:# mâine": "by #:# tomorrow",
+ "până la ora #:# poimâine": "by #:# the day after tomorrow",
+ "Nu e nevoie de generator în următoarele # de ore. Cel mai jos: # %, azi la #:#.": "No generator needed in the next # hours. Lowest: # %, today at #:#.",
+ "Nu e nevoie de generator în următoarele # de ore. Cel mai jos: # %, mâine la #:#.": "No generator needed in the next # hours. Lowest: # %, tomorrow at #:#.",
+ "Nu e nevoie de generator în următoarele # de ore. Cel mai jos: # %, poimâine la #:#.": "No generator needed in the next # hours. Lowest: # %, the day after tomorrow at #:#.",
+ "Nu sunt date despre baterie.": "No battery data.",
+ "Coordonate greșite.": "Wrong coordinates.",
+ "Pragul trebuie să fie între # și # %.": "The threshold must be between # and # %.",
+ "Prognoza meteo nu s-a putut descărca ({...}).": "The weather forecast could not be downloaded ({...}).",
+ "Căutarea nu merge acum ({...}).": "Search is not working right now ({...}).",
+ "Amper: prognoză": "Amper: forecast"
 }

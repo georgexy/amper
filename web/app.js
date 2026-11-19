@@ -119,6 +119,7 @@ async function boot() {
   if (v === "update") { show("settings"); showPanel("update"); history.replaceState(null, "", location.pathname); }
   if (v === "cells") { show("cells"); history.replaceState(null, "", location.pathname); }
   if (v === "night") { show("report"); history.replaceState(null, "", location.pathname); }
+  if (v === "forecast") { show("forecast"); history.replaceState(null, "", location.pathname); }
   $("#set-about-sub").textContent = `Amper ${isPro() ? "Pro" : "Lite"} ${state.info.version || ""} · actualizări, Pi-ul`;
   setInterval(tickConn, 1000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -752,13 +753,18 @@ casa.update = (root, h) => {
   put(root, "ct-bat", `${h.b.soc == null ? "–" : num(h.b.soc, 0) + " %"}${bp == null ? "" : ` · ${bp > 0 ? "+" : ""}${watts(bp, false)}`}`);
   put(root, "cl-bat", h.mode === "charging" ? "Baterie, se încarcă" : h.mode === "discharging" ? "Baterie, se descarcă" : "Baterie");
   const hr = new Date().getHours();
-  casa.api?.set({ night: pv < 30 && (hr >= 18 || hr < 7), soc: h.b.soc,
+  // norii de acum, din prognoza meteo salvată pe Pi (cerut 2026-11-19); cerut din nou la 10 minute
+  if (!casa.skyAt || Date.now() - casa.skyAt > 600000) {
+    casa.skyAt = Date.now();
+    api("/api/sky").then((r) => { casa.cloud = r.cloud ?? null; casa.api?.set({ cloud: casa.cloud }); }).catch(() => {});
+  }
+  casa.api?.set({ night: pv < 30 && (hr >= 18 || hr < 7), soc: h.b.soc, cloud: casa.cloud ?? null,
     flows: { pv: pv > 20 ? 1 : 0, bat: bp > 20 ? 1 : bp < -20 ? -1 : 0, load: ld > 20 ? 1 : 0, grid: ac > 20 ? 1 : 0 } });
   if (casa.sel) casaSheet();
   casaMount(root);
 };
 casa.leave = () => {
-  casa.api?.dispose(); casa.api = null; casa.sel = null;
+  casa.api?.dispose(); casa.api = null; casa.sel = null; casa.skyAt = 0;
   clearTimeout(casa.timer); casa.timer = 0; casa.tries = 0; casa.failed = false;   // la revenirea în temă, de la capăt
 };
 
@@ -973,6 +979,181 @@ $("#nr-notify").onchange = async (e) => {
   try { await api("/api/night-report/notify", { method: "POST", body: JSON.stringify({ on: e.target.checked }) }); }
   catch { e.target.checked = !e.target.checked; }
 };
+
+/* Prognoză și generator (forecast.py): vremea de la Open-Meteo, panourile învățate din ultimele 14 zile, bateria
+   simulată oră cu oră pe 48 de ore; sfatul pentru generator (cerut 2026-11-19) */
+const fc = { data: null };
+const dayWord = (key, now) => {
+  const d = Math.round((new Date(key + "T12:00").getTime() - new Date(new Date(now).toDateString()).getTime() - 43200000) / 86400000);
+  return d === 0 ? t("Azi") : d === 1 ? t("Mâine") : d === 2 ? t("Poimâine")
+    : new Date(key + "T12:00").toLocaleDateString(LOC, { weekday: "long" });
+};
+const hm = (ts) => new Date(ts * 1000).toLocaleTimeString(LOC, { hour: "2-digit", minute: "2-digit" });
+async function loadForecastRow() {
+  try {
+    const r = await api("/api/forecast");
+    fc.data = r;
+    const chip = $("#fc-chip");
+    chip.hidden = true;
+    if (r.missing === "location") { $("#fc-sub").textContent = t("Alege localitatea ca să pornească"); return; }
+    if (!r.ready) { $("#fc-sub").textContent = r.error || t("Se adună date"); return; }
+    const tm = r.days[1];
+    $("#fc-sub").textContent = !tm ? "" : r.no_pv ? tf("Mâine: consum ~{0} kWh (panourile încă neînvățate)", num(tm.load_kwh, 1))
+      : tf("Mâine: soare ~{0} kWh, consum ~{1} kWh", num(tm.pv_kwh, 1), num(tm.load_kwh, 1));
+    chip.hidden = false;
+    chip.className = "chip " + (r.no_pv ? "" : r.advice.level === "need" ? "al" : "ok");
+    chip.textContent = r.no_pv ? t("Învăț") : r.advice.level === "need" ? t("Generator") : t("Ajunge");
+  } catch {}
+}
+$("#fc-row").onclick = () => show("forecast");
+$("#fc-back").onclick = () => show("packs");
+function fcChart(r) {
+  const pts = r.points, W = 360, H = 150, top = 8, bot = 22, h = H - top - bot;
+  const t0 = pts[0].ts, t1 = pts[pts.length - 1].ts, x = (ts) => ((ts - t0) / (t1 - t0)) * W;
+  const y = (soc) => top + (1 - soc / 100) * h;
+  const pvMax = Math.max(1, ...pts.map((p) => p.pv || 0), ...pts.map((p) => p.load || 0));
+  const bw = W / (pts.length - 1);
+  const bars = pts.slice(1).map((p) => {
+    const bh = ((p.pv || 0) / pvMax) * h * 0.55;
+    return bh > 0.5 ? `<rect x="${(x(p.ts) - bw).toFixed(1)}" y="${(top + h - bh).toFixed(1)}" width="${(bw - 0.6).toFixed(1)}" height="${bh.toFixed(1)}" class="fc-pv"/>` : "";
+  }).join("");
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${x(p.ts).toFixed(1)},${y(p.soc).toFixed(1)}`).join("");
+  const area = `${line}L${W},${top + h}L0,${top + h}Z`;
+  let marks = "";
+  const d0 = new Date(t0 * 1000);
+  for (let m = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() + 1); m.getTime() / 1000 < t1; m.setDate(m.getDate() + 1)) {
+    const mx = x(m.getTime() / 1000);
+    const key = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}-${String(m.getDate()).padStart(2, "0")}`;
+    marks += `<line x1="${mx}" x2="${mx}" y1="${top}" y2="${top + h}" class="fc-mid"/><text x="${mx + 4}" y="${H - 6}" class="fc-tx">${esc(dayWord(key, Date.now()))}</text>`;
+  }
+  const lim = r.settings.min_soc;
+  return `<svg class="fc-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(t("Bateria în următoarele 48 de ore"))}">
+    ${bars}<path d="${area}" class="fc-area"/><path d="${line}" class="fc-line"/>
+    <line x1="0" x2="${W}" y1="${y(lim)}" y2="${y(lim)}" class="fc-lim"/>
+    <text x="${W - 2}" y="${y(lim) - 4}" class="fc-tx" text-anchor="end">${lim} %</text>
+    <text x="2" y="${H - 6}" class="fc-tx">${esc(t("acum"))}</text>${marks}
+    <text x="2" y="${top + 10}" class="fc-tx">100 %</text></svg>
+    <div class="fc-legend"><span class="l1"></span>${esc(t("Bateria (SOC)"))}<span class="l2"></span>${esc(t("Soare (producție estimată)"))}<span class="l3"></span>${esc(t("Prag"))}</div>`;
+}
+function renderFcSettings(s) {
+  $("#fc-place").textContent = s.place || (s.lat != null ? `${num(s.lat, 2)}, ${num(s.lon, 2)}` : t("nealeasă"));
+  $("#fc-place-btn").textContent = s.lat != null ? t("Schimbă") : t("Alege");
+  $("#fc-search").hidden = s.lat != null && !fc.searching;
+  const sel = $("#fc-min");
+  if (!sel.options.length) sel.innerHTML = [10, 15, 20, 25, 30, 35, 40, 50].map((v) => `<option value="${v}">${v} %</option>`).join("");
+  sel.value = String(s.min_soc);
+  $("#fc-notify").checked = !!s.notify;
+}
+async function loadForecast() {
+  const box = $("#fc-body");
+  if (!fc.data) box.innerHTML = `<p class="note">${esc(t("Calculez…"))}</p>`;
+  let r;
+  try { r = await api("/api/forecast"); } catch (e) { if (e.message !== "auth") box.innerHTML = `<div class="banner">${esc(e.message)}</div>`; return; }
+  fc.data = r;
+  renderFcSettings(r.settings);
+  if (r.missing === "location") {
+    fc.searching = true;
+    $("#fc-search").hidden = false;
+    box.innerHTML = `<div class="nr-head-txt"><b>${esc(t("Alege localitatea"))}</b><br>${esc(t("Prognoza are nevoie de locul instalației, pentru vreme. Caută localitatea mai jos."))}</div>`;
+    return;
+  }
+  if (r.error) { box.innerHTML = `<div class="banner">${esc(r.error)}</div>`; return; }
+  if (!r.ready) {
+    box.innerHTML = `<div class="nr-head-txt">${esc(r.missing === "battery" ? t("Nu sunt date despre baterie acum.")
+      : t("Încă nu sunt destule date despre consum. Revino după o zi."))}</div>`;
+    return;
+  }
+  const a = r.advice, cal = r.calibration;
+  const last = r.points[r.points.length - 1].ts;
+  const rows = r.days.map((d, i) => {
+    const partial = i === r.days.length - 1 && new Date(last * 1000).getHours() !== 0;
+    return `<tr><th>${esc(dayWord(d.day, Date.now()))}${i === 0 ? ` <small>${esc(t("din acest moment"))}</small>` : partial ? ` <small>${esc(tf("până la {0}", hm(last)))}</small>` : ""}</th>
+      <td>${r.no_pv ? "–" : `${num(d.pv_kwh, 1)} kWh`}</td><td>${num(d.load_kwh, 1)} kWh</td>
+      <td class="${d.min_soc < r.settings.min_soc ? "bad" : ""}">${num(d.min_soc, 0)} % <small>${hm(d.min_at)}</small></td><td>${num(d.end_soc, 0)} %</td></tr>`;
+  }).join("");
+  box.innerHTML = `<div class="nr-head-txt ${a.level === "need" ? "bad" : "ok"}">${esc(a.text)}</div>` +
+    (r.no_pv ? `<div class="banner">${esc(t("Pi-ul nu știe încă cât produc panourile tale (are nevoie de câteva ore cu soare). Până atunci, prognoza socotește fără producția lor."))}</div>`
+      : r.learning ? `<p class="note">${esc(tf("Producția panourilor e deocamdată aproximativă: Pi-ul are {0} din 12 ore cu soare și bateria neplină de care are nevoie ca s-o învețe bine.", cal.hours))}</p>` : "") +
+    (r.weather_stale ? `<p class="note">${esc(t("Prognoza meteo nu s-a putut actualiza; folosesc ultima descărcată."))}</p>` : "") +
+    fcChart(r) +
+    `<div class="nr-tw"><table class="nr-t"><thead><tr><th></th><th>${esc(t("Soare"))}</th><th>${esc(t("Consum"))}</th><th>${esc(t("Bateria minim"))}</th><th>${esc(t("La final"))}</th></tr></thead><tbody>${rows}</tbody></table></div>` +
+    `<p class="note">${esc(tf("Estimare: vremea de la Open-Meteo; producția panourilor învățată din ultimele 14 zile ({0} ore cu soare); consumul = media fiecărei ore din ultimele {1} zile. Generatorul și rețeaua nu intră în socoteală.", cal.hours, r.profile_days))}</p>`;
+}
+async function fcSave(body) {
+  try {
+    const r = await fetch("/api/forecast/settings", { method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || `eroare ${r.status}`);
+    fc.searching = false;
+    renderFcSettings(j.settings);
+    loadForecast();
+  } catch (e) { alert(e.message); }
+}
+$("#fc-place-btn").onclick = () => { fc.searching = true; $("#fc-search").hidden = false; $("#fc-q").focus(); };
+let fcTimer = null;
+$("#fc-q").oninput = () => {
+  clearTimeout(fcTimer);
+  fcTimer = setTimeout(async () => {
+    const q = $("#fc-q").value.trim(), res = $("#fc-res");
+    if (q.length < 2) { res.innerHTML = ""; return; }
+    try {
+      const j = await api(`/api/forecast/places?q=${encodeURIComponent(q)}`);
+      if (j.error) { res.innerHTML = `<p class="note">${esc(j.error)}</p>`; return; }
+      fc.places = j.places;
+      res.innerHTML = j.places.length ? j.places.map((p, i) => `<button class="row fc-pick" data-i="${i}"><b>${esc(p.name)}</b><small>${esc(p.region)}</small></button>`).join("")
+        : `<p class="note">${esc(t("Nicio localitate găsită."))}</p>`;
+      $$(".fc-pick").forEach((b) => (b.onclick = () => {
+        const p = fc.places[+b.dataset.i];
+        $("#fc-q").value = ""; res.innerHTML = "";
+        fcSave({ lat: p.lat, lon: p.lon, place: p.name });
+      }));
+    } catch {}
+  }, 350);
+};
+$("#fc-min").onchange = (e) => fcSave({ min_soc: +e.target.value });
+$("#fc-notify").onchange = (e) => fcSave({ notify: e.target.checked });
+
+/* Capacitatea reală (capacity.py): Ah măsurați de la plin până aproape de gol, pe fiecare modul */
+const CAP_METHOD = { rest: "în repaus", knee: "la capătul descărcării" };
+async function loadCapacityRow() {
+  try {
+    const r = await api("/api/capacity");
+    const done = r.modules.filter((m) => m.cap != null);
+    $("#cap-sub").textContent = !done.length ? t("Se adună date (descărcări adânci, de la plin)")
+      : done.map((m) => `${m.name}: ${num(m.cap, 0)} Ah`).join(" · ");
+  } catch {}
+}
+$("#cap-row").onclick = () => show("capacity");
+$("#cap-back").onclick = () => show("packs");
+async function loadCapacity() {
+  const box = $("#cap-body");
+  box.innerHTML = `<p class="note">${esc(t("Analizez…"))}</p>`;
+  let r;
+  try { r = await api("/api/capacity"); } catch (e) { if (e.message !== "auth") box.innerHTML = `<div class="banner">${esc(e.message)}</div>`; return; }
+  const date = (ts) => new Date(ts * 1000).toLocaleDateString(LOC, { day: "numeric", month: "short" });
+  const v3 = (v) => num(v, 2);
+  box.innerHTML = (r.modules.length ? "" : `<p class="note">${esc(t("Niciun modul legat."))}</p>`) + r.modules.map((m) => {
+    if (m.cap == null) {
+      const p = m.progress || {};
+      const where = !p.last_full ? t("Nicio încărcare completă în ultimele 14 zile.")
+        : tf("Ultima încărcare completă: {0}; cel mai jos de atunci: {1} V pe celulă ({2}).", date(p.last_full),
+          p.low ? v3(p.low.cell) : "–", p.low ? date(p.low.ts) : "–");
+      return `<div class="rk-grp"><div class="rk-h">${esc(m.name)}</div><div class="cap-wait"><b>${esc(t("Încă nicio măsurătoare"))}</b>
+        <p>${esc(tf("Se măsoară singur când modulul coboară de la plin până sub {0} V pe celulă (cam 12 % rămas), fără pauze în date.", v3(r.rules.rest_max)))}</p>
+        <p>${esc(where)}</p>${m.rated ? `<p>${esc(tf("În BMS: {0} Ah.", num(m.rated, 0)))}</p>` : ""}</div></div>`;
+    }
+    const cls = m.pct == null ? "" : m.pct >= 90 ? "ok" : m.pct >= 75 ? "wa" : "al";
+    const mx = Math.max(...m.months.map((x) => x.cap), m.rated || 0);
+    return `<div class="rk-grp"><div class="rk-h">${esc(m.name)}</div>
+      <div class="cap-big"><b class="num">${num(m.cap, 0)} Ah</b>${m.rated ? `<span class="chip ${cls}">${esc(tf("{0} % din {1} Ah (BMS)", m.pct, num(m.rated, 0)))}</span>` : ""}</div>
+      <p class="cap-p">${esc(tf("Ultima măsurătoare: {0}, de la plin până la {1} % rămas ({2}): {3} Ah scoși.", date(m.last.ts), num(m.last.soc_low, 0), t(CAP_METHOD[m.last.method] || m.last.method), num(m.last.ah, 0)))}
+        ${m.count > 1 ? esc(tf("Valoarea de sus = mediana ultimelor {0} din {1} măsurători.", Math.min(3, m.count), m.count)) : ""}</p>
+      ${m.months.length > 1 ? `<div class="cap-months">${m.months.map((x) => `<div><span>${esc(new Date(x.month + "-15").toLocaleDateString(LOC, { month: "short", year: "2-digit" }))}</span>
+        <i style="width:${Math.max(4, (x.cap / mx) * 100).toFixed(0)}%"></i><b>${num(x.cap, 0)}</b></div>`).join("")}</div>` : ""}</div>`;
+  }).join("") + `<p class="note">${esc(tf("Cum se măsoară: de la plin (celula cea mai încărcată peste {0} V) se adună curentul scos, până când modulul ajunge aproape de gol, recunoscut după tensiune (sub {1} V pe celulă în repaus sau sub {2} V sub sarcină). Descărcările mai mici de {3} % nu contează: între 20 și 90 % tensiunea LiFePO4 e aproape aceeași, deci de acolo nu se poate spune cât a mai rămas.",
+    v3(r.rules.full_cell), v3(r.rules.rest_max), v3(r.rules.knee), r.rules.min_depth))}</p>`;
+}
 
 // cât de sigur e rezultatul (cell_health.confidence): după numărul de momente și cât de mult diferă între ele
 const CONF = { high: "sigur", medium: "probabil", low: "incert" };
@@ -2215,14 +2396,16 @@ $$("nav.tabs button").forEach((b) => (b.onclick = () => show(b.dataset.view)));
 function show(v) {
   state.view = v;
   document.body.dataset.view = v;              // tema Casă 3D: fără spațiu jos doar pe „Acum”
-  const tab = ["packs", "inverter", "bms", "cells", "report"].includes(v) ? "now" : v;      // se deschid din „Acum”
+  const tab = ["packs", "inverter", "bms", "cells", "report", "forecast", "capacity"].includes(v) ? "now" : v;      // se deschid din „Acum”
   $$("nav.tabs button").forEach((b) => b.dataset.view === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
-  for (const k of ["now", "hist", "alerts", "packs", "inverter", "bms", "cells", "report", "settings"]) $("#view-" + k).hidden = v !== k;
+  for (const k of ["now", "hist", "alerts", "packs", "inverter", "bms", "cells", "report", "forecast", "capacity", "settings"]) $("#view-" + k).hidden = v !== k;
   $("#pvpop").hidden = true;
   if (v === "bms") loadBms();
-  if (v === "packs") { renderPacks(); loadCellsRow(); }
+  if (v === "packs") { renderPacks(); loadCellsRow(); loadForecastRow(); loadCapacityRow(); }
   if (v === "cells") loadCells();
   if (v === "report") openReport();
+  if (v === "forecast") loadForecast();
+  if (v === "capacity") loadCapacity();
   if (v === "inverter") {
     renderInverterLive();
     $("#iv-pro").hidden = !isPro();                 // Lite: doar starea invertorului, fără setări
@@ -2300,6 +2483,9 @@ function drawHistory(data, pk, inv) {
       { name: "Panouri", color: css.getPropertyValue("--sun").trim(), data: ser(ih.rows, "pv_power") },
       { name: "Consum", color: "#F0524B", data: ser(ih.rows, "load_power") },
       { name: "Rețea", color: "#3FCB7E", data: ser(ih.rows, "ac_in_power") },
+      // producția preconizată: vremea × panourile învățate (forecast.py), punctată, și puțin în viitor
+      ...(data.pv_forecast?.points?.length ? [{ name: data.pv_forecast.approx ? t("Preconizat (aprox.)") : t("Preconizat"),
+        color: css.getPropertyValue("--sun").trim(), data: data.pv_forecast.points, dash: [6, 4], fill: false }] : []),
     ], { zero: true, fmt: (v) => watts(v, false) });
   }
   drawEnergy();
@@ -2361,7 +2547,7 @@ async function loadEnergyRange() {
   if (!from || !to) return;
   try {
     const r = await api(`/api/energy?from=${from}&to=${to}`);
-    Object.assign(enRange, { rows: r.rows || [], from, to });
+    Object.assign(enRange, { rows: r.rows || [], from, to, fc: r.forecast || null });
     drawEnergy();
   } catch {}
 }
@@ -2374,6 +2560,9 @@ function drawEnergy() {
   // toate zilele din interval (cele fără date = 0); peste 62 de zile: totaluri pe lună
   const days = [];
   for (let d = new Date(from + "T12:00"); isoDay(d) <= to; d.setDate(d.getDate() + 1)) days.push(isoDay(d));
+  const fcDays = enRange.fc?.days || {};
+  const tomorrow = isoDay(new Date(Date.now() + 86400000));
+  if (days.length <= 62 && to === isoDay(new Date()) && fcDays[tomorrow] != null) days.push(tomorrow);    // mâine, doar preconizat
   const monthly = days.length > 62;
   const keys = [...new Set(days.map((d) => (monthly ? d.slice(0, 7) : d)))];
   const sum = (k, field) => days.filter((d) => (monthly ? d.slice(0, 7) : d) === k).reduce((a, d) => a + (byDay.get(d)?.[field] || 0), 0);
@@ -2383,10 +2572,14 @@ function drawEnergy() {
   $("#ch-energy h3").textContent = monthly ? "Energie pe lună (kWh)" : "Energie pe zi (kWh)";
   $("#en-total").innerHTML = `Total ${dayTime2(from)} – ${dayTime2(to)}: produs <b>${tot(pv)} kWh</b>` +
     ` · consumat <b>${tot(load)} kWh</b> · din rețea <b>${tot(grid)} kWh</b>`;
+  const fcSer = !monthly && Object.keys(fcDays).length
+    ? [{ name: enRange.fc.approx ? t("Preconizat (aprox.)") : t("Preconizat"), color: css.getPropertyValue("--sun").trim(),
+         data: keys.map((k) => fcDays[k] ?? null), outline: true, of: 0 }] : [];
   barChart($("#ch-energy"), keys, [
     { name: "Produs", color: css.getPropertyValue("--sun").trim(), data: pv },
     { name: "Consumat", color: css.getPropertyValue("--load").trim(), data: load },
     { name: "Din rețea", color: "#3FCB7E", data: grid },
+    ...fcSer,
   ]);
 }
 const dayTime2 = (d) => new Date(d + "T12:00").toLocaleDateString(LOC, { day: "numeric", month: "short", year: "numeric" });
@@ -2471,7 +2664,14 @@ function lineChart(box, series, opt = {}) {
       }
       return out;
     };
+    const nowS = Date.now() / 1000;
+    if (t1 > nowS + 60 && nowS > t0) {               // preconizarea trece de acum: linia „acum”
+      ctx.save(); ctx.strokeStyle = txt; ctx.globalAlpha = 0.6; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(X(nowS), T); ctx.lineTo(X(nowS), h - B); ctx.stroke(); ctx.restore();
+      ctx.fillStyle = txt; ctx.textAlign = "left"; ctx.fillText(t("acum"), X(nowS) + 4, T + 11);
+    }
     for (const s of series) {
+      if (s.fill === false) continue;
       ctx.fillStyle = s.color; ctx.globalAlpha = series.length > 3 ? 0.07 : series.length > 1 ? 0.14 : 0.22;
       for (const seg of segments(s)) {
         ctx.beginPath(); ctx.moveTo(X(seg[0][0]), base);
@@ -2482,12 +2682,15 @@ function lineChart(box, series, opt = {}) {
     ctx.globalAlpha = 1;
     for (const s of series) {
       ctx.strokeStyle = s.color;
+      ctx.setLineDash(s.dash || []);
+      ctx.globalAlpha = s.dash ? 0.85 : 1;
       for (const seg of segments(s)) {
         ctx.beginPath();
         seg.forEach(([t, v], i) => (i ? ctx.lineTo(X(t), Y(v)) : ctx.moveTo(X(t), Y(v))));
         ctx.stroke();
       }
     }
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
     // cursor
     let tc = null;
     if (cursorX != null) {
@@ -2497,12 +2700,13 @@ function lineChart(box, series, opt = {}) {
     }
     const valAt = (s) => {
       if (!s.data.length) return null;
-      if (tc == null) return s.data[s.data.length - 1][1];
+      if (tc == null && !s.dash) return s.data[s.data.length - 1][1];
+      const at = tc ?? nowS;                       // preconizarea: valoarea de acum, nu cea de la capăt
       let best = s.data[0];
-      for (const p of s.data) if (Math.abs(p[0] - tc) < Math.abs(best[0] - tc)) best = p;
+      for (const p of s.data) if (Math.abs(p[0] - at) < Math.abs(best[0] - at)) best = p;
       return best[1];
     };
-    legend.innerHTML = series.map((s) => `<span style="--c:${s.color}">${esc(s.name)}<b>${opt.fmt(valAt(s))}</b></span>`).join("");
+    legend.innerHTML = series.map((s) => `<span class="${s.dash ? "fc-lg" : ""}" style="--c:${s.color}">${esc(s.name)}<b>${opt.fmt(valAt(s))}</b></span>`).join("");
     box.querySelector(".when").textContent = tc == null ? "ultima valoare" : dayTime(tc);
   };
   attachCursor(box);
@@ -2520,10 +2724,11 @@ function barChart(box, labels, series) {
     const { ctx, w, h, grid, txt, font } = setupCanvas(box);
     const legend = box.querySelector(".legend");
     if (!labels.length) { ctx.fillStyle = txt; ctx.font = font; ctx.fillText("Încă nu sunt date.", 8, h / 2); legend.innerHTML = ""; return; }
-    const hiRaw = Math.max(1, ...series.flatMap((s) => s.data));
+    const hiRaw = Math.max(1, ...series.flatMap((s) => s.data.map((v) => v || 0)));
     const step = niceStep(hiRaw, 4), hi = Math.ceil(hiRaw / step) * step;
     const L = 34, R = 4, T = 8, B = 22;
-    const gw = (w - L - R) / labels.length, bw = Math.max(2, (gw * 0.72) / series.length);
+    const bars = series.filter((s) => !s.outline).length;
+    const gw = (w - L - R) / labels.length, bw = Math.max(2, (gw * 0.72) / bars);
     const Y = (v) => T + (1 - v / hi) * (h - T - B);
     ctx.font = font;
     for (let v = 0; v <= hi + step / 2; v += step) {
@@ -2534,8 +2739,14 @@ function barChart(box, labels, series) {
     if (cursorX != null) sel = Math.max(0, Math.min(labels.length - 1, Math.floor((cursorX - L) / gw)));
     labels.forEach((d, i) => {
       series.forEach((s, k) => {
+        const x = L + i * gw + gw * 0.14 + (s.outline ? s.of : k) * bw;
+        if (s.outline) {                                   // preconizarea: contur punctat, fără umplere
+          if (s.data[i] == null) return;
+          ctx.save(); ctx.strokeStyle = s.color; ctx.globalAlpha = i === sel ? 1 : 0.75; ctx.setLineDash([3, 2]); ctx.lineWidth = 1.2;
+          ctx.strokeRect(x + 0.5, Y(s.data[i]) + 0.5, Math.max(1, bw - 2), Y(0) - Y(s.data[i]) - 1); ctx.restore();
+          return;
+        }
         ctx.fillStyle = s.color; ctx.globalAlpha = i === sel ? 1 : 0.6;
-        const x = L + i * gw + gw * 0.14 + k * bw;
         ctx.fillRect(x, Y(s.data[i] || 0), bw - 1, Y(0) - Y(s.data[i] || 0));
       });
       ctx.globalAlpha = 1;
@@ -2546,7 +2757,7 @@ function barChart(box, labels, series) {
     const monthly = labels[0].length === 7;
     const short = (d) => monthly ? new Date(d + "-01").toLocaleDateString(LOC, { month: "short" }) : d.slice(8) + "." + d.slice(5, 7);
     labels.forEach((d, i) => { if ((labels.length - 1 - i) % every === 0) ctx.fillText(short(d), L + i * gw + gw / 2, h - 5); });
-    legend.innerHTML = series.map((s) => `<span style="--c:${s.color}">${esc(s.name)}<b>${num(s.data[sel], 1)} kWh</b></span>`).join("");
+    legend.innerHTML = series.map((s) => `<span class="${s.outline ? "fc-lg" : ""}" style="--c:${s.color}">${esc(s.name)}<b>${s.data[sel] == null ? "–" : `${num(s.data[sel], 1)} kWh`}</b></span>`).join("");
     box.querySelector(".when").textContent = monthly
       ? new Date(labels[sel] + "-01").toLocaleDateString(LOC, { month: "long", year: "numeric" })
       : new Date(labels[sel]).toLocaleDateString(LOC, { weekday: "long", day: "numeric", month: "long" });
@@ -3120,6 +3331,7 @@ function openNotifUrl(u) {
   if (u.includes("v=update")) { show("settings"); showPanel("update"); }
   if (u.includes("v=cells")) show("cells");
   if (u.includes("v=night")) show("report");
+  if (u.includes("v=forecast")) show("forecast");
 }
 navigator.serviceWorker?.addEventListener("message", (e) => {
   if ($("#app").hidden) return;
