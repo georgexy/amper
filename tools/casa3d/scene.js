@@ -377,9 +377,9 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
   }
   let shadowAlpha = 0;
 
-  // ---- ploaia și ninsoarea (cerute 2026-11-19): particule într-un volum de 180 × 60 × 180 m care urmează locul la
+  // ---- ploaia și ninsoarea (cerute 2026-11-19): particule într-un volum de 120 × 50 × 120 m care urmează locul la
   // care te uiți; mișcarea e calculată pe placa video (shader), deci o singură desenare. Câte se văd = intensitatea.
-  const PW = 180, PH = 60;
+  const PW = 120, PH = 50;
   const precipGeo = (n, line) => {
     const pos = new Float32Array(n * (line ? 6 : 3)), end = new Float32Array(n * (line ? 2 : 1)), seed = new Float32Array(n * (line ? 2 : 1));
     for (let i = 0; i < n; i++) {
@@ -409,21 +409,22 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
   const rainMat = new THREE.ShaderMaterial({
     uniforms: { ...precipUniforms(), uSize: { value: 2.2 * PR * H / 2 } }, transparent: true, depthWrite: false,
     vertexShader: `uniform float uTime; uniform vec3 uCenter; uniform float uSize; attribute float aSeed; varying float vD;
+      varying float vSize;
       ${WRAP}
       void main() {
         vec3 w = wrapPos(position, uTime * (17.0 + aSeed * 6.0));
         vec4 mv = viewMatrix * vec4(w, 1.0); vD = -mv.z;
-        gl_PointSize = clamp(uSize * (0.7 + aSeed * 0.6) / vD, 2.0, 64.0);
+        gl_PointSize = clamp(uSize * (0.7 + aSeed * 0.6) / vD, 2.0, 64.0); vSize = gl_PointSize;
         gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: `uniform vec3 uColor; uniform float uOpacity; uniform float uFade; varying float vD;
+    fragmentShader: `uniform vec3 uColor; uniform float uOpacity; uniform float uFade; varying float vD; varying float vSize;
       void main() { vec2 c = gl_PointCoord - 0.5;
-        float wdt = max(0.035, 1.2 / max(gl_PointSize, 1.0));                // ~1,2 pixeli fizici, cel puțin 3,5 %
+        float wdt = max(0.035, 1.2 / max(vSize, 1.0));                       // ~1,2 pixeli fizici, cel puțin 3,5 %
         if (abs(c.x + c.y * 0.12) > wdt) discard;                             // ușor înclinată de vânt
         float a = smoothstep(0.5, -0.1, c.y) * smoothstep(-0.5, -0.3, c.y);
         gl_FragColor = vec4(uColor, a * uOpacity * (1.0 - smoothstep(uFade * 0.5, uFade, vD))); }`,
   });
   const snowMat = new THREE.ShaderMaterial({
-    uniforms: { ...precipUniforms(), uSize: { value: 0.42 * PR * H } }, transparent: true, depthWrite: false,
+    uniforms: { ...precipUniforms(), uSize: { value: 0.55 * PR * H } }, transparent: true, depthWrite: false,
     vertexShader: `uniform float uTime; uniform vec3 uCenter; uniform float uSize; attribute float aSeed; varying float vD;
       ${WRAP}
       void main() {
