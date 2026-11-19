@@ -403,35 +403,41 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
       float z = mod(p.z - uCenter.z + ${PW / 2}.0, ${PW}.0) + uCenter.z - ${PW / 2}.0;
       float y = mod(p.y - fall, ${PH}.0);
       return vec3(x, y, z); }`;
+  // ploaia: puncte mari în care se desenează o dâră verticală subțire (liniile de 1 pixel dispăreau pe telefoanele
+  // cu ecran dens); grosimea dârei crește cu densitatea ecranului
+  const PR = renderer.getPixelRatio();
   const rainMat = new THREE.ShaderMaterial({
-    uniforms: precipUniforms(), transparent: true, depthWrite: false,
-    vertexShader: `uniform float uTime; uniform vec3 uCenter; attribute float aEnd; attribute float aSeed; varying float vD;
+    uniforms: { ...precipUniforms(), uSize: { value: 2.2 * PR * H / 2 } }, transparent: true, depthWrite: false,
+    vertexShader: `uniform float uTime; uniform vec3 uCenter; uniform float uSize; attribute float aSeed; varying float vD;
       ${WRAP}
       void main() {
         vec3 w = wrapPos(position, uTime * (17.0 + aSeed * 6.0));
-        w.y -= aEnd * (0.9 + aSeed * 0.5); w.x += aEnd * 0.18;            // dâră scurtă, ușor înclinată de vânt
-        w.y = max(w.y, 0.0);
         vec4 mv = viewMatrix * vec4(w, 1.0); vD = -mv.z;
+        gl_PointSize = clamp(uSize * (0.7 + aSeed * 0.6) / vD, 2.0, 64.0);
         gl_Position = projectionMatrix * mv; }`,
     fragmentShader: `uniform vec3 uColor; uniform float uOpacity; uniform float uFade; varying float vD;
-      void main() { gl_FragColor = vec4(uColor, uOpacity * (1.0 - smoothstep(uFade * 0.5, uFade, vD))); }`,
+      void main() { vec2 c = gl_PointCoord - 0.5;
+        float wdt = max(0.035, 1.2 / max(gl_PointSize, 1.0));                // ~1,2 pixeli fizici, cel puțin 3,5 %
+        if (abs(c.x + c.y * 0.12) > wdt) discard;                             // ușor înclinată de vânt
+        float a = smoothstep(0.5, -0.1, c.y) * smoothstep(-0.5, -0.3, c.y);
+        gl_FragColor = vec4(uColor, a * uOpacity * (1.0 - smoothstep(uFade * 0.5, uFade, vD))); }`,
   });
   const snowMat = new THREE.ShaderMaterial({
-    uniforms: { ...precipUniforms(), uSize: { value: 0.16 * renderer.getPixelRatio() * H } }, transparent: true, depthWrite: false,
+    uniforms: { ...precipUniforms(), uSize: { value: 0.42 * PR * H } }, transparent: true, depthWrite: false,
     vertexShader: `uniform float uTime; uniform vec3 uCenter; uniform float uSize; attribute float aSeed; varying float vD;
       ${WRAP}
       void main() {
         vec3 w = wrapPos(position, uTime * (1.1 + aSeed * 0.7));
         w.x += sin(uTime * 0.7 + aSeed * 40.0) * 0.6; w.z += cos(uTime * 0.5 + aSeed * 30.0) * 0.5;   // fulgii plutesc
         vec4 mv = viewMatrix * vec4(w, 1.0); vD = -mv.z;
-        gl_PointSize = clamp(uSize * (0.6 + aSeed * 0.8) / vD, 1.0, 14.0);
+        gl_PointSize = clamp(uSize * (0.6 + aSeed * 0.8) / vD, ${(1.5 * PR).toFixed(2)}, 26.0);
         gl_Position = projectionMatrix * mv; }`,
     fragmentShader: `uniform vec3 uColor; uniform float uOpacity; uniform float uFade; varying float vD;
       void main() { float r = length(gl_PointCoord - 0.5); if (r > 0.5) discard;
         gl_FragColor = vec4(uColor, uOpacity * smoothstep(0.5, 0.2, r) * (1.0 - smoothstep(uFade * 0.5, uFade, vD))); }`,
   });
-  const RAIN_MAX = 14000, SNOW_MAX = 9000;
-  const rain = new THREE.LineSegments(precipGeo(RAIN_MAX, true), rainMat);
+  const RAIN_MAX = 9000, SNOW_MAX = 6000;
+  const rain = new THREE.Points(precipGeo(RAIN_MAX, false), rainMat);
   const snow = new THREE.Points(precipGeo(SNOW_MAX, false), snowMat);
   for (const o of [rain, snow]) { o.frustumCulled = false; o.visible = false; o.renderOrder = 3; scene.add(o); }
   // fulgerele (la furtună): un trăsnet în zare și lumina care sare pe toată scena câteva zecimi de secundă
@@ -531,7 +537,7 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
     const g = sky.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 256);
     [0, 0.55, 1].forEach((p, i) => gr.addColorStop(p, "#" + mix(clear[i], grey[i], over).lerp(new THREE.Color(black[i]), dark).getHexString()));
     g.fillStyle = gr; g.fillRect(0, 0, 4, 256); skyTex.needsUpdate = true;
-    fogDense = w.kind === "fog" ? 1 : falling ? 0.35 + 0.4 * w.intensity : 0;
+    fogDense = w.kind === "fog" ? 1 : falling ? 0.2 + 0.3 * w.intensity : 0;
     scene.fog.color.copy(n ? mix(0x0d2030, 0x161d23, over) : mix(0xbcd6e4, w.kind === "fog" ? 0xc9cdd0 : 0xb4bcc1, over))
       .lerp(new THREE.Color(n ? 0x0b0e11 : 0x8a9298), dark * 0.6);
     if (dayChanged) {
@@ -569,9 +575,9 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
     fogOver = over;
     // ploaia / ninsoarea: câte particule se desenează și cât de vizibile sunt
     rain.visible = wet; snow.visible = w.kind === "snow";
-    rain.geometry.setDrawRange(0, Math.round(RAIN_MAX * (0.15 + 0.85 * w.intensity)) * 2);
+    rain.geometry.setDrawRange(0, Math.round(RAIN_MAX * (0.15 + 0.85 * w.intensity)));
     snow.geometry.setDrawRange(0, Math.round(SNOW_MAX * (0.2 + 0.8 * w.intensity)));
-    rainMat.uniforms.uColor.value.set(n ? 0x6f7f8f : 0xc8d6e4); rainMat.uniforms.uOpacity.value = n ? 0.35 : 0.42;
+    rainMat.uniforms.uColor.value.set(n ? 0x6f7f8f : 0xc8d6e4); rainMat.uniforms.uOpacity.value = n ? 0.45 : 0.6;
     snowMat.uniforms.uColor.value.set(n ? 0xaab4c0 : 0xffffff); snowMat.uniforms.uOpacity.value = n ? 0.7 : 0.95;
     storm = w.kind === "storm" ? Math.max(0.6, +w.intensity || 0) : 0;
   };
@@ -636,8 +642,9 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
     // ceața începe dincolo de casă, oricât de departe e camera (altfel, depărtată, imaginea se spăla); la ceață
     // adevărată / ploaie deasă se apropie
     const dist = camera.position.distanceTo(controls.target);
-    scene.fog.near = Math.max(4, dist + 10 - 18 * fogOver - (dist + 2) * 0.85 * fogDense);
-    scene.fog.far = dist + 80 - 25 * fogOver - 52 * fogDense;
+    const fogNear = dist + 10 - 18 * fogOver, fogFar = dist + 80 - 25 * fogOver;
+    scene.fog.near = wx.kind === "fog" ? Math.max(4, dist - 22) : fogNear - 14 * fogDense;
+    scene.fog.far = wx.kind === "fog" ? dist + 30 : fogFar - 40 * fogDense;
     // norii: un nor care ajunge pe ecran în dreptul casei sau prea aproape de cameră se estompează
     const home = tmpV.copy(controls.target).project(camera);
     for (const cl of allClouds) if (cl.visible) {
