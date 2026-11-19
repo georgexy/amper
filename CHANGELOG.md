@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.25 — în pregătire
+## 1.0.0-beta.25 — 2026-11-19
 - Tema „Casă 3D” urmează vremea de afară: plouă (drumul se udă), ninge (iarba și acoperișurile se albesc după cât
   zăpadă e depusă), e ceață sau furtună cu fulgere — după prognoza Open-Meteo pentru localitatea aleasă. Norii acoperă
   tot cerul (se văd când rotești casa spre orizont), iar ploaia și ninsoarea cad peste tot în jur.
