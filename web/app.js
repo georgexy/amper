@@ -753,13 +753,18 @@ casa.update = (root, h) => {
   put(root, "ct-bat", `${h.b.soc == null ? "–" : num(h.b.soc, 0) + " %"}${bp == null ? "" : ` · ${bp > 0 ? "+" : ""}${watts(bp, false)}`}`);
   put(root, "cl-bat", h.mode === "charging" ? "Baterie, se încarcă" : h.mode === "discharging" ? "Baterie, se descarcă" : "Baterie");
   const hr = new Date().getHours();
-  casa.api?.set({ night: pv < 30 && (hr >= 18 || hr < 7), soc: h.b.soc,
+  // norii de acum, din prognoza meteo salvată pe Pi (cerut 2026-11-19); cerut din nou la 10 minute
+  if (!casa.skyAt || Date.now() - casa.skyAt > 600000) {
+    casa.skyAt = Date.now();
+    api("/api/sky").then((r) => { casa.cloud = r.cloud ?? null; casa.api?.set({ cloud: casa.cloud }); }).catch(() => {});
+  }
+  casa.api?.set({ night: pv < 30 && (hr >= 18 || hr < 7), soc: h.b.soc, cloud: casa.cloud ?? null,
     flows: { pv: pv > 20 ? 1 : 0, bat: bp > 20 ? 1 : bp < -20 ? -1 : 0, load: ld > 20 ? 1 : 0, grid: ac > 20 ? 1 : 0 } });
   if (casa.sel) casaSheet();
   casaMount(root);
 };
 casa.leave = () => {
-  casa.api?.dispose(); casa.api = null; casa.sel = null;
+  casa.api?.dispose(); casa.api = null; casa.sel = null; casa.skyAt = 0;
   clearTimeout(casa.timer); casa.timer = 0; casa.tries = 0; casa.failed = false;   // la revenirea în temă, de la capăt
 };
 
@@ -2478,6 +2483,9 @@ function drawHistory(data, pk, inv) {
       { name: "Panouri", color: css.getPropertyValue("--sun").trim(), data: ser(ih.rows, "pv_power") },
       { name: "Consum", color: "#F0524B", data: ser(ih.rows, "load_power") },
       { name: "Rețea", color: "#3FCB7E", data: ser(ih.rows, "ac_in_power") },
+      // producția preconizată: vremea × panourile învățate (forecast.py), punctată, și puțin în viitor
+      ...(data.pv_forecast?.points?.length ? [{ name: data.pv_forecast.approx ? t("Preconizat (aprox.)") : t("Preconizat"),
+        color: css.getPropertyValue("--sun").trim(), data: data.pv_forecast.points, dash: [6, 4], fill: false }] : []),
     ], { zero: true, fmt: (v) => watts(v, false) });
   }
   drawEnergy();
@@ -2539,7 +2547,7 @@ async function loadEnergyRange() {
   if (!from || !to) return;
   try {
     const r = await api(`/api/energy?from=${from}&to=${to}`);
-    Object.assign(enRange, { rows: r.rows || [], from, to });
+    Object.assign(enRange, { rows: r.rows || [], from, to, fc: r.forecast || null });
     drawEnergy();
   } catch {}
 }
@@ -2552,6 +2560,9 @@ function drawEnergy() {
   // toate zilele din interval (cele fără date = 0); peste 62 de zile: totaluri pe lună
   const days = [];
   for (let d = new Date(from + "T12:00"); isoDay(d) <= to; d.setDate(d.getDate() + 1)) days.push(isoDay(d));
+  const fcDays = enRange.fc?.days || {};
+  const tomorrow = isoDay(new Date(Date.now() + 86400000));
+  if (days.length <= 62 && to === isoDay(new Date()) && fcDays[tomorrow] != null) days.push(tomorrow);    // mâine, doar preconizat
   const monthly = days.length > 62;
   const keys = [...new Set(days.map((d) => (monthly ? d.slice(0, 7) : d)))];
   const sum = (k, field) => days.filter((d) => (monthly ? d.slice(0, 7) : d) === k).reduce((a, d) => a + (byDay.get(d)?.[field] || 0), 0);
@@ -2561,10 +2572,14 @@ function drawEnergy() {
   $("#ch-energy h3").textContent = monthly ? "Energie pe lună (kWh)" : "Energie pe zi (kWh)";
   $("#en-total").innerHTML = `Total ${dayTime2(from)} – ${dayTime2(to)}: produs <b>${tot(pv)} kWh</b>` +
     ` · consumat <b>${tot(load)} kWh</b> · din rețea <b>${tot(grid)} kWh</b>`;
+  const fcSer = !monthly && Object.keys(fcDays).length
+    ? [{ name: enRange.fc.approx ? t("Preconizat (aprox.)") : t("Preconizat"), color: css.getPropertyValue("--sun").trim(),
+         data: keys.map((k) => fcDays[k] ?? null), outline: true, of: 0 }] : [];
   barChart($("#ch-energy"), keys, [
     { name: "Produs", color: css.getPropertyValue("--sun").trim(), data: pv },
     { name: "Consumat", color: css.getPropertyValue("--load").trim(), data: load },
     { name: "Din rețea", color: "#3FCB7E", data: grid },
+    ...fcSer,
   ]);
 }
 const dayTime2 = (d) => new Date(d + "T12:00").toLocaleDateString(LOC, { day: "numeric", month: "short", year: "numeric" });
@@ -2649,7 +2664,14 @@ function lineChart(box, series, opt = {}) {
       }
       return out;
     };
+    const nowS = Date.now() / 1000;
+    if (t1 > nowS + 60 && nowS > t0) {               // preconizarea trece de acum: linia „acum”
+      ctx.save(); ctx.strokeStyle = txt; ctx.globalAlpha = 0.6; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(X(nowS), T); ctx.lineTo(X(nowS), h - B); ctx.stroke(); ctx.restore();
+      ctx.fillStyle = txt; ctx.textAlign = "left"; ctx.fillText(t("acum"), X(nowS) + 4, T + 11);
+    }
     for (const s of series) {
+      if (s.fill === false) continue;
       ctx.fillStyle = s.color; ctx.globalAlpha = series.length > 3 ? 0.07 : series.length > 1 ? 0.14 : 0.22;
       for (const seg of segments(s)) {
         ctx.beginPath(); ctx.moveTo(X(seg[0][0]), base);
@@ -2660,12 +2682,15 @@ function lineChart(box, series, opt = {}) {
     ctx.globalAlpha = 1;
     for (const s of series) {
       ctx.strokeStyle = s.color;
+      ctx.setLineDash(s.dash || []);
+      ctx.globalAlpha = s.dash ? 0.85 : 1;
       for (const seg of segments(s)) {
         ctx.beginPath();
         seg.forEach(([t, v], i) => (i ? ctx.lineTo(X(t), Y(v)) : ctx.moveTo(X(t), Y(v))));
         ctx.stroke();
       }
     }
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
     // cursor
     let tc = null;
     if (cursorX != null) {
@@ -2675,12 +2700,13 @@ function lineChart(box, series, opt = {}) {
     }
     const valAt = (s) => {
       if (!s.data.length) return null;
-      if (tc == null) return s.data[s.data.length - 1][1];
+      if (tc == null && !s.dash) return s.data[s.data.length - 1][1];
+      const at = tc ?? nowS;                       // preconizarea: valoarea de acum, nu cea de la capăt
       let best = s.data[0];
-      for (const p of s.data) if (Math.abs(p[0] - tc) < Math.abs(best[0] - tc)) best = p;
+      for (const p of s.data) if (Math.abs(p[0] - at) < Math.abs(best[0] - at)) best = p;
       return best[1];
     };
-    legend.innerHTML = series.map((s) => `<span style="--c:${s.color}">${esc(s.name)}<b>${opt.fmt(valAt(s))}</b></span>`).join("");
+    legend.innerHTML = series.map((s) => `<span class="${s.dash ? "fc-lg" : ""}" style="--c:${s.color}">${esc(s.name)}<b>${opt.fmt(valAt(s))}</b></span>`).join("");
     box.querySelector(".when").textContent = tc == null ? "ultima valoare" : dayTime(tc);
   };
   attachCursor(box);
@@ -2698,10 +2724,11 @@ function barChart(box, labels, series) {
     const { ctx, w, h, grid, txt, font } = setupCanvas(box);
     const legend = box.querySelector(".legend");
     if (!labels.length) { ctx.fillStyle = txt; ctx.font = font; ctx.fillText("Încă nu sunt date.", 8, h / 2); legend.innerHTML = ""; return; }
-    const hiRaw = Math.max(1, ...series.flatMap((s) => s.data));
+    const hiRaw = Math.max(1, ...series.flatMap((s) => s.data.map((v) => v || 0)));
     const step = niceStep(hiRaw, 4), hi = Math.ceil(hiRaw / step) * step;
     const L = 34, R = 4, T = 8, B = 22;
-    const gw = (w - L - R) / labels.length, bw = Math.max(2, (gw * 0.72) / series.length);
+    const bars = series.filter((s) => !s.outline).length;
+    const gw = (w - L - R) / labels.length, bw = Math.max(2, (gw * 0.72) / bars);
     const Y = (v) => T + (1 - v / hi) * (h - T - B);
     ctx.font = font;
     for (let v = 0; v <= hi + step / 2; v += step) {
@@ -2712,8 +2739,14 @@ function barChart(box, labels, series) {
     if (cursorX != null) sel = Math.max(0, Math.min(labels.length - 1, Math.floor((cursorX - L) / gw)));
     labels.forEach((d, i) => {
       series.forEach((s, k) => {
+        const x = L + i * gw + gw * 0.14 + (s.outline ? s.of : k) * bw;
+        if (s.outline) {                                   // preconizarea: contur punctat, fără umplere
+          if (s.data[i] == null) return;
+          ctx.save(); ctx.strokeStyle = s.color; ctx.globalAlpha = i === sel ? 1 : 0.75; ctx.setLineDash([3, 2]); ctx.lineWidth = 1.2;
+          ctx.strokeRect(x + 0.5, Y(s.data[i]) + 0.5, Math.max(1, bw - 2), Y(0) - Y(s.data[i]) - 1); ctx.restore();
+          return;
+        }
         ctx.fillStyle = s.color; ctx.globalAlpha = i === sel ? 1 : 0.6;
-        const x = L + i * gw + gw * 0.14 + k * bw;
         ctx.fillRect(x, Y(s.data[i] || 0), bw - 1, Y(0) - Y(s.data[i] || 0));
       });
       ctx.globalAlpha = 1;
@@ -2724,7 +2757,7 @@ function barChart(box, labels, series) {
     const monthly = labels[0].length === 7;
     const short = (d) => monthly ? new Date(d + "-01").toLocaleDateString(LOC, { month: "short" }) : d.slice(8) + "." + d.slice(5, 7);
     labels.forEach((d, i) => { if ((labels.length - 1 - i) % every === 0) ctx.fillText(short(d), L + i * gw + gw / 2, h - 5); });
-    legend.innerHTML = series.map((s) => `<span style="--c:${s.color}">${esc(s.name)}<b>${num(s.data[sel], 1)} kWh</b></span>`).join("");
+    legend.innerHTML = series.map((s) => `<span class="${s.outline ? "fc-lg" : ""}" style="--c:${s.color}">${esc(s.name)}<b>${s.data[sel] == null ? "–" : `${num(s.data[sel], 1)} kWh`}</b></span>`).join("");
     box.querySelector(".when").textContent = monthly
       ? new Date(labels[sel] + "-01").toLocaleDateString(LOC, { month: "long", year: "numeric" })
       : new Date(labels[sel]).toLocaleDateString(LOC, { weekday: "long", day: "numeric", month: "long" });

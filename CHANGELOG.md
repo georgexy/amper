@@ -10,6 +10,11 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
 - Bateriile → „Capacitatea reală”: câți Ah dă fiecare modul de la plin până aproape de gol, măsurat de Amper (nu cât
   scrie în BMS), cu procentul din capacitatea din BMS și evoluția lună de lună. Se măsoară singur la descărcările
   adânci (sub ~12 % rămas).
+- Istoric: producția preconizată din prognoza meteo apare pe grafice: linie punctată „Preconizat” pe graficul
+  Putere (și câteva ore înainte, după „acum”) și contur punctat peste bara „Produs” la Energie pe zi, inclusiv
+  pentru mâine.
+- Tema „Casă 3D”: cerul urmează vremea de afară (din prognoză): pe senin rămâne albastru, cu nori se adună nori în
+  jurul casei, iar pe cer acoperit lumina e cenușie și fără umbre tari.
 
 ## 1.0.0-beta.23 — 2026-11-17
 - Setări → Despre → „Export pentru diagnostic”: alegi perioada (ultima oră, ultima zi, 3 zile, 7 zile sau aleasă de tine)

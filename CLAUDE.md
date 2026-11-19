@@ -693,6 +693,16 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `reports_since`. `analyze` (mediana ultimelor 3, pe luni, % din capacitatea din BMS), `progress` (ultima încărcare
   completă, cel mai jos de atunci). `Engine.pack_info()`. API `GET /api/capacity`. UI `#cap-row`, `view-capacity`.
   NEVERIFICATE pe date reale: pragurile și tabelul OCV, calibrarea PV (panouri înclinate vs. radiație orizontală).
+- Cerute tot pe 2026-11-19: preconizarea pe grafice + vremea în Casă 3D. Doar din cache (`weather(...,
+  allow_fetch=False)`; `check` din maintenance_loop ține vremea la zi și cu notificarea oprită). `pv_model` (ținut în
+  `_MODEL` pe oră), `pv_series` → `/api/history/all.pv_forecast` (+3 h / +12 h / +24 h în viitor pentru 6 h / 24 h /
+  7 zile), `pv_days` → `/api/energy.forecast` (zile întregi; mâine adăugată în grafic dacă intervalul ține până azi),
+  `sky_now` → `GET /api/sky` {cloud, rad}. `lineChart`: seriile `dash` + `fill: false`, linia „acum”, legenda dă
+  valoarea de acum; `barChart`: seriile `outline` (contur punctat peste bara seriei `of`).
+  Casă 3D: `set({cloud})` 0–100 → `applySky(night, cloud)` (cer/ceață amestecate senin→cenușiu peste 20 %, soarele
+  ×(1−0,72·acoperire), umbre moi, stele ascunse peste 60 %); 14 nori (`SPOTS` = locuri goale de pe ecranul de la
+  început, puși pe raza camerei la 58–86 m, adică dincolo de insulă), câți apar = 2 + acoperire × 12, plutesc
+  sinusoidal. `app.js` cere `/api/sky` la 10 min (`casa.cloud`).
 
 ## Jurnalul pe card, copia de siguranță explicată, toate notificările (1.0.0-beta.21, cerut 2026-11-09)
 - Motiv: pe 09.11 clona (00:17, după ~17 min, prin 4G) a eșuat, iar jurnalul era doar în RAM (Raspberry Pi OS:

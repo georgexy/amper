@@ -132,3 +132,21 @@ def test_places_from_geocoding():
     assert forecast.places("Brașov", fetch) == [dict(name="Brașov", region="Județul Brașov, România", lat=45.65,
                                                      lon=25.61)]
     assert forecast.places("B", fetch) == []
+
+
+def test_chart_forecast_and_sky_come_from_the_cache_only(tmp_path):
+    db = make_db(tmp_path, NOW)
+    assert forecast.pv_series(db, NOW - DAY, NOW + 12 * 3600, NOW) is None          # fără localitate
+    assert forecast.sky_now(db, NOW) == {}
+    s = forecast.save_settings(db, {"lat": 45.65, "lon": 25.6})
+    assert forecast.pv_series(db, NOW - DAY, NOW, NOW) is None                         # nimic descărcat încă
+    forecast.weather(db, s, fake_fetch(NOW), NOW)
+    ser = forecast.pv_series(db, NOW - DAY, NOW + 12 * 3600, NOW)
+    ts = [p[0] for p in ser["points"]]
+    assert min(ts) >= NOW - DAY - 3600 and max(ts) > NOW and not ser["approx"]
+    noon = max(ser["points"], key=lambda p: p[1])
+    assert noon[1] == pytest.approx(K * 800 * math.sin(math.pi * 5.5 / 10) / 1, rel=0.05) or noon[1] > 3500
+    tomorrow = time.strftime("%Y-%m-%d", time.localtime(NOW + DAY))
+    days = forecast.pv_days(db, "2026-11-10", tomorrow, NOW)["days"]
+    assert tomorrow in days and days[tomorrow] > 20
+    assert forecast.sky_now(db, NOW) == {"cloud": 10, "rad": 0.0}

@@ -90,9 +90,9 @@ def places(query: str, fetch=_fetch, lang: str = "ro") -> list[dict]:
 
 
 # ---------------- vremea ----------------
-def weather(db, s: dict, fetch=_fetch, now: float | None = None) -> dict:
+def weather(db, s: dict, fetch=_fetch, now: float | None = None, allow_fetch: bool = True) -> dict:
     """Radiația pe ore {ora (secunde, sfârșitul orei): W/m²}, din cache dacă e proaspătă. Ridică eroare doar dacă
-    nu există nici o prognoză folosibilă."""
+    nu există nici o prognoză folosibilă. `allow_fetch=False`: doar din cache (graficele, casa 3D)."""
     now = now or time.time()
     try:
         c = json.loads(db.get_meta(CACHE) or "{}")
@@ -101,6 +101,10 @@ def weather(db, s: dict, fetch=_fetch, now: float | None = None) -> dict:
     same = c.get("lat") == s["lat"] and c.get("lon") == s["lon"]
     if same and now - c.get("at", 0) < REFRESH_S:
         return c
+    if not allow_fetch:
+        if same and now - c.get("at", 0) < STALE_S:
+            return c
+        raise RuntimeError("fără prognoză descărcată")
     q = dict(latitude=s["lat"], longitude=s["lon"], hourly="shortwave_radiation,cloud_cover",
              past_days=PAST_DAYS, forecast_days=3, timezone="GMT", timeformat="unixtime")
     try:
@@ -280,10 +284,17 @@ def build(db, bank: dict, fetch=_fetch, now: float | None = None) -> dict:
 
 
 def check(db, notifier, bank: dict, fetch=_fetch, now: float | None = None) -> dict | None:
-    """Din maintenance_loop (la oră): o notificare pe zi dacă bateria ar coborî sub prag în următoarele 24 de ore."""
+    """Din maintenance_loop (la oră): vremea ținută la zi (graficele și casa 3D o citesc din cache) și o notificare
+    pe zi dacă bateria ar coborî sub prag în următoarele 24 de ore."""
     now = now or time.time()
     s = settings(db)
-    if not s["notify"] or s["lat"] is None:
+    if s["lat"] is None:
+        return None
+    try:
+        weather(db, s, fetch, now)
+    except RuntimeError:
+        return None
+    if not s["notify"]:
         return None
     if db.get_meta(NOTIFIED) == _day_key(now):
         return None
@@ -294,3 +305,70 @@ def check(db, notifier, bank: dict, fetch=_fetch, now: float | None = None) -> d
     db.set_meta(NOTIFIED, _day_key(now))
     notifier.send("⛅ " + a["text"], title="Amper: prognoză", priority="high", url="/?v=forecast")
     return rep
+
+
+# ---------------- preconizarea pe grafice și vremea pentru casa 3D (doar din cache, fără internet) ----------------
+_MODEL: dict = {}
+
+
+def pv_model(db, now: float | None = None) -> tuple[dict, dict] | None:
+    """(calibrarea, radiația pe ore) din prognoza salvată; ținută în memorie cât nu se schimbă ora sau prognoza."""
+    now = now or time.time()
+    s = settings(db)
+    if s["lat"] is None:
+        return None
+    try:
+        w = weather(db, s, now=now, allow_fetch=False)
+    except RuntimeError:
+        return None
+    key = (id(db), w.get("at"), int(now // 3600))
+    if _MODEL.get("key") != key:
+        rad = _by_hour(w)
+        hist = db.hourly(int(now - PAST_DAYS * 86400), int(now // 3600 * 3600))
+        _MODEL.update(key=key, val=(calibrate(hist, rad), rad))
+    return _MODEL["val"]
+
+
+def _pv(cal: dict, r: float) -> float:
+    pv = cal["k"] * r
+    return min(pv, cal["pv_max"] * 1.15) if cal["pv_max"] else pv
+
+
+def pv_series(db, start: float, end: float, now: float | None = None) -> dict | None:
+    """Producția preconizată pe ore între `start` și `end` (poate fi și în viitor): [[mijlocul orei, W], …]."""
+    m = pv_model(db, now)
+    if not m or m[0]["k"] is None:
+        return None
+    cal, rad = m
+    pts = [[h + 1800, round(_pv(cal, r))] for h, (r, _c) in sorted(rad.items())
+           if start - 3600 <= h <= end and r is not None]
+    return dict(points=pts, approx=cal["approx"])
+
+
+def pv_days(db, day_from: str, day_to: str, now: float | None = None) -> dict | None:
+    """kWh preconizați pe zile (AAAA-LL-ZZ), doar zilele acoperite în întregime de prognoză."""
+    m = pv_model(db, now)
+    if not m or m[0]["k"] is None:
+        return None
+    cal, rad = m
+    days: dict[str, list] = {}
+    for h, (r, _c) in rad.items():
+        d = _day_key(h)
+        if day_from <= d <= day_to and r is not None:
+            days.setdefault(d, []).append(_pv(cal, r))
+    return dict(days={d: round(sum(v) / 1000, 1) for d, v in days.items() if len(v) >= 23},
+                approx=cal["approx"])
+
+
+def sky_now(db, now: float | None = None) -> dict:
+    """Norii de acum (%) și radiația, pentru casa 3D. Fără localitate sau prognoză: {}."""
+    now = now or time.time()
+    s = settings(db)
+    if s["lat"] is None:
+        return {}
+    try:
+        w = weather(db, s, now=now, allow_fetch=False)
+    except RuntimeError:
+        return {}
+    r, c = _by_hour(w).get(int(now // 3600 * 3600), (None, None))
+    return dict(cloud=c, rad=r)

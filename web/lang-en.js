@@ -43,7 +43,7 @@ const EN = {
   "În BMS: {0} Ah.": "In the BMS: {0} Ah.",
   "Încă nicio măsurătoare": "No measurement yet",
   "Încă nu sunt destule date despre consum. Revino după o zi.": "Not enough consumption data yet. Come back in a day.",
-  "Învăț": "Learning", "din acest moment": "from now",
+  "Învăț": "Learning", "Preconizat": "Forecast", "Preconizat (aprox.)": "Forecast (approx.)", "din acest moment": "from now",
   "la capătul descărcării": "at the end of the discharge",
   "Prognoză și generator": "Forecast and generator",
   "Soarele de mâine și unde ajunge bateria": "Tomorrow's sun and where the battery ends up",

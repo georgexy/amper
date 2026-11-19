@@ -212,6 +212,44 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
   const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xcfe3f2, size: 0.35, fog: false }));
   scene.add(stars); nightObjs.push(stars);
 
+  // ---- norii (cerut 2026-11-19: „când e înnorat afară, să fie înnorat și acolo”): grămezi de sfere turtite, în
+  // spatele și în stânga insulei (nu între cameră și casă), câți după acoperirea cerului din prognoză; se mișcă încet
+  const cloudMat = M({ color: 0xffffff, roughness: 1, flatShading: true, transparent: true, opacity: 0.94 });
+  const puff = new THREE.IcosahedronGeometry(1, 2);
+  const clouds = [];
+  const rnd = (() => { let x = 7; return () => ((x = (x * 16807) % 2147483647) / 2147483647); })();   // aceeași formă mereu
+  // locurile goale de pe ecranul de la început (coordonate -1…1, y în sus): deasupra casei, în dreapta, sub insulă;
+  // norul stă pe raza din cameră prin acel punct, la `d` metri (dincolo de insulă), deci nu acoperă casa.
+  // Ordinea = ordinea în care apar când cerul se acoperă (alternativ sus / jos)
+  const SPOTS = [[-0.62, 0.74, 72], [-0.3, -0.72, 62], [0.4, 0.72, 74], [0.62, -0.58, 60], [0.92, 0.32, 62], [-0.82, -0.6, 60],
+                 [-0.08, 0.79, 80], [0.9, -0.76, 58], [0.82, 0.76, 72], [0.08, -0.7, 60], [-0.95, 0.42, 70], [0.95, -0.08, 62],
+                 [0.15, 0.64, 86], [-0.55, -0.8, 58]];
+  camera.updateMatrixWorld();
+  const camRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+  for (const [nx, ny, d] of SPOTS) {
+    const g = new THREE.Group();
+    const n = 5 + Math.floor(rnd() * 4), len = 4 + rnd() * 3.5;
+    for (let j = 0; j < n; j++) {
+      const m = new THREE.Mesh(puff, cloudMat);
+      const r = 1.25 + rnd() * 1.2;
+      m.scale.set(r * 1.25, r * 0.72, r);
+      m.position.set((j / (n - 1) - 0.5) * len, rnd() * 1.1 + (1 - Math.abs(j / (n - 1) - 0.5) * 2) * 1.0, (rnd() - 0.5) * 2.6);
+      g.add(m);
+    }
+    const dir = new THREE.Vector3(nx, ny, 0.5).unproject(camera).sub(camera.position).normalize();
+    g.userData = { base: camera.position.clone().add(dir.multiplyScalar(d)), amp: 1.5 + rnd() * 2, w: 0.05 + rnd() * 0.05,
+                   ph: rnd() * 6.28 };
+    g.lookAt(camera.position.x, g.userData.base.y, camera.position.z);   // partea lată spre cameră
+    g.visible = false;
+    scene.add(g); clouds.push(g);
+  }
+  // plutesc încet stânga–dreapta (fără salturi)
+  const placeCloud = (g, t = 0) => {
+    const u = g.userData;
+    g.position.copy(u.base).addScaledVector(camRight, u.amp * Math.sin(t * u.w + u.ph));
+  };
+  clouds.forEach((g) => placeCloud(g));
+
   // ---- fluxurile: cablurile merg pe pereți și pe acoperiș, ca niște trasee de cablu reale (segmente drepte,
   // colțuri rotunjite, la ~10 cm de suprafețe), nu prin ziduri; pe ele, particulele luminoase.
   // Garajul: pereți x 4,4…8,8, z −2,4…3,6, acoperiș sus la y 3,345 (margini x 8,95, z 3,75); invertorul pe
@@ -267,26 +305,45 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
 
-  // ---- zi / noapte
-  let night = null;
-  const setNight = (n) => {
-    if (night === n) return;
-    night = n;
-    const g = sky.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 256);
-    if (n) { gr.addColorStop(0, "#071019"); gr.addColorStop(0.55, "#0d2030"); gr.addColorStop(1, "#14283a"); }
-    else { gr.addColorStop(0, "#2d6f9e"); gr.addColorStop(0.55, "#7fb4d6"); gr.addColorStop(1, "#cfe2ec"); }
-    g.fillStyle = gr; g.fillRect(0, 0, 4, 256); skyTex.needsUpdate = true;
-    scene.fog.color.set(n ? 0x0d2030 : 0xbcd6e4);
-    for (const [m, c] of Object.values(n ? NIGHT : DAY)) m.color.set(c);
-    mat.glass.emissiveIntensity = n ? 1.15 : 0;
-    hemi.color.set(n ? 0x4a6a9a : 0xdfeefe); hemi.groundColor.set(n ? 0x0b1410 : 0x4d6b3a); hemi.intensity = n ? 0.35 : 0.8;
-    sun.color.set(n ? 0x9fb8ff : 0xfff1d6); sun.intensity = n ? 0.35 : 2.3;
-    scene.environmentIntensity = n ? 0.15 : 0.55;
-    renderer.toneMappingExposure = n ? 0.9 : 0.92;
-    bloom.strength = n ? 0.5 : 0.7; bloom.threshold = n ? 2.2 : 1.6;
-    nightObjs.forEach((o) => (o.visible = n));
+  // ---- zi / noapte și cerul (senin … acoperit): `cloud` 0–1 din prognoza meteo
+  const mix = (a, b, f) => new THREE.Color(a).lerp(new THREE.Color(b), f);
+  const SKY = {
+    day: [["#2d6f9e", "#7fb4d6", "#cfe2ec"], ["#7b8893", "#a2adb5", "#c9cfd3"]],
+    night: [["#071019", "#0d2030", "#14283a"], ["#0b0f13", "#141b21", "#1b232a"]],
   };
-  setNight(false);
+  let night = null, cloud = -1;
+  const applySky = (n, c) => {
+    if (night === n && Math.abs(cloud - c) < 0.02) return;
+    const dayChanged = night !== n;
+    night = n; cloud = c;
+    const over = Math.min(1, Math.max(0, (c - 0.2) / 0.75));              // sub 20 % = senin, peste 95 % = acoperit
+    const [clear, grey] = SKY[n ? "night" : "day"];
+    const g = sky.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 256);
+    [0, 0.55, 1].forEach((p, i) => gr.addColorStop(p, "#" + mix(clear[i], grey[i], over).getHexString()));
+    g.fillStyle = gr; g.fillRect(0, 0, 4, 256); skyTex.needsUpdate = true;
+    scene.fog.color.copy(n ? mix(0x0d2030, 0x161d23, over) : mix(0xbcd6e4, 0xb4bcc1, over));
+    scene.fog.near = 60 - 22 * over;
+    if (dayChanged) {
+      for (const [m, col] of Object.values(n ? NIGHT : DAY)) m.color.set(col);
+      mat.glass.emissiveIntensity = n ? 1.15 : 0;
+      hemi.color.set(n ? 0x4a6a9a : 0xdfeefe); hemi.groundColor.set(n ? 0x0b1410 : 0x4d6b3a);
+      sun.color.set(n ? 0x9fb8ff : 0xfff1d6);
+      renderer.toneMappingExposure = n ? 0.9 : 0.92;
+      bloom.strength = n ? 0.5 : 0.7; bloom.threshold = n ? 2.2 : 1.6;
+      nightObjs.forEach((o) => (o.visible = n));
+    }
+    // cu cerul acoperit: soarele aproape dispare (umbre slabe), lumina vine difuz de peste tot
+    sun.intensity = n ? 0.35 * (1 - 0.7 * over) : 2.3 * (1 - 0.72 * over);
+    sun.shadow.radius = 4 + 10 * over;
+    hemi.intensity = n ? 0.35 : 0.8 + 0.35 * over;
+    scene.environmentIntensity = n ? 0.15 : 0.55 - 0.1 * over;
+    stars.visible = n && c < 0.6;
+    const shown = c < 0.1 ? 0 : Math.round(2 + c * (clouds.length - 2));
+    clouds.forEach((cl, i) => (cl.visible = i < shown));
+    cloudMat.color.copy(n ? mix(0x4a5660, 0x343d45, over) : mix(0xffffff, 0x9ea6ad, over));
+    cloudMat.opacity = 0.9 + 0.08 * over;
+  };
+  applySky(false, 0);
 
   // ---- atingerea: raza din cameră → prima piesă cu „tip”
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
@@ -342,6 +399,7 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
       });
     }
     ledMat.color.setHex(0x3ddc84).multiplyScalar(2 + 1.5 * Math.sin(t * 4));
+    for (const cl of clouds) if (cl.visible) placeCloud(cl, t);
     controls.update();
     composer.render();
     onFrame(anchors());
@@ -349,9 +407,10 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
   frame();
 
   return {
-    // night: true/false; flows: {pv, bat, load, grid} = 1 (spre invertor/consumator), -1 (invers), 0 (oprit); soc 0–100
-    set({ night: n, flows: fl = {}, soc } = {}) {
-      if (n !== undefined) setNight(!!n);
+    // night: true/false; flows: {pv, bat, load, grid} = 1 (spre invertor/consumator), -1 (invers), 0 (oprit); soc 0–100;
+    // cloud: acoperirea cerului 0–100 % (prognoza meteo; null = necunoscută → senin)
+    set({ night: n, flows: fl = {}, soc, cloud: c } = {}) {
+      if (n !== undefined || c !== undefined) applySky(n !== undefined ? !!n : !!night, c != null ? c / 100 : Math.max(0, cloud));
       for (const [k, d] of Object.entries(fl)) if (flows[k]) {
         flows[k].dir = d; flows[k].tubeMat.opacity = d ? 0.45 : 0.12;
       }

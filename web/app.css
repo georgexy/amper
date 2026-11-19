@@ -920,3 +920,4 @@ body[data-look="casa"] nav.tabs { z-index: 6; }
 .cap-months div { display: grid; grid-template-columns: 56px 1fr 34px; align-items: center; gap: 8px; font-size: 12.5px; }
 .cap-months span { color: var(--muted); } .cap-months b { text-align: right; }
 .cap-months i { display: block; height: 8px; border-radius: 4px; background: var(--charge); opacity: .8; }
+.chart .legend span.fc-lg::before { background: none; height: 0; border-top: 2px dashed var(--c); }
