@@ -53,6 +53,18 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
   controls.maxPolarAngle = Math.PI * 0.47;                        // nu coboară sub pământ
   controls.screenSpacePanning = true;
   controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+  // iPhone (raportat 2026-11-19: „dă zoom când ating doar cu un deget”): uneori ridicarea degetului nu ajunge la
+  // canvas, iar OrbitControls păstrează un deget „fantomă”; următoarea atingere cu un deget devine atunci gestul cu
+  // două degete (zoom). Curățăm: (1) la începutul unei atingeri noi (`isPrimary`), degetele vechi se uită;
+  // (2) ridicarea / anularea / pierderea capturii prinse oriunde închide degetul urmărit.
+  const cv = renderer.domElement;
+  const forget = () => { controls._pointers.length = 0; for (const k in controls._pointerPositions) delete controls._pointerPositions[k]; };
+  const onPrimary = (e) => { if (e.isPrimary && controls._pointers.length) forget(); };
+  const onLift = (e) => { if (controls._pointers.includes(e.pointerId)) { try { controls._onPointerUp(e); } catch { forget(); } } };
+  cv.addEventListener("pointerdown", onPrimary, { capture: true });   // înaintea OrbitControls
+  cv.addEventListener("lostpointercapture", onLift);
+  window.addEventListener("pointerup", onLift);
+  window.addEventListener("pointercancel", onLift);
   let moved = false;
   controls.addEventListener("start", () => { if (!moved) { moved = true; onMove(true); } });
   controls.addEventListener("change", () => {                    // centrul rotirii rămâne pe insulă
@@ -688,12 +700,14 @@ export function mount(host, { onPick = () => {}, onFrame = () => {}, onLost = ()
     },
     anchors,
     resetView() { moved = false; placeCamera(); onMove(false); },   // vederea de la început
+    _controls: controls,                                             // pentru testele cu atingeri (Playwright)
     dispose() {
       alive = false; cancelAnimationFrame(raf); ro.disconnect(); controls.dispose();
       renderer.domElement.removeEventListener("pointerdown", onDown);
       renderer.domElement.removeEventListener("pointerup", onUp);
       scene.traverse((o) => { o.geometry?.dispose(); (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m?.dispose?.()); });
       renderer.domElement.removeEventListener("webglcontextlost", lost);
+      window.removeEventListener("pointerup", onLift); window.removeEventListener("pointercancel", onLift);
       composer.dispose?.(); pmrem.dispose(); renderer.dispose();
       renderer.forceContextLoss(); renderer.domElement.remove();
     },
