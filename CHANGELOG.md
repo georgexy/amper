@@ -15,6 +15,9 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
   pentru mâine.
 - Tema „Casă 3D”: cerul urmează vremea de afară (din prognoză): pe senin rămâne albastru, cu nori se adună nori în
   jurul casei, iar pe cer acoperit lumina e cenușie și fără umbre tari.
+- Tema „Casă 3D”: casa nu mai stă pe o insulă plutitoare, ci pe un câmp care se pierde în zare (nu se mai vede sub
+  pământ). Împrejur: strada cu trotuare și felinare în față, o mașină pe aleea garajului, case vecine peste drum și
+  pădure în spate. Norii stau sus, deasupra pădurii, iar peste curte trec umbrele lor.
 
 ## 1.0.0-beta.23 — 2026-11-17
 - Setări → Despre → „Export pentru diagnostic”: alegi perioada (ultima oră, ultima zi, 3 zile, 7 zile sau aleasă de tine)

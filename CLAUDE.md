@@ -703,6 +703,15 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   ×(1−0,72·acoperire), umbre moi, stele ascunse peste 60 %); 14 nori (`SPOTS` = locuri goale de pe ecranul de la
   început, puși pe raza camerei la 58–86 m, adică dincolo de insulă), câți apar = 2 + acoperire × 12, plutesc
   sinusoidal. `app.js` cere `/api/sky` la 10 min (`casa.cloud`).
+- Tot 2026-11-19 („să nu văd sub pământ”, „stradă în față, pădure în spate”): insula (rbox de pământ) înlocuită cu
+  `CircleGeometry(260)` (`mat.field`), gazonul curții rămâne; strada la z 14,6 (asfalt 6,2 m, trotuare, linie punctată
+  instanțiată), alei până la trotuar, mașină pe aleea garajului, 4 felinare (x −34/−14/18/38, lumini doar la −14 și 18),
+  4 case vecine peste drum (z ~27, acoperiș = prismă `CylinderGeometry(…,3)` cu `roofBasis`), pădure instanțiată
+  (`InstancedMesh` conifere/foioase/trunchiuri, ~340, z < −13, fără umbre) pe `mat.forest`; `maxDistance` 95.
+  Norii: doar `SPOTS` din partea de sus a ecranului, la înălțimea `Y` pe raza camerei (mai jos acopereau casa); fiecare
+  cu materialul lui, estompat când ajunge pe ecran în dreptul casei (camera rotită). Umbrele norilor: 8 pete negre
+  transparente pe pământ, trec spre dreapta, doar ziua și sub cer acoperit de tot. Ceața urmează distanța camerei
+  (`fog.near = dist + 10`), altfel la depărtare se spăla imaginea.
 
 ## Jurnalul pe card, copia de siguranță explicată, toate notificările (1.0.0-beta.21, cerut 2026-11-09)
 - Motiv: pe 09.11 clona (00:17, după ~17 min, prin 4G) a eșuat, iar jurnalul era doar în RAM (Raspberry Pi OS:
