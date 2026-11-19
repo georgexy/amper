@@ -712,6 +712,18 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   cu materialul lui, estompat când ajunge pe ecran în dreptul casei (camera rotită). Umbrele norilor: 8 pete negre
   transparente pe pământ, trec spre dreapta, doar ziua și sub cer acoperit de tot. Ceața urmează distanța camerei
   (`fog.near = dist + 10`), altfel la depărtare se spăla imaginea.
+- 1.0.0-beta.25 (cerut 2026-11-19: „dacă afară plouă, să plouă și aici”, „fă tot”, „norii pe tot cerul”): vremea
+  cere și `weather_code,precipitation,snowfall,snow_depth` (cache-ul vechi fără `code` se reîmprospătează);
+  `sky_now` → {cloud, rad, code, kind clear|rain|snow|fog|storm (`FOG/SNOW/RAIN/STORM_CODES`, WMO), intensity 0–1
+  (`_ramp` pe mm/h sau cm/h), precip, snow_cm}. Scena: `set({weather})` → `applySky(night, cloud, wx)`: cer mai
+  închis (`SKY.*[2]`) la ploaie/furtună, `WET` (culori mai închise, asfaltul lucios), `SNOWY` (albire după
+  snow_cm/6), ceața (`fogDense`; la „fog” și casa învăluită ușor). Norii = forme unite (`mergeGeometries`, 8 forme):
+  `field` 46 sus (30–46 m, până la 170 m), `ring` 18 spre orizont, `spots` 10 din vederea de început; câți apar
+  = acoperire × grup; vânt spre +x; estompați în dreptul casei sau la < 30 m de cameră. Ploaia/ninsoarea =
+  `THREE.Points` cu ShaderMaterial (cutie 120 × 50 × 120 m în jurul țintei, poziția împachetată în shader;
+  ploaia = dâră verticală desenată în punct, pentru că liniile de 1 px dispăreau pe ecrane dense; `vSize` ca
+  varying — `gl_PointSize` nu există în fragment shader), număr după intensitate (`setDrawRange`). Furtuna:
+  `strike()` (trăsnet `TubeGeometry` în zare) + licărire dublă prin `hemiBase + flash`. app.js: `casa.wx`.
 
 ## Jurnalul pe card, copia de siguranță explicată, toate notificările (1.0.0-beta.21, cerut 2026-11-09)
 - Motiv: pe 09.11 clona (00:17, după ~17 min, prin 4G) a eșuat, iar jurnalul era doar în RAM (Raspberry Pi OS:

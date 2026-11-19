@@ -2,6 +2,11 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.25 — 2026-11-19
+- Tema „Casă 3D” urmează vremea de afară: plouă (drumul se udă), ninge (iarba și acoperișurile se albesc după cât
+  zăpadă e depusă), e ceață sau furtună cu fulgere — după prognoza Open-Meteo pentru localitatea aleasă. Norii acoperă
+  tot cerul (se văd când rotești casa spre orizont), iar ploaia și ninsoarea cad peste tot în jur.
+
 ## 1.0.0-beta.24 — 2026-11-19
 - Bateriile → „Prognoză și generator”: pe baza vremii (Open-Meteo, fără cont) și a ultimelor 14 zile, Amper estimează
   cât produc panourile mâine și poimâine, cât se consumă și unde ajunge bateria oră cu oră. Dacă bateria ar coborî
