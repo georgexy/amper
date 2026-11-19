@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.24 — în pregătire
+## 1.0.0-beta.24 — 2026-11-19
 - Bateriile → „Prognoză și generator”: pe baza vremii (Open-Meteo, fără cont) și a ultimelor 14 zile, Amper estimează
   cât produc panourile mâine și poimâine, cât se consumă și unde ajunge bateria oră cu oră. Dacă bateria ar coborî
   sub pragul ales (implicit 20 %), îți spune până la ce oră să pornești generatorul și câți kWh lipsesc, cu o
