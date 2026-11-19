@@ -2,6 +2,15 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.24 — în pregătire
+- Bateriile → „Prognoză și generator”: pe baza vremii (Open-Meteo, fără cont) și a ultimelor 14 zile, Amper estimează
+  cât produc panourile mâine și poimâine, cât se consumă și unde ajunge bateria oră cu oră. Dacă bateria ar coborî
+  sub pragul ales (implicit 20 %), îți spune până la ce oră să pornești generatorul și câți kWh lipsesc, cu o
+  notificare pe zi. Alegi localitatea o dată; cât produc panourile învață singur.
+- Bateriile → „Capacitatea reală”: câți Ah dă fiecare modul de la plin până aproape de gol, măsurat de Amper (nu cât
+  scrie în BMS), cu procentul din capacitatea din BMS și evoluția lună de lună. Se măsoară singur la descărcările
+  adânci (sub ~12 % rămas).
+
 ## 1.0.0-beta.23 — 2026-11-17
 - Setări → Despre → „Export pentru diagnostic”: alegi perioada (ultima oră, ultima zi, 3 zile, 7 zile sau aleasă de tine)
   și descarci un fișier .zip cu citirile bateriilor și ale invertorului, alertele, notificările, setările schimbate,

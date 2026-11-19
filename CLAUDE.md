@@ -671,6 +671,29 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   consimțământul cu un cont real pe iPhone, OneDrive Graph, pCloud UE, un server WebDAV/SMB real.
   UI: Setări → Conectare → `#set-backup` (`loadBackup/renderBackup`). Notificare ☁️ la legare/oprire.
 
+## Prognoză și generator + capacitatea reală (1.0.0-beta.24, în pregătire, cerute 2026-11-19)
+- Imaginea SD a fost testată de utilizator pe un Pi nou (beta, 2026-11-19): „a mers foarte bine”.
+- `amper/forecast.py`: setări în meta `forecast` (place/lat/lon/min_soc 20/notify), cache vreme în meta
+  `forecast_weather` (2 h, folosit încă 24 h la eroare). Open-Meteo `shortwave_radiation` (medie pe ora care SE
+  TERMINĂ la ora din listă; `timeformat=unixtime`, `past_days=14`, `forecast_days=3`); geocoding pentru localitate.
+  `db.hourly` = PV/consum adunate pe invertoare + SOC mediu pe ore. `calibrate`: mediana PV/radiație în orele cu
+  ≥ 150 W/m² și SOC < 95 % (cu bateria plină PV-ul e tăiat); < 12 ore → `approx` (p90 din toate orele cu soare),
+  nimic → `no_pv` (prognoza fără panouri, fără notificare). `load_profile` = media pe ora din zi. `project` 48 h
+  (INV_EFF 0,92 consumul, CHG_EFF 0,97, PV plafonat la max văzut × 1,15) de la `bank.kwh`/`capacity_kwh`.
+  `advice` (need/ok) + `need_kwh`; `check` din maintenance_loop: o notificare ⛅ pe zi dacă sub prag în 24 h,
+  url `/?v=forecast`. API `GET /api/forecast`, `GET /api/forecast/places?q=`, `POST /api/forecast/settings` (doar
+  cookie). UI: `#fc-row` (Bateriile, primul rând), `view-forecast` (`loadForecast`, `fcChart` SVG, `#fc-set`).
+  Mediul de lucru al lui Claude: hosturile Open-Meteo adăugate în rețea; IP-ul comun dă uneori „Daily API request
+  limit exceeded” (pe Pi nu, fiecare are IP-ul lui).
+- `amper/capacity.py`: plin (celula max ≥ 3,44 V sau SOC ≥ 99,5 cu max ≥ 3,40) → Ah scoși (net) pe `pack_series`
+  (5 min + brute) → ancora de jos din TENSIUNE: „rest” (|I| ≤ 5 % C și media celulelor ≤ 3,21 V → `OCV` tabel)
+  sau „knee” (celula min ≤ 2,95 V → 2 %); cap = Ah / (1 − SOC rămas); doar ≥ 50 % din capacitate, 40–130 %
+  plauzibil, fără pauze > 15 min, fără BMS cu ≥ 20 % citiri 0 A. Tabela `capacity_events` (PRIMARY KEY device,
+  t_full). `scan` incremental (meta `capacity_scan`, 3 zile suprapunere) din maintenance_loop și la GET; respectă
+  `reports_since`. `analyze` (mediana ultimelor 3, pe luni, % din capacitatea din BMS), `progress` (ultima încărcare
+  completă, cel mai jos de atunci). `Engine.pack_info()`. API `GET /api/capacity`. UI `#cap-row`, `view-capacity`.
+  NEVERIFICATE pe date reale: pragurile și tabelul OCV, calibrarea PV (panouri înclinate vs. radiație orizontală).
+
 ## Jurnalul pe card, copia de siguranță explicată, toate notificările (1.0.0-beta.21, cerut 2026-11-09)
 - Motiv: pe 09.11 clona (00:17, după ~17 min, prin 4G) a eșuat, iar jurnalul era doar în RAM (Raspberry Pi OS:
   `/usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf`, Storage=volatile; fără rsyslog) → cauza pierdută.

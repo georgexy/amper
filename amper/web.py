@@ -1255,6 +1255,41 @@ def make_app(engine) -> web.Application:
         rep = await asyncio.to_thread(battery_report.build, engine.db, pack_names(), start, end, invs)
         return _json(i18n.report(rep))
 
+    # ---------------- prognoza și capacitatea reală (ambele ediții) ----------------
+    from . import capacity, forecast
+
+    async def forecast_get(request):
+        rep = await asyncio.to_thread(forecast.build, engine.db, engine.bank())
+        if isinstance(rep.get("advice"), dict):
+            rep["advice"]["text"] = i18n.tr(rep["advice"]["text"])
+        return _json(rep)
+
+    async def forecast_places(request):
+        try:
+            res = await asyncio.to_thread(forecast.places, request.query.get("q", ""),
+                                          lang="en" if i18n.lang() == "en" else "ro")
+        except Exception as e:
+            return _json({"error": f"Căutarea nu merge acum ({e})."}, 502)
+        return _json({"places": res})
+
+    async def forecast_settings(request):
+        body = await request.json()
+        try:
+            s = await asyncio.to_thread(forecast.save_settings, engine.db,
+                                        {k: body[k] for k in ("lat", "lon", "place", "min_soc", "notify") if k in body})
+        except (TypeError, ValueError) as e:
+            return _json({"error": str(e) or "valoare greșită"}, 400)
+        return _json({"ok": True, "settings": s})
+
+    async def capacity_get(request):
+        packs = engine.pack_info()
+        await asyncio.to_thread(capacity.scan, engine.db, packs)
+        res = await asyncio.to_thread(capacity.analyze, engine.db, packs)
+        prog = await asyncio.to_thread(capacity.progress, engine.db, packs)
+        for m in res["modules"]:
+            m["progress"] = prog.get(m["id"])
+        return _json(res)
+
     async def reports_reset(request):
         """Pi mutat la altă instalație: rapoartele (nopții / pe perioadă) pornesc de acum; datele rămân în istoric."""
         body = await request.json()
@@ -1359,6 +1394,10 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/api/night-report", night_get)
     app.router.add_post("/api/night-report/notify", night_notify)
     app.router.add_get("/api/battery-report", battery_report_get)
+    app.router.add_get("/api/forecast", forecast_get)
+    app.router.add_get("/api/forecast/places", forecast_places)
+    app.router.add_post("/api/forecast/settings", forecast_settings)
+    app.router.add_get("/api/capacity", capacity_get)
     app.router.add_get("/api/wifi/scan", wifi_scan)
     app.router.add_get("/api/wifi/status", wifi_status)
     app.router.add_post("/api/wifi/connect", wifi_connect)
