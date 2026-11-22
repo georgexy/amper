@@ -38,6 +38,8 @@ body[data-look="carduri"] { --acc: #FF8A3D; --bg: #11161B; --panel: #1B2229; --p
 
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); }
+/* iPhone: dubla atingere mărea pagina (raportat 2026-11-19 în tema Casă 3D); `manipulation` o oprește, pinch-ul rămâne */
+html, body { touch-action: manipulation; }
 body {
   font: 400 16px/1.45 "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-variant-numeric: tabular-nums;
@@ -837,8 +839,10 @@ body[data-look="casa"] #app > .wrap:first-child { position: relative; z-index: 3
 body[data-look="casa"] #app > .wrap:first-child > * { max-width: 688px; margin-left: auto; margin-right: auto; }
 body[data-look="casa"] nav.tabs { z-index: 6; }
 .cs-wrap { position: fixed; inset: 0; z-index: 1; background: #0E1A22; }
-.cs-host { position: absolute; inset: 0; }
-.cs-host canvas { display: block; width: 100% !important; height: 100% !important; touch-action: manipulation; }
+.cs-host { position: absolute; inset: 0; touch-action: none; }
+/* scena primește toate gesturile (rotire, zoom în scenă), pagina niciunul; etichetele doar atingeri simple */
+.cs-host canvas { display: block; width: 100% !important; height: 100% !important; touch-action: none !important; }
+.cs-tag, .cs-reset, .cs-hint { touch-action: manipulation; }
 .cs-tag { position: absolute; left: 0; top: 0; z-index: 2; display: flex; align-items: center; gap: 7px; padding: 5px 11px 5px 5px;
   border-radius: 20px; background: rgba(14,26,34,.74); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
   border: 1px solid rgba(255,255,255,.14); box-shadow: 0 6px 18px rgba(0,0,0,.35); white-space: nowrap; cursor: pointer;

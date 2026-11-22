@@ -685,6 +685,15 @@ async function casaMount(root) {
     const m = await import("./casa3d.js");
     const host = root.querySelector(".cs-host");
     if (!host || !host.isConnected) return;
+    if (!host.dataset.noZoom) {                       // iPhone: gesturile din scenă nu măresc pagina (doar camera 3D)
+      host.dataset.noZoom = "1";
+      for (const ev of ["gesturestart", "gesturechange", "dblclick"]) host.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+      let lastEnd = 0;
+      host.addEventListener("touchend", (e) => {      // a doua atingere rapidă = dublă atingere → fără zoom de pagină
+        if (e.timeStamp - lastEnd < 350 && e.changedTouches.length === 1 && e.touches.length === 0) e.preventDefault();
+        lastEnd = e.timeStamp;
+      }, { passive: false });
+    }
     if (!m.supported()) throw new Error("webgl");
     casa.api = m.mount(host, { onPick: (k) => casaPick(k), onFrame: casaFrame, onLost: () => casaLost(root),
       onMove: (on) => {

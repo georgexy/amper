@@ -724,6 +724,13 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   ploaia = dâră verticală desenată în punct, pentru că liniile de 1 px dispăreau pe ecrane dense; `vSize` ca
   varying — `gl_PointSize` nu există în fragment shader), număr după intensitate (`setDrawRange`). Furtuna:
   `strike()` (trăsnet `TubeGeometry` în zare) + licărire dublă prin `hemiBase + flash`. app.js: `casa.wx`.
+- 1.0.0-beta.26 (raportat 2026-11-19 pe iPhone: „dă zoom când ating doar cu un deget”): OrbitControls ascultă
+  `pointerup` doar pe canvas; o ridicare pierdută lasă un deget în `controls._pointers`, iar următorul deget devine
+  gestul cu două degete (DOLLY_PAN). În scene.js: `pointerdown` în captură cu `isPrimary` → degetele vechi uitate
+  (`forget`), `pointerup/pointercancel` pe window + `lostpointercapture` → `_onPointerUp`. Plus: `html, body
+  { touch-action: manipulation }` (fără zoom la dublă atingere), `.cs-host` și canvasul `touch-action: none`,
+  `gesturestart/gesturechange/dblclick` și a doua atingere rapidă (`touchend` < 350 ms) cu preventDefault pe `.cs-host`.
+  `api._controls` expus pentru testul Playwright cu atingeri CDP (`Input.dispatchTouchEvent`).
 
 ## Jurnalul pe card, copia de siguranță explicată, toate notificările (1.0.0-beta.21, cerut 2026-11-09)
 - Motiv: pe 09.11 clona (00:17, după ~17 min, prin 4G) a eșuat, iar jurnalul era doar în RAM (Raspberry Pi OS:
