@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.26 — în pregătire
+## 1.0.0-beta.26 — 2026-11-22
 - Tema „Casă 3D” pe iPhone: atingerea cu un deget nu mai mărește (zoom). Pagina nu se mai mărește la dublă atingere,
   iar scena nu mai rămâne cu un „deget fantomă” după o atingere pierdută (de aceea un deget părea două).
 
