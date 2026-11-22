@@ -98,6 +98,9 @@ class Engine:
         self._load_forced()
         from .cell_health import Tracker
         self.cells = Tracker(self.db)            # sănătatea celulelor: momentele utile, analizate săptămânal
+        from .soc_est import SocEstimator
+        self.soc = SocEstimator(self.db)         # SOC-ul calculat de Amper (Ah de la plin / capacitatea învățată)
+        self.soc_source = self.db.get_meta("soc_source") or "amper"     # ce SOC se afișează: amper | bms
         self.subscribers: set[asyncio.Queue] = set()
         self._tasks: dict[str, asyncio.Task] = {}
         self._energy_t: dict[str, float] = {}
@@ -174,7 +177,23 @@ class Engine:
         now = now or time.time()
         stale_after = max(30, self.cfg["poll_interval"] * 6)
         devs = {k: v.to_dict(now, stale_after) for k, v in self.devices.items()}
-        return dict(ts=now, started=self.started, devices=devs, bank=self._bank(devs),
+        # SOC-ul calculat de Amper lângă cel din BMS; cu sursa „amper”, el ia locul SOC-ului în citire (deci în bancă,
+        # pe ecrane, în prognoză și în alerte), iar al BMS-ului rămâne în `soc_bms`
+        for k, d in devs.items():
+            st = self.devices[k]
+            if d["kind"] != "pack" or not d.get("reading"):
+                continue
+            r = d["reading"]
+            info = self.soc.info(k, self._rated(st), r.get("soc"))
+            d["soc_info"] = info
+            d["soc_bms"] = r.get("soc")
+            if info and self.soc_source == "amper" and info["soc"] is not None:
+                r["soc"] = info["soc"]
+                cap = info["cap"] if info["cap_kind"] in ("measured", "relative") else d.get("capacity_ah")
+                if cap:
+                    d["capacity_ah"] = cap
+                    r["remaining_ah"] = round(float(cap) * info["soc"] / 100, 1)
+        return dict(ts=now, started=self.started, devices=devs, bank=self._bank(devs), soc_source=self.soc_source,
                     alerts=self.alerts.active_list(), notifications=self.notifier.enabled,
                     app_version=self.app_version() if self.app_version else None)
 
@@ -247,6 +266,10 @@ class Engine:
                         self.cells.observe(st.cfg["id"], r)
                     except Exception:
                         log.exception("sănătatea celulelor: %s", st.cfg["id"])
+                    try:
+                        self.soc.observe(st.cfg["id"], r, self._rated(st))
+                    except Exception:
+                        log.exception("SOC calculat: %s", st.cfg["id"])
                 if isinstance(r, InverterReading):
                     self._integrate_energy(r)
                 self._push(self.snapshot())      # pe ecran imediat, nu la următorul tick
@@ -267,6 +290,16 @@ class Engine:
             await asyncio.sleep(self.cfg["poll_interval"])
             self.check_clock()
             self.expire_devices()
+            try:
+                self.soc.save()
+                from . import capacity
+                packs = self.pack_info()
+                if packs:
+                    capacity.test_tick(self.db, self.soc, packs,
+                                       {d: self.devices[d].reading for d in packs if self.devices[d].reading},
+                                       self.notifier)
+            except Exception:
+                log.exception("SOC calculat / testul de capacitate")
             snap = self.snapshot()
             try:
                 self.alerts.process(snap)
@@ -277,6 +310,18 @@ class Engine:
 
     def device_names(self) -> dict[str, str]:
         return {k: st.cfg.get("name", k) for k, st in self.devices.items()}
+
+    @staticmethod
+    def _rated(st) -> float | None:
+        """Capacitatea din config sau din BMS (Ah)."""
+        v = st.cfg.get("capacity_ah") or getattr(st.reading, "capacity_ah", None)
+        return float(v) if v else None
+
+    def set_soc_source(self, source: str) -> None:
+        if source not in ("amper", "bms"):
+            raise ValueError("Sursă necunoscută.")
+        self.soc_source = source
+        self.db.set_meta("soc_source", source)
 
     def pack_info(self) -> dict[str, dict]:
         """Modulele legate: nume, capacitatea din config/BMS (Ah) și numărul de celule (capacitatea reală)."""
@@ -337,7 +382,7 @@ class Engine:
             if st.reading is None or st.last_ok is None or now - st.last_ok > stale_after:
                 continue
             if isinstance(st.reading, PackReading):
-                self.db.insert_pack(st.reading, ts=int(now))
+                self.db.insert_pack(st.reading, ts=int(now), soc_amper=self.soc.soc(st.cfg["id"], self._rated(st)))
             else:
                 self.db.insert_inverter(st.reading, ts=int(now))
         self._flush_energy()
@@ -361,6 +406,7 @@ class Engine:
             try:
                 from . import capacity
                 await asyncio.to_thread(capacity.scan, self.db, self.pack_info())
+                self.soc.set_caps(await asyncio.to_thread(capacity.learned, self.db, self.pack_info()))
             except Exception:
                 log.exception("eroare la măsurarea capacității")
             try:

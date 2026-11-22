@@ -1306,9 +1306,49 @@ def make_app(engine) -> web.Application:
         await asyncio.to_thread(capacity.scan, engine.db, packs)
         res = await asyncio.to_thread(capacity.analyze, engine.db, packs)
         prog = await asyncio.to_thread(capacity.progress, engine.db, packs)
+        learned = await asyncio.to_thread(capacity.learned, engine.db, packs)
+        engine.soc.set_caps(learned)
+        now = time.time()
         for m in res["modules"]:
             m["progress"] = prog.get(m["id"])
+            m["learned"] = learned.get(m["id"])
+            s = engine.soc.st.get(m["id"]) or {}
+            m["full_ago"] = int(now - s["full_ts"]) if s.get("anchored") and s.get("full_ts") else None
+        res["test"] = await asyncio.to_thread(capacity.test_state, engine.db)
+        res["test_thresholds"] = list(capacity.TEST_THRESHOLDS)
+        res["test_full_within"] = capacity.TEST_FULL_WITHIN
         return _json(res)
+
+    async def capacity_test(request):
+        """Testul de capacitate ghidat: {action: start, threshold} sau {action: stop}."""
+        body = await request.json()
+        try:
+            if body.get("action") == "start":
+                st = await asyncio.to_thread(capacity.test_start, engine.db, engine.soc, engine.pack_info(),
+                                             float(body.get("threshold") or 3.0))
+                engine.notifier.send("🔋 Testul de capacitate a pornit. Lasă bateria să se descarce la consumul "
+                                     "obișnuit; îți spun când ajunge la prag.", title="Amper: test de capacitate",
+                                     priority="default", url="/?v=capacity")
+            else:
+                st = await asyncio.to_thread(capacity.test_stop, engine.db)
+        except (TypeError, ValueError) as e:
+            return _json({"error": str(e)}, 400)
+        return _json({"ok": True, "test": st})
+
+    async def soc_get(request):
+        snap = engine.snapshot()
+        mods = [dict(id=k, name=d["name"], **(d.get("soc_info") or {})) for k, d in snap["devices"].items()
+                if d["kind"] == "pack" and d.get("soc_info")]
+        return _json({"source": engine.soc_source, "modules": mods})
+
+    async def soc_source(request):
+        body = await request.json()
+        try:
+            engine.set_soc_source(str(body.get("source")))
+        except ValueError as e:
+            return _json({"error": str(e)}, 400)
+        engine._push(engine.snapshot())
+        return _json({"ok": True, "source": engine.soc_source})
 
     async def reports_reset(request):
         """Pi mutat la altă instalație: rapoartele (nopții / pe perioadă) pornesc de acum; datele rămân în istoric."""
@@ -1418,6 +1458,9 @@ def make_app(engine) -> web.Application:
     app.router.add_get("/api/forecast/places", forecast_places)
     app.router.add_post("/api/forecast/settings", forecast_settings)
     app.router.add_get("/api/capacity", capacity_get)
+    app.router.add_post("/api/capacity/test", capacity_test)
+    app.router.add_get("/api/soc", soc_get)
+    app.router.add_post("/api/soc/source", soc_source)
     app.router.add_get("/api/sky", sky_get)
     app.router.add_get("/api/wifi/scan", wifi_scan)
     app.router.add_get("/api/wifi/status", wifi_status)

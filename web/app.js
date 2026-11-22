@@ -120,6 +120,7 @@ async function boot() {
   if (v === "cells") { show("cells"); history.replaceState(null, "", location.pathname); }
   if (v === "night") { show("report"); history.replaceState(null, "", location.pathname); }
   if (v === "forecast") { show("forecast"); history.replaceState(null, "", location.pathname); }
+  if (v === "capacity") { show("capacity"); history.replaceState(null, "", location.pathname); }
   $("#set-about-sub").textContent = `Amper ${isPro() ? "Pro" : "Lite"} ${state.info.version || ""} · actualizări, Pi-ul`;
   setInterval(tickConn, 1000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -823,8 +824,33 @@ function bleId(r) {
   const both = n && mac && !n.toUpperCase().includes(mac.replace(/:/g, ""));
   return `<div class="pk-id"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>${esc(n || mac)}${both ? ` · ${esc(mac)}` : ""}</div>`;
 }
+/* SOC afișat: calculat de Amper (soc_est.py) sau citit din BMS — o setare pe Pi (cerută 2026-11-22) */
+const socSrc = () => state.snap?.soc_source || "amper";
+function socOther(d) {
+  const i = d.soc_info;
+  if (!i || !i.differs || i.soc == null || i.soc_bms == null) return "";
+  const amper = socSrc() === "amper";
+  return `<small class="soc-alt ${i.mismatch ? "bad" : ""}" title="${esc(i.mismatch || "")}">${amper ? "BMS" : "Amper"} ${num(amper ? i.soc_bms : i.soc, 0)}%</small>`;
+}
+const socApprox = (d) => (socSrc() === "amper" && d.soc_info && !d.soc_info.anchored ? `<span class="soc-tilde" title="${esc(t("aproximativ, până la prima încărcare completă"))}">~</span>` : "");
+function renderSocSrc() {
+  $$("#soc-src button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.s === socSrc()));
+}
+$$("#soc-src button").forEach((b) => (b.onclick = async () => {
+  if (b.dataset.s === socSrc()) return;
+  try {
+    const r = await fetch("/api/soc/source", { method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: b.dataset.s }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || `eroare ${r.status}`);
+    if (state.snap) state.snap.soc_source = j.source;
+    renderSocSrc();
+  } catch (e) { alert(e.message); }
+}));
+
 function renderPacks() {
   const h = homeData(), b = h.b;
+  renderSocSrc();
   $("#pk-soc").textContent = b.soc == null ? "–" : `${num(b.soc, 0)}%`;
   const temps = h.list.flatMap((x) => (x.d.stale ? [] : x.d.reading?.temps || []));
   $("#pk-sum").innerHTML = [["Rămas", kv(b.kwh, "kWh", 1)], ["Curent", b.current == null ? "–" : `${b.current > 0 ? "+" : ""}${num(b.current, 1)} A`],
@@ -855,7 +881,7 @@ function renderPacks() {
       <div class="t"><div class="n">${esc(d.name)} <span class="tag">${esc(label)}</span>${["daly", "seplos"].includes(d.type) && !d.stale
         && isPro() ? `<span class="pk-gear" data-bms="${esc(d.id)}" role="button" tabindex="0" aria-label="Setările BMS ${esc(d.name)}">⚙</span>` : ""}</div>
       <div class="s">${d.restarting ? "Repornește…" : d.stale ? `Nu comunică${d.error ? ": " + esc(d.error) : ""}` : facts}</div>${bleId(r)}</div>
-      <div class="soc">${r.soc == null ? "–" : num(r.soc, 0)}<sup>%</sup></div></div>
+      <div class="soc">${socApprox(d)}${r.soc == null ? "–" : num(r.soc, 0)}<sup>%</sup>${socOther(d)}</div></div>
       ${cells.length ? `<div class="pk-cells">${cells.map((v) => `<i class="${hi - lo > 0.005 ? (v === hi ? "hi" : v === lo ? "lo" : "") : ""}"
         style="height:${Math.max(8, ((v - floor) / span) * 100)}%"></i>`).join("")}</div>` : ""}
       <div class="ft"><span>${cells.length ? `${cells.length} celule · min <b>${num(lo, 3)}</b> · max <b>${num(hi, 3)}</b>${cellsOld(r)}` : ""}</span>
@@ -1139,6 +1165,54 @@ async function loadCapacityRow() {
 }
 $("#cap-row").onclick = () => show("capacity");
 $("#cap-back").onclick = () => show("packs");
+// comparația cu celelalte module (în paralel: Ah-ii dați într-o noapte sunt proporționali cu capacitatea)
+function capRel(m) {
+  const l = m.learned || {};
+  const parts = [];
+  if (l.rel != null) parts.push(tf("Comparat cu celelalte module (raportat la capacitatea din BMS): dă {0} % față de media lor, din {1} nopți.", Math.round(l.rel * 100), l.nights));
+  else parts.push(tf("Comparația cu celelalte module: are nevoie de cel puțin 3 nopți cu date bune (acum {0}).", l.nights || 0));
+  if (l.cap && l.kind === "relative") parts.push(tf("Capacitate estimată din comparație: {0} Ah.", num(l.cap, 0)));
+  return `<p class="cap-p cap-rel">${parts.map(esc).join(" ")}</p>`;
+}
+// testul de capacitate ghidat: pornit de utilizator cu bateria plină, oprit de Amper la pragul ales
+function capTest(r) {
+  const s = r.test, hm = (ts) => new Date(ts * 1000).toLocaleString(LOC, { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  const v2 = (v) => num(v, 2);
+  let body;
+  if (s && s.state === "running") {
+    body = `<p><b>${esc(tf("În curs, de la {0}. Se oprește când o celulă ajunge la {1} V.", hm(s.started), v2(s.threshold)))}</b></p>
+      <p>${esc(t("Lasă bateria să se descarce la consumul obișnuit, fără generator. Primești o notificare la final; atunci pornește încărcarea."))}</p>
+      <button class="btn danger" id="ct-stop">Oprește testul</button>`;
+  } else {
+    const ready = r.modules.every((m) => m.full_ago != null && m.full_ago <= r.test_full_within);
+    const last = !s ? "" : s.state === "done"
+      ? `<p><b>${esc(tf("Ultimul test ({0}):", hm(s.ended)))}</b> ${Object.entries(s.result || {}).map(([id, x]) =>
+        esc(tf("{0}: {1} Ah ({2} %)", r.modules.find((m) => m.id === id)?.name || id, num(x.cap, 0), x.pct))).join(" · ")}</p>`
+      : `<p>${esc(tf("Ultimul test s-a oprit: {0}.", t(s.reason || "")))}</p>`;
+    body = `${last}<p>${esc(t("O noapte, o dată: pornești testul cu bateria plină și lași casa să consume ca de obicei. Când cea mai descărcată celulă ajunge la prag, Amper oprește testul, notează capacitatea fiecărui modul și îți spune să pornești încărcarea. Amper nu oprește nimic în invertor sau în BMS-uri."))}</p>
+      <label class="row-check"><span><b>${esc(t("Pragul de jos"))}</b><small>${esc(t("Tensiunea celulei la care se oprește testul"))}</small></span>
+        <select id="ct-thr">${r.test_thresholds.map((v) => `<option value="${v}" ${v === 3 ? "selected" : ""}>${v2(v)} V</option>`).join("")}</select></label>
+      <button class="btn" id="ct-start" ${ready ? "" : "disabled"}>Pornește testul</button>
+      ${ready ? "" : `<p class="note">${esc(t("Se poate porni doar cu bateria plină: toate modulele încărcate complet în ultimele 3 ore."))}</p>`}`;
+  }
+  return `<div class="rk-grp cap-test"><div class="rk-h">${esc(t("Test de capacitate"))}</div>${body}</div>`;
+}
+async function capTestPost(body) {
+  try {
+    const r = await fetch("/api/capacity/test", { method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || `eroare ${r.status}`);
+  } catch (e) { alert(e.message); }
+  loadCapacity();
+}
+$("#cap-body").addEventListener("click", (e) => {
+  if (e.target.id === "ct-start") {
+    if (!confirm(t("Pornești testul de capacitate? Bateria se va descărca până la pragul ales; ține generatorul pregătit."))) return;
+    capTestPost({ action: "start", threshold: +$("#ct-thr").value });
+  }
+  if (e.target.id === "ct-stop") capTestPost({ action: "stop" });
+});
 async function loadCapacity() {
   const box = $("#cap-body");
   box.innerHTML = `<p class="note">${esc(t("Analizez…"))}</p>`;
@@ -1154,7 +1228,7 @@ async function loadCapacity() {
           p.low ? v3(p.low.cell) : "–", p.low ? date(p.low.ts) : "–");
       return `<div class="rk-grp"><div class="rk-h">${esc(m.name)}</div><div class="cap-wait"><b>${esc(t("Încă nicio măsurătoare"))}</b>
         <p>${esc(tf("Se măsoară singur când modulul coboară de la plin până sub {0} V pe celulă (cam 12 % rămas), fără pauze în date.", v3(r.rules.rest_max)))}</p>
-        <p>${esc(where)}</p>${m.rated ? `<p>${esc(tf("În BMS: {0} Ah.", num(m.rated, 0)))}</p>` : ""}</div></div>`;
+        <p>${esc(where)}</p>${m.rated ? `<p>${esc(tf("În BMS: {0} Ah.", num(m.rated, 0)))}</p>` : ""}${capRel(m)}</div></div>`;
     }
     const cls = m.pct == null ? "" : m.pct >= 90 ? "ok" : m.pct >= 75 ? "wa" : "al";
     const mx = Math.max(...m.months.map((x) => x.cap), m.rated || 0);
@@ -1163,8 +1237,8 @@ async function loadCapacity() {
       <p class="cap-p">${esc(tf("Ultima măsurătoare: {0}, de la plin până la {1} % rămas ({2}): {3} Ah scoși.", date(m.last.ts), num(m.last.soc_low, 0), t(CAP_METHOD[m.last.method] || m.last.method), num(m.last.ah, 0)))}
         ${m.count > 1 ? esc(tf("Valoarea de sus = mediana ultimelor {0} din {1} măsurători.", Math.min(3, m.count), m.count)) : ""}</p>
       ${m.months.length > 1 ? `<div class="cap-months">${m.months.map((x) => `<div><span>${esc(new Date(x.month + "-15").toLocaleDateString(LOC, { month: "short", year: "2-digit" }))}</span>
-        <i style="width:${Math.max(4, (x.cap / mx) * 100).toFixed(0)}%"></i><b>${num(x.cap, 0)}</b></div>`).join("")}</div>` : ""}</div>`;
-  }).join("") + `<p class="note">${esc(tf("Cum se măsoară: de la plin (celula cea mai încărcată peste {0} V) se adună curentul scos, până când modulul ajunge aproape de gol, recunoscut după tensiune (sub {1} V pe celulă în repaus sau sub {2} V sub sarcină). Descărcările mai mici de {3} % nu contează: între 20 și 90 % tensiunea LiFePO4 e aproape aceeași, deci de acolo nu se poate spune cât a mai rămas.",
+        <i style="width:${Math.max(4, (x.cap / mx) * 100).toFixed(0)}%"></i><b>${num(x.cap, 0)}</b></div>`).join("")}</div>` : ""}${capRel(m)}</div>`;
+  }).join("") + capTest(r) + `<p class="note">${esc(tf("Cum se măsoară: de la plin (celula cea mai încărcată peste {0} V) se adună curentul scos, până când modulul ajunge aproape de gol, recunoscut după tensiune (sub {1} V pe celulă în repaus sau sub {2} V sub sarcină). Descărcările mai mici de {3} % nu contează: între 20 și 90 % tensiunea LiFePO4 e aproape aceeași, deci de acolo nu se poate spune cât a mai rămas.",
     v3(r.rules.full_cell), v3(r.rules.rest_max), v3(r.rules.knee), r.rules.min_depth))}</p>`;
 }
 
@@ -2485,7 +2559,9 @@ function drawHistory(data, pk, inv) {
   const S = data.series || {}, rowsOf = (d) => S[d.id]?.rows || [];
   const ph = pk.map((d) => ({ rows: rowsOf(d) })), ih = inv.length ? { rows: sumRows(inv.map(rowsOf)) } : null;
   const ser = (rows, key) => rows.map((r) => [r.t, r[key]]).filter((p) => p[1] != null);
-  lineChart($("#ch-soc"), pk.map((d, i) => ({ name: d.name, color: SERIES[i % SERIES.length], data: ser(ph[i].rows, "soc") })),
+  // SOC-ul ales în Bateriile: cel calculat de Amper (unde există în istoric) sau cel din BMS
+  const socKey = (rows) => (socSrc() === "amper" && rows.some((r) => r.soc_amper != null) ? "soc_amper" : "soc");
+  lineChart($("#ch-soc"), pk.map((d, i) => ({ name: d.name, color: SERIES[i % SERIES.length], data: ser(ph[i].rows, socKey(ph[i].rows)) })),
     { min: 0, max: 100, fmt: (v) => num(v, 0) + "%" });
   lineChart($("#ch-cur"), pk.map((d, i) => ({ name: d.name, color: SERIES[i % SERIES.length], data: ser(ph[i].rows, "current") })),
     { zero: true, fmt: (v) => num(v, 1) + " A" });
@@ -3345,6 +3421,7 @@ function openNotifUrl(u) {
   if (u.includes("v=cells")) show("cells");
   if (u.includes("v=night")) show("report");
   if (u.includes("v=forecast")) show("forecast");
+  if (u.includes("v=capacity")) show("capacity");
 }
 navigator.serviceWorker?.addEventListener("message", (e) => {
   if ($("#app").hidden) return;

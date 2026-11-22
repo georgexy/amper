@@ -2,6 +2,16 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.27 — în pregătire
+- SOC calculat de Amper, pe fiecare modul: numără Ah-ii ieșiți de la ultima încărcare completă (recunoscută după
+  tensiunea celulelor, nu după BMS) și îi împarte la capacitatea învățată. Nu mai crede un BMS care coboară singur
+  la 0 % fără curent. În Bateriile alegi ce SOC se afișează: „Calculat de Amper” sau „Citit din BMS”; când diferă
+  mult, pe cardul modulului apare și cealaltă cifră. Dacă SOC-ul din BMS nu se potrivește cu curentul sau cu
+  tensiunea, primești o alertă.
+- Capacitatea reală: comparația dintre module în fiecare noapte (cât dă fiecare față de celelalte, raportat la
+  capacitatea din BMS) și un test de capacitate ghidat — îl pornești cu bateria plină, iar Amper îți spune când
+  celulele ajung la pragul ales și notează capacitatea fiecărui modul.
+
 ## 1.0.0-beta.26 — 2026-11-22
 - Tema „Casă 3D” pe iPhone: atingerea cu un deget nu mai mărește (zoom). Pagina nu se mai mărește la dublă atingere,
   iar scena nu mai rămâne cu un „deget fantomă” după o atingere pierdută (de aceea un deget părea două).
