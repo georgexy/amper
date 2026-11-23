@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.27 — în pregătire
+## 1.0.0-beta.27 — 2026-11-23
 - SOC calculat de Amper, pe fiecare modul: numără Ah-ii ieșiți de la ultima încărcare completă (recunoscută după
   tensiunea celulelor, nu după BMS) și îi împarte la capacitatea învățată. Nu mai crede un BMS care coboară singur
   la 0 % fără curent. În Bateriile alegi ce SOC se afișează: „Calculat de Amper” sau „Citit din BMS”; când diferă
