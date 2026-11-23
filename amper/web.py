@@ -1292,7 +1292,7 @@ def make_app(engine) -> web.Application:
         body = await request.json()
         try:
             s = await asyncio.to_thread(forecast.save_settings, engine.db,
-                                        {k: body[k] for k in ("lat", "lon", "place", "min_soc", "notify") if k in body})
+                                        {k: body[k] for k in ("enabled", "lat", "lon", "place", "min_soc", "notify") if k in body})
         except (TypeError, ValueError) as e:
             return _json({"error": str(e) or "valoare greșită"}, 400)
         return _json({"ok": True, "settings": s})

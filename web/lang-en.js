@@ -77,6 +77,15 @@ const EN = {
   "Citit din BMS": "Read from the BMS",
   "Pornește testul": "Start the test",
   "Oprește testul": "Stop the test",
+  // ---------- Setări și rapoarte, prognoza pornită/oprită (1.0.0-beta.28)
+  "Setări și rapoarte": "Settings and reports",
+  "Prognoză, raport, capacitate, sănătatea celulelor": "Forecast, report, capacity, cell health",
+  "Prognoză producție": "Production forecast",
+  "Prognoză producție solară": "Solar production forecast",
+  "După vremea din localitatea ta, Amper estimează cât produc panourile, cât consumi și unde ajunge bateria în următoarele 48 de ore": "From the weather at your location, Amper estimates how much the panels produce, how much you use and where the battery ends up over the next 48 hours",
+  "Alerte generator": "Generator alerts",
+  "O notificare pe zi, doar dacă bateria ar coborî sub prag în următoarele 24 de ore, cu ora până la care să pornești generatorul. Pentru cine are generator; cu rețea nu e nevoie.": "One notification a day, only if the battery would go below the threshold in the next 24 hours, with the time by which to start the generator. For those with a generator; not needed with the grid.",
+  "Oprită": "Off",
   // ---------- Alerte → Toate notificările
   "Reîncearcă": "Retry",
   "Copia de siguranță": "Backup", "În cloud sau pe un NAS, în fiecare noapte": "In the cloud or on a NAS, every night",

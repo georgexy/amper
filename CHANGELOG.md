@@ -2,6 +2,14 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
+## 1.0.0-beta.28 — în pregătire
+- Bateriile: tot ce era sub module (prognoza, raportul, capacitatea reală, sănătatea celulelor) e acum sub un singur
+  rând, „Setări și rapoarte”.
+- „Prognoză și generator” devine „Prognoză producție”: se pornește dintr-un glisor („Prognoză producție solară”), iar
+  alertele pentru generator au glisorul lor, separat — cine are rețea, nu generator, nu are nevoie de ele. Fără
+  alerte de generator, prognoza spune doar cât de jos coboară bateria. Oprită, prognoza nu mai cere vremea (nici
+  pentru grafice și casa 3D). Pe Pi-urile care aveau deja localitatea aleasă, rămâne pornită ca până acum.
+
 ## 1.0.0-beta.27 — 2026-11-23
 - SOC calculat de Amper, pe fiecare modul: numără Ah-ii ieșiți de la ultima încărcare completă (recunoscută după
   tensiunea celulelor, nu după BMS) și îi împarte la capacitatea învățată. Nu mai crede un BMS care coboară singur

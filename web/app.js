@@ -913,7 +913,7 @@ async function loadCellsRow() {
   } catch {}
 }
 $("#ch-row").onclick = () => show("cells");
-$("#ch-back").onclick = () => show("packs");
+$("#ch-back").onclick = () => show("batmore");
 /* raportul nopții: text + tabel, calculat pe server din citirile nopții (night_report.py); ‹ › = alte nopți */
 const nr = { ago: 0 };
 const md = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
@@ -961,7 +961,7 @@ $("#ch-reset").onclick = () => resetData("/api/cells/health/reset",
   "Se șterg toate măsurătorile pentru sănătatea celulelor, iar analiza o ia de la capăt. Continui?", () => {
     cellsState.data = null; loadCells(); loadCellsRow();
   });
-$("#rep-back").onclick = () => show("packs");
+$("#rep-back").onclick = () => show("batmore");
 function openReport() {
   nr.ago = 0;
   setRange("night");
@@ -1034,18 +1034,22 @@ async function loadForecastRow() {
     fc.data = r;
     const chip = $("#fc-chip");
     chip.hidden = true;
+    if (r.disabled) { $("#fc-sub").textContent = t("Oprită"); return; }
     if (r.missing === "location") { $("#fc-sub").textContent = t("Alege localitatea ca să pornească"); return; }
     if (!r.ready) { $("#fc-sub").textContent = r.error || t("Se adună date"); return; }
     const tm = r.days[1];
     $("#fc-sub").textContent = !tm ? "" : r.no_pv ? tf("Mâine: consum ~{0} kWh (panourile încă neînvățate)", num(tm.load_kwh, 1))
       : tf("Mâine: soare ~{0} kWh, consum ~{1} kWh", num(tm.pv_kwh, 1), num(tm.load_kwh, 1));
     chip.hidden = false;
+    chip.hidden = !r.no_pv && r.advice.level === "info";
     chip.className = "chip " + (r.no_pv ? "" : r.advice.level === "need" ? "al" : "ok");
     chip.textContent = r.no_pv ? t("Învăț") : r.advice.level === "need" ? t("Generator") : t("Ajunge");
   } catch {}
 }
 $("#fc-row").onclick = () => show("forecast");
-$("#fc-back").onclick = () => show("packs");
+$("#fc-back").onclick = () => show("batmore");
+$("#bm-row").onclick = () => show("batmore");
+$("#bm-back").onclick = () => show("packs");
 function fcChart(r) {
   const pts = r.points, W = 360, H = 150, top = 8, bot = 22, h = H - top - bot;
   const t0 = pts[0].ts, t1 = pts[pts.length - 1].ts, x = (ts) => ((ts - t0) / (t1 - t0)) * W;
@@ -1065,14 +1069,14 @@ function fcChart(r) {
     const key = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}-${String(m.getDate()).padStart(2, "0")}`;
     marks += `<line x1="${mx}" x2="${mx}" y1="${top}" y2="${top + h}" class="fc-mid"/><text x="${mx + 4}" y="${H - 6}" class="fc-tx">${esc(dayWord(key, Date.now()))}</text>`;
   }
-  const lim = r.settings.min_soc;
+  const lim = r.settings.min_soc, gen = !!r.settings.notify;
   return `<svg class="fc-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(t("Bateria în următoarele 48 de ore"))}">
     ${bars}<path d="${area}" class="fc-area"/><path d="${line}" class="fc-line"/>
-    <line x1="0" x2="${W}" y1="${y(lim)}" y2="${y(lim)}" class="fc-lim"/>
-    <text x="${W - 2}" y="${y(lim) - 4}" class="fc-tx" text-anchor="end">${lim} %</text>
+    ${gen ? `<line x1="0" x2="${W}" y1="${y(lim)}" y2="${y(lim)}" class="fc-lim"/>
+    <text x="${W - 2}" y="${y(lim) - 4}" class="fc-tx" text-anchor="end">${lim} %</text>` : ""}
     <text x="2" y="${H - 6}" class="fc-tx">${esc(t("acum"))}</text>${marks}
     <text x="2" y="${top + 10}" class="fc-tx">100 %</text></svg>
-    <div class="fc-legend"><span class="l1"></span>${esc(t("Bateria (SOC)"))}<span class="l2"></span>${esc(t("Soare (producție estimată)"))}<span class="l3"></span>${esc(t("Prag"))}</div>`;
+    <div class="fc-legend"><span class="l1"></span>${esc(t("Bateria (SOC)"))}<span class="l2"></span>${esc(t("Soare (producție estimată)"))}${gen ? `<span class="l3"></span>${esc(t("Prag"))}` : ""}</div>`;
 }
 function renderFcSettings(s) {
   $("#fc-place").textContent = s.place || (s.lat != null ? `${num(s.lat, 2)}, ${num(s.lon, 2)}` : t("nealeasă"));
@@ -1081,7 +1085,10 @@ function renderFcSettings(s) {
   const sel = $("#fc-min");
   if (!sel.options.length) sel.innerHTML = [10, 15, 20, 25, 30, 35, 40, 50].map((v) => `<option value="${v}">${v} %</option>`).join("");
   sel.value = String(s.min_soc);
-  $("#fc-notify").checked = !!s.notify;
+  $("#fc-on").checked = !!s.enabled;
+  $("#fc-content").hidden = !s.enabled;
+  $("#fc-gen").checked = !!s.notify;
+  $("#fc-gen-set").hidden = !s.notify;
 }
 async function loadForecast() {
   const box = $("#fc-body");
@@ -1090,6 +1097,7 @@ async function loadForecast() {
   try { r = await api("/api/forecast"); } catch (e) { if (e.message !== "auth") box.innerHTML = `<div class="banner">${esc(e.message)}</div>`; return; }
   fc.data = r;
   renderFcSettings(r.settings);
+  if (r.disabled) { box.innerHTML = ""; return; }
   if (r.missing === "location") {
     fc.searching = true;
     $("#fc-search").hidden = false;
@@ -1108,9 +1116,9 @@ async function loadForecast() {
     const partial = i === r.days.length - 1 && new Date(last * 1000).getHours() !== 0;
     return `<tr><th>${esc(dayWord(d.day, Date.now()))}${i === 0 ? ` <small>${esc(t("din acest moment"))}</small>` : partial ? ` <small>${esc(tf("până la {0}", hm(last)))}</small>` : ""}</th>
       <td>${r.no_pv ? "–" : `${num(d.pv_kwh, 1)} kWh`}</td><td>${num(d.load_kwh, 1)} kWh</td>
-      <td class="${d.min_soc < r.settings.min_soc ? "bad" : ""}">${num(d.min_soc, 0)} % <small>${hm(d.min_at)}</small></td><td>${num(d.end_soc, 0)} %</td></tr>`;
+      <td class="${r.settings.notify && d.min_soc < r.settings.min_soc ? "bad" : ""}">${num(d.min_soc, 0)} % <small>${hm(d.min_at)}</small></td><td>${num(d.end_soc, 0)} %</td></tr>`;
   }).join("");
-  box.innerHTML = `<div class="nr-head-txt ${a.level === "need" ? "bad" : "ok"}">${esc(a.text)}</div>` +
+  box.innerHTML = `<div class="nr-head-txt ${a.level === "need" ? "bad" : a.level === "info" ? "" : "ok"}">${esc(a.text)}</div>` +
     (r.no_pv ? `<div class="banner">${esc(t("Pi-ul nu știe încă cât produc panourile tale (are nevoie de câteva ore cu soare). Până atunci, prognoza socotește fără producția lor."))}</div>`
       : r.learning ? `<p class="note">${esc(tf("Producția panourilor e deocamdată aproximativă: Pi-ul are {0} din 12 ore cu soare și bateria neplină de care are nevoie ca s-o învețe bine.", cal.hours))}</p>` : "") +
     (r.weather_stale ? `<p class="note">${esc(t("Prognoza meteo nu s-a putut actualiza; folosesc ultima descărcată."))}</p>` : "") +
@@ -1151,7 +1159,11 @@ $("#fc-q").oninput = () => {
   }, 350);
 };
 $("#fc-min").onchange = (e) => fcSave({ min_soc: +e.target.value });
-$("#fc-notify").onchange = (e) => fcSave({ notify: e.target.checked });
+$("#fc-gen").onchange = (e) => fcSave({ notify: e.target.checked });
+$("#fc-on").onchange = (e) => {
+  $("#fc-content").hidden = !e.target.checked;
+  fcSave({ enabled: e.target.checked });
+};
 
 /* Capacitatea reală (capacity.py): Ah măsurați de la plin până aproape de gol, pe fiecare modul */
 const CAP_METHOD = { rest: "în repaus", knee: "la capătul descărcării" };
@@ -1164,7 +1176,7 @@ async function loadCapacityRow() {
   } catch {}
 }
 $("#cap-row").onclick = () => show("capacity");
-$("#cap-back").onclick = () => show("packs");
+$("#cap-back").onclick = () => show("batmore");
 // comparația cu celelalte module (în paralel: Ah-ii dați într-o noapte sunt proporționali cu capacitatea)
 function capRel(m) {
   const l = m.learned || {};
@@ -2483,12 +2495,13 @@ $$("nav.tabs button").forEach((b) => (b.onclick = () => show(b.dataset.view)));
 function show(v) {
   state.view = v;
   document.body.dataset.view = v;              // tema Casă 3D: fără spațiu jos doar pe „Acum”
-  const tab = ["packs", "inverter", "bms", "cells", "report", "forecast", "capacity"].includes(v) ? "now" : v;      // se deschid din „Acum”
+  const tab = ["packs", "batmore", "inverter", "bms", "cells", "report", "forecast", "capacity"].includes(v) ? "now" : v;      // se deschid din „Acum”
   $$("nav.tabs button").forEach((b) => b.dataset.view === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
-  for (const k of ["now", "hist", "alerts", "packs", "inverter", "bms", "cells", "report", "forecast", "capacity", "settings"]) $("#view-" + k).hidden = v !== k;
+  for (const k of ["now", "hist", "alerts", "packs", "batmore", "inverter", "bms", "cells", "report", "forecast", "capacity", "settings"]) $("#view-" + k).hidden = v !== k;
   $("#pvpop").hidden = true;
   if (v === "bms") loadBms();
-  if (v === "packs") { renderPacks(); loadCellsRow(); loadForecastRow(); loadCapacityRow(); }
+  if (v === "packs") renderPacks();
+  if (v === "batmore") { loadCellsRow(); loadForecastRow(); loadCapacityRow(); }
   if (v === "cells") loadCells();
   if (v === "report") openReport();
   if (v === "forecast") loadForecast();

@@ -760,6 +760,15 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `GET /api/capacity` + `learned`, `full_ago`, `test`. UI: `#soc-src` (Bateriile), `socOther`/`socApprox` pe carduri,
   `capRel`/`capTest` în view-capacity.
 
+## Bateriile → „Setări și rapoarte”; prognoza pornită/oprită, alerte generator separate (1.0.0-beta.28, cerut 2026-11-23)
+- `view-batmore` (rândul `#bm-row` sub module) conține `#fc-row`, `#rep-row`, `#cap-row`, `#ch-row`; „înapoi” din
+  prognoză/raport/capacitate/celule duce la `batmore`; rândurile se încarcă la `show("batmore")`.
+- forecast `DEFAULTS`: `enabled` (glisorul „Prognoză producție solară”) și `notify` (= „Alerte generator”) ambele
+  false pe un Pi nou; meta veche fără `enabled` dar cu localitate → enabled true, notify cum era. Oprită: `build`
+  → `disabled`, `check`/`pv_model`/`sky_now` nu fac nimic (nici vremea pentru grafice/casă). `advice(..., generator)`:
+  fără alerte → `level` „info”, „În următoarele 48 de ore bateria coboară cel mai jos la X %, …”; pragul pe grafic
+  și roșul din tabel doar cu alertele. UI: `#fc-on`, `#fc-content`, `#fc-gen`, `#fc-gen-set` (pragul).
+
 ## Jurnalul pe card, copia de siguranță explicată, toate notificările (1.0.0-beta.21, cerut 2026-11-09)
 - Motiv: pe 09.11 clona (00:17, după ~17 min, prin 4G) a eșuat, iar jurnalul era doar în RAM (Raspberry Pi OS:
   `/usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf`, Storage=volatile; fără rsyslog) → cauza pierdută.

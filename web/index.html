@@ -70,9 +70,21 @@
           <button data-s="amper">Calculat de Amper</button><button data-s="bms">Citit din BMS</button></div></div>
       <div id="pk-list"></div>
       <p class="note">Atinge un pachet pentru celule, temperaturi și MOSFET-uri.</p>
+      <button class="ch-row" id="bm-row">
+        <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></span>
+        <span class="tx"><b>Setări și rapoarte</b><small>Prognoză, raport, capacitate, sănătatea celulelor</small></span><span class="ar">›</span>
+      </button>
+    </main>
+
+    <!-- ====================== BATERIILE → SETĂRI ȘI RAPOARTE ====================== -->
+    <main id="view-batmore" class="wrap" hidden>
+      <div class="pk-top">
+        <button class="back" id="bm-back" aria-label="Înapoi la baterii">‹</button>
+        <h2>Setări și rapoarte</h2>
+      </div>
       <button class="ch-row" id="fc-row">
         <span class="ic"><svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="3.2"/><path d="M9 2.5v1.6M2.5 9h1.6M4.4 4.4l1.1 1.1M13.6 4.4l-1.1 1.1M8 20.5h9a3.5 3.5 0 0 0 0-7 4.5 4.5 0 0 0-8.6 1.2A3 3 0 0 0 8 20.5z"/></svg></span>
-        <span class="tx"><b>Prognoză și generator</b><small id="fc-sub">Soarele de mâine și unde ajunge bateria</small></span><span class="chip" id="fc-chip" hidden></span><span class="ar">›</span>
+        <span class="tx"><b>Prognoză producție</b><small id="fc-sub">Soarele de mâine și unde ajunge bateria</small></span><span class="chip" id="fc-chip" hidden></span><span class="ar">›</span>
       </button>
       <button class="ch-row" id="rep-row">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10A.5.5 0 0 1 7 20z"/><path d="M14 3.5V8h4M10 12h5M10 15.5h5"/></svg></span>
@@ -120,23 +132,30 @@
     <!-- ====================== PROGNOZĂ ȘI GENERATOR ====================== -->
     <main id="view-forecast" class="wrap" hidden>
       <div class="pk-top">
-        <button class="back" id="fc-back" aria-label="Înapoi la baterii">‹</button>
-        <h2>Prognoză și generator</h2>
+        <button class="back" id="fc-back" aria-label="Înapoi">‹</button>
+        <h2>Prognoză producție</h2>
       </div>
-      <div id="fc-body"></div>
-      <section class="fc-set" id="fc-set">
-        <h3>Setări</h3>
-        <div class="fc-place"><span>Localitatea</span><b id="fc-place">–</b><button class="btn" id="fc-place-btn">Schimbă</button></div>
-        <div class="fc-search" id="fc-search" hidden>
-          <input type="search" id="fc-q" placeholder="Scrie numele localității" autocomplete="off">
-          <div class="list" id="fc-res"></div>
+      <label class="row-check fc-switch"><span><b>Prognoză producție solară</b><small>După vremea din localitatea ta,
+        Amper estimează cât produc panourile, cât consumi și unde ajunge bateria în următoarele 48 de ore</small></span>
+        <input type="checkbox" id="fc-on"></label>
+      <div id="fc-content" hidden>
+        <section class="fc-set">
+          <div class="fc-place"><span>Localitatea</span><b id="fc-place">–</b><button class="btn" id="fc-place-btn">Schimbă</button></div>
+          <div class="fc-search" id="fc-search" hidden>
+            <input type="search" id="fc-q" placeholder="Scrie numele localității" autocomplete="off">
+            <div class="list" id="fc-res"></div>
+          </div>
+        </section>
+        <div id="fc-body"></div>
+        <label class="row-check fc-switch"><span><b>Alerte generator</b><small>O notificare pe zi, doar dacă bateria ar
+          coborî sub prag în următoarele 24 de ore, cu ora până la care să pornești generatorul. Pentru cine are
+          generator; cu rețea nu e nevoie.</small></span><input type="checkbox" id="fc-gen"></label>
+        <div id="fc-gen-set" hidden>
+          <label class="row-check"><span><b>Pragul de jos</b><small>Sub el îți spun să pornești generatorul</small></span>
+            <select id="fc-min"></select></label>
         </div>
-        <label class="row-check"><span><b>Pragul de jos</b><small>Sub el îți spun să pornești generatorul</small></span>
-          <select id="fc-min"></select></label>
-        <label class="row-check"><span><b>Notificare pe telefon</b><small>O dată pe zi, doar dacă bateria coboară sub prag
-          în următoarele 24 de ore</small></span><input type="checkbox" id="fc-notify"></label>
         <p class="note">Vremea vine de la Open-Meteo (gratuit, fără cont). Pi-ul trimite doar coordonatele localității.</p>
-      </section>
+      </div>
     </main>
 
     <!-- ====================== CAPACITATEA REALĂ ====================== -->

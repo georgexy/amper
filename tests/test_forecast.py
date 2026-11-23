@@ -48,13 +48,14 @@ NOW = time.mktime(time.strptime("2026-11-19 20:00", "%Y-%m-%d %H:%M"))
 
 def test_needs_a_location_first(tmp_path):
     db = make_db(tmp_path, NOW)
+    forecast.save_settings(db, {"enabled": True})
     rep = forecast.build(db, {"kwh": 8, "capacity_kwh": 16, "soc": 50}, fake_fetch(NOW), NOW)
     assert rep["missing"] == "location" and not rep["ready"]
 
 
 def test_learns_the_panels_and_says_no_generator(tmp_path):
     db = make_db(tmp_path, NOW)
-    forecast.save_settings(db, {"lat": 45.65, "lon": 25.6, "place": "Brașov"})
+    forecast.save_settings(db, {"enabled": True, "notify": True, "lat": 45.65, "lon": 25.6, "place": "Brașov"})
     rep = forecast.build(db, {"kwh": 10, "capacity_kwh": 16, "soc": 62}, fake_fetch(NOW), NOW)
     assert rep["ready"] and not rep["learning"]
     assert rep["calibration"]["k"] == pytest.approx(K, rel=0.01)
@@ -67,7 +68,7 @@ def test_learns_the_panels_and_says_no_generator(tmp_path):
 
 def test_cloudy_days_ask_for_the_generator(tmp_path):
     db = make_db(tmp_path, NOW)
-    forecast.save_settings(db, {"lat": 45.65, "lon": 25.6, "min_soc": 20})
+    forecast.save_settings(db, {"enabled": True, "notify": True, "lat": 45.65, "lon": 25.6, "min_soc": 20})
     rep = forecast.build(db, {"kwh": 6, "capacity_kwh": 16, "soc": 37}, fake_fetch(NOW, peak_future=60), NOW)
     a = rep["advice"]
     assert a["level"] == "need" and "Pornește generatorul" in a["text"] and "sub 20 %" in a["text"]
@@ -78,7 +79,7 @@ def test_cloudy_days_ask_for_the_generator(tmp_path):
 def test_full_battery_hours_are_left_out_of_calibration(tmp_path):
     """Cu bateria plină invertorul taie PV-ul: orele acelea nu trag estimarea în jos."""
     db = make_db(tmp_path, NOW, soc=99)
-    forecast.save_settings(db, {"lat": 45.65, "lon": 25.6})
+    forecast.save_settings(db, {"enabled": True, "notify": True, "lat": 45.65, "lon": 25.6})
     rep = forecast.build(db, {"kwh": 15, "capacity_kwh": 16, "soc": 94}, fake_fetch(NOW), NOW)
     assert rep["learning"] and rep["calibration"]["hours"] == 0
     assert rep["calibration"]["approx"] and rep["calibration"]["k"] == pytest.approx(K, rel=0.01)     # aproximativ
@@ -86,7 +87,7 @@ def test_full_battery_hours_are_left_out_of_calibration(tmp_path):
 
 def test_weather_is_cached_and_survives_an_outage(tmp_path):
     db = make_db(tmp_path, NOW)
-    s = forecast.save_settings(db, {"lat": 45.65, "lon": 25.6})
+    s = forecast.save_settings(db, {"enabled": True, "notify": True, "lat": 45.65, "lon": 25.6})
     calls = []
     forecast.weather(db, s, fake_fetch(NOW, calls=calls), NOW)
     forecast.weather(db, s, fake_fetch(NOW, calls=calls), NOW + 600)
@@ -108,11 +109,12 @@ def test_settings_are_checked(tmp_path):
         forecast.save_settings(db, {"lat": 120, "lon": 0})
     s = forecast.save_settings(db, {"min_soc": 30, "notify": False})
     assert s["min_soc"] == 30 and s["notify"] is False and json.loads(db.get_meta(forecast.META))["min_soc"] == 30
+    assert s["enabled"] is False                                   # pe un Pi nou, prognoza e oprită
 
 
 def test_one_notification_per_day(tmp_path):
     db = make_db(tmp_path, NOW)
-    forecast.save_settings(db, {"lat": 45.65, "lon": 25.6})
+    forecast.save_settings(db, {"enabled": True, "notify": True, "lat": 45.65, "lon": 25.6})
     sent = []
 
     class N:
@@ -138,7 +140,7 @@ def test_chart_forecast_and_sky_come_from_the_cache_only(tmp_path):
     db = make_db(tmp_path, NOW)
     assert forecast.pv_series(db, NOW - DAY, NOW + 12 * 3600, NOW) is None          # fără localitate
     assert forecast.sky_now(db, NOW) == {}
-    s = forecast.save_settings(db, {"lat": 45.65, "lon": 25.6})
+    s = forecast.save_settings(db, {"enabled": True, "notify": True, "lat": 45.65, "lon": 25.6})
     assert forecast.pv_series(db, NOW - DAY, NOW, NOW) is None                         # nimic descărcat încă
     forecast.weather(db, s, fake_fetch(NOW), NOW)
     ser = forecast.pv_series(db, NOW - DAY, NOW + 12 * 3600, NOW)
@@ -159,7 +161,7 @@ def test_chart_forecast_and_sky_come_from_the_cache_only(tmp_path):
     (95, 6, 0, 0, "storm", 0.9, 1), (3, 0.3, 0, 0, "rain", 0.2, 0.3)])
 def test_weather_kinds_for_the_3d_house(tmp_path, code, precip, snowfall, depth, kind, lo, hi):
     db = make_db(tmp_path, NOW)
-    s = forecast.save_settings(db, {"lat": 45.65, "lon": 25.6})
+    s = forecast.save_settings(db, {"enabled": True, "notify": True, "lat": 45.65, "lon": 25.6})
     h0 = int(NOW // 3600 * 3600)
 
     def fetch(url):
@@ -177,8 +179,41 @@ def test_weather_kinds_for_the_3d_house(tmp_path, code, precip, snowfall, depth,
 def test_old_cache_without_rain_is_refreshed(tmp_path):
     """Pi-urile care au prognoza salvată de beta.24 (fără ploaie/ninsoare) o cer din nou la prima ocazie."""
     db = make_db(tmp_path, NOW)
-    s = forecast.save_settings(db, {"lat": 45.65, "lon": 25.6})
+    s = forecast.save_settings(db, {"enabled": True, "notify": True, "lat": 45.65, "lon": 25.6})
     db.set_meta(forecast.CACHE, json.dumps(dict(lat=45.65, lon=25.6, at=NOW, time=[], rad=[], cloud=[])))
     calls = []
     forecast.weather(db, s, fake_fetch(NOW, calls=calls), NOW + 60)
     assert len(calls) == 1
+
+
+def test_disabled_forecast_does_nothing(tmp_path):
+    db = make_db(tmp_path, NOW)
+    forecast.save_settings(db, {"lat": 45.65, "lon": 25.6})                       # localitate, dar oprită
+    calls = []
+    rep = forecast.build(db, {"kwh": 8, "capacity_kwh": 16, "soc": 50}, fake_fetch(NOW, calls=calls), NOW)
+    assert rep["disabled"] and not rep["ready"] and not calls
+    assert forecast.check(db, None, {}, fake_fetch(NOW, calls=calls), NOW) is None and not calls
+    assert forecast.sky_now(db, NOW) == {} and forecast.pv_series(db, NOW - 3600, NOW, NOW) is None
+
+
+def test_without_generator_alerts_only_the_lowest_point(tmp_path):
+    db = make_db(tmp_path, NOW)
+    forecast.save_settings(db, {"enabled": True, "lat": 45.65, "lon": 25.6})        # alertele de generator oprite
+    rep = forecast.build(db, {"kwh": 6, "capacity_kwh": 16, "soc": 37}, fake_fetch(NOW, peak_future=60), NOW)
+    a = rep["advice"]
+    assert a["level"] == "info" and "generator" not in a["text"] and "cel mai jos" in a["text"]
+    sent = []
+
+    class N:
+        def send(self, msg, **k):
+            sent.append(msg)
+    assert forecast.check(db, N(), {"kwh": 5, "capacity_kwh": 16, "soc": 31}, fake_fetch(NOW, peak_future=40), NOW) is None
+    assert not sent
+
+
+def test_old_settings_stay_on(tmp_path):
+    """Pi-urile care aveau prognoza configurată înainte (fără „enabled”) rămân cu ea pornită, cu notificarea lor."""
+    db = make_db(tmp_path, NOW)
+    db.set_meta(forecast.META, json.dumps({"place": "Brașov", "lat": 45.65, "lon": 25.6, "min_soc": 25, "notify": True}))
+    s = forecast.settings(db)
+    assert s["enabled"] and s["notify"] and s["min_soc"] == 25
