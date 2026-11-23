@@ -20,6 +20,7 @@ descărcarea lui se respinge.
 """
 from __future__ import annotations
 
+import json
 import statistics
 import time
 
@@ -165,3 +166,146 @@ def progress(db, packs: dict[str, dict], now: float | None = None) -> dict[str, 
                 low = dict(ts=lo["ts"], cell=round(lo["voltage"] / cells, 3), soc=lo.get("soc"))
         out[dev] = dict(last_full=last_full, low=low)
     return out
+
+
+# ---------------- comparația dintre module (în fiecare noapte) ----------------
+REL_NIGHTS_DAYS = 14         # citirile brute (raw_retention_days)
+REL_MIN_AH = 3.0             # o noapte cu mai puțin de atât descărcat pe modul nu spune nimic
+REL_MIN_NIGHTS = 3
+
+
+def relative(db, packs: dict[str, dict], now: float | None = None) -> dict[str, dict]:
+    """Modulele sunt în paralel, deci au aceeași tensiune și coboară cam la fel în SOC: Ah-ii dați de fiecare într-o
+    noapte sunt proporționali cu capacitatea lui reală. Ca să se poată compara și module de mărimi diferite (Daly
+    105 Ah cu Seplos 280 Ah), Ah-ii se împart la capacitatea din BMS: `rel` = (Ah / capacitatea din BMS) al modulului
+    față de media modulelor (mediana nopților); 1,0 = exact cât ar trebui, 0,8 = 20 % mai puțin decât ceilalți.
+    Nopțile în care un modul n-a văzut curenții mici (prea multe citiri cu 0 A) nu intră."""
+    from . import battery_report, night_report as nr
+    now = now or time.time()
+    start = max(now - REL_NIGHTS_DAYS * 86400, reports_since(db))
+    packs = {d: p for d, p in packs.items() if p.get("rated")}
+    ratios: dict[str, list] = {d: [] for d in packs}
+    for n in battery_report.nights_in(db, start, now):
+        rows = nr.night_rows(db, {d: p.get("name", d) for d, p in packs.items()}, int(n["start"]), int(n["end"]))
+        stats = {d: nr.pack_stats(rows.get(d, [])) for d in packs}
+        good = {d: -x["ah"] / packs[d]["rated"] for d, x in stats.items()
+                if x and x["zero"] < nr.ZERO_BAD and -x["ah"] >= REL_MIN_AH}
+        if len(good) < 2 or len(good) < len(packs):
+            continue
+        mean = sum(good.values()) / len(good)
+        for d, ah in good.items():
+            ratios[d].append(ah / mean)
+    return {d: dict(rel=round(statistics.median(v), 3) if len(v) >= REL_MIN_NIGHTS else None, nights=len(v))
+            for d, v in ratios.items()}
+
+
+def learned(db, packs: dict[str, dict], now: float | None = None) -> dict[str, dict]:
+    """Capacitatea folosită de SOC-ul calculat de Amper, pe modul: {cap, kind, rel, nights}.
+    measured = descărcare adâncă / test (mediana ultimelor 3); relative = un alt modul măsurat × raportul dintre ele;
+    altfel nimic (rămâne cea din BMS / config)."""
+    a = {m["id"]: m for m in analyze(db, packs, now)["modules"]}
+    rel = relative(db, packs, now)
+    out = {}
+    refs = [(d, m) for d, m in a.items() if m.get("cap") and (rel.get(d) or {}).get("rel")]
+    ref = max(refs, key=lambda x: x[1]["count"]) if refs else None
+    for d in packs:
+        r = rel.get(d) or {}
+        o = dict(rel=r.get("rel"), nights=r.get("nights", 0), cap=None, kind=None)
+        if a.get(d, {}).get("cap"):
+            o.update(cap=a[d]["cap"], kind="measured")
+        elif ref and r.get("rel") and packs[d].get("rated") and packs[ref[0]].get("rated"):
+            # capacitatea reală ∝ capacitatea din BMS × rel; scara o dă modulul măsurat
+            o.update(cap=round(ref[1]["cap"] * (packs[d]["rated"] * r["rel"]) /
+                               (packs[ref[0]]["rated"] * rel[ref[0]]["rel"]), 1), kind="relative")
+        out[d] = o
+    return out
+
+
+# ---------------- testul de capacitate (ghidat, o noapte) ----------------
+TEST_META = "capacity_test"
+TEST_FULL_WITHIN = 3 * 3600          # toate modulele încărcate complet în ultimele 3 ore
+TEST_MAX_S = 36 * 3600
+TEST_THRESHOLDS = (3.10, 3.05, 3.00, 2.95)
+TEST_HOLD = 3                        # citiri la rând sub prag (nu un vârf de consum)
+
+
+def test_state(db) -> dict | None:
+    try:
+        return json.loads(db.get_meta(TEST_META) or "null")
+    except ValueError:
+        return None
+
+
+def test_start(db, est, packs: dict[str, dict], threshold: float, now: float | None = None) -> dict:
+    now = now or time.time()
+    if threshold not in TEST_THRESHOLDS:
+        raise ValueError("Prag necunoscut.")
+    st = test_state(db)
+    if st and st.get("state") == "running":
+        raise ValueError("Un test e deja în curs.")
+    late = [p.get("name", d) for d, p in packs.items()
+            if not (est.st.get(d) or {}).get("anchored") or now - ((est.st.get(d) or {}).get("full_ts") or 0) > TEST_FULL_WITHIN]
+    if late:
+        raise ValueError("Testul pornește doar cu bateria plină: " + ", ".join(late) +
+                         " n-au fost încărcate complet în ultimele 3 ore.")
+    st = dict(state="running", started=now, threshold=threshold, low_count=0, result=None, reason=None,
+              full_ts={d: est.st[d]["full_ts"] for d in packs})
+    db.set_meta(TEST_META, json.dumps(st))
+    return st
+
+
+def test_stop(db, reason: str = "oprit din aplicație", now: float | None = None) -> dict | None:
+    st = test_state(db)
+    if st and st.get("state") == "running":
+        st.update(state="cancelled", reason=reason, ended=now or time.time())
+        db.set_meta(TEST_META, json.dumps(st))
+    return st
+
+
+def test_tick(db, est, packs: dict[str, dict], readings: dict[str, object], notifier=None,
+              now: float | None = None) -> dict | None:
+    """Din tick-ul motorului: oprește testul la prag (și salvează capacitățile) sau îl anulează dacă bateria s-a
+    încărcat complet între timp / a trecut prea mult."""
+    st = test_state(db)
+    if not st or st.get("state") != "running":
+        return None
+    now = now or time.time()
+    for d in packs:
+        s = est.st.get(d) or {}
+        if s.get("full_ts") and st["full_ts"].get(d) and s["full_ts"] > st["full_ts"][d] + 60:
+            st.update(state="cancelled", reason="bateria s-a încărcat complet în timpul testului", ended=now)
+            db.set_meta(TEST_META, json.dumps(st))
+            return st
+    if now - st["started"] > TEST_MAX_S:
+        st.update(state="cancelled", reason="a trecut prea mult timp (36 de ore)", ended=now)
+        db.set_meta(TEST_META, json.dumps(st))
+        return st
+    lows = [min(r.cells) for r in readings.values() if getattr(r, "cells", None)]
+    before = st.get("low_count", 0)
+    st["low_count"] = before + 1 if lows and min(lows) <= st["threshold"] else 0
+    if st["low_count"] < TEST_HOLD:
+        if st["low_count"] != before:                 # scriem pe card doar când se schimbă ceva
+            db.set_meta(TEST_META, json.dumps(st))
+        return st
+    # gata: Ah scoși de la plin, pe fiecare modul; SOC-ul rămas după tensiunea celulelor (sub sarcină)
+    res = {}
+    for d, p in packs.items():
+        s, r = est.st.get(d) or {}, readings.get(d)
+        if not s or r is None or not getattr(r, "cells", None) or not p.get("rated"):
+            continue
+        low = min(ocv_soc(min(r.cells)), 8.0)
+        cap = s["ah_out"] / (1 - low / 100)
+        res[d] = dict(ah=round(s["ah_out"], 1), soc_low=round(low, 1), cap=round(cap, 1),
+                      pct=round(cap / p["rated"] * 100))
+        if PLAUSIBLE[0] * p["rated"] <= cap <= PLAUSIBLE[1] * p["rated"]:
+            db.save_capacity(dict(device=d, t_full=int(st["full_ts"][d]), ts=int(now), ah=res[d]["ah"],
+                                  soc_low=res[d]["soc_low"], cap=res[d]["cap"], method="test"))
+    st.update(state="done", ended=now, result=res)
+    db.set_meta(TEST_META, json.dumps(st))
+    if notifier is not None:
+        parts = "; ".join(f"{packs[d].get('name', d)} {v['cap']:.0f} Ah ({v['pct']} %)" for d, v in res.items())
+        thr = f"{st['threshold']:.2f}".replace(".", ",")
+        notifier.send(f"🔋 Testul de capacitate s-a terminat (celulele au ajuns la {thr} V): {parts}. "
+                      "Pornește acum încărcarea (generatorul).",
+                      title="Amper: test de capacitate", priority="high", url="/?v=capacity")
+    return st

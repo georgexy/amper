@@ -53,7 +53,7 @@ def mos_note(r: dict) -> str:
 
 # alertele păstrate cu `only_important` (implicit): cele de protecție (cerut 2026-11-01)
 IMPORTANT = {"bms_protection", "charge_mos_off", "discharge_mos_off", "not_charging", "inverter_fault",
-             "mos_forced_off", "comm_lost", "user"}
+             "mos_forced_off", "comm_lost", "user", "soc_mismatch"}
 
 # protecțiile care apar normal la încărcarea completă (BMS-ul oprește încărcarea la plin): Daly, Seplos/PACE, JK
 FULL_PROT = re.compile(r"^(tensiune (celulă|totală) mare|soc mare|celulă: protecție la supratensiune"
@@ -183,9 +183,20 @@ def evaluate(snapshot: dict, cfg: dict, now: float) -> list[Condition]:
                                  f"{n}: se încarcă la {r['temp_min']:.0f} °C (prea rece pentru LiFePO4)", hold=60))
 
         # --- raportate de BMS: protecții/defecte (critice) și alarme (avertismente) ---
+        info = v.get("soc_info") or {}
         if r.get("protections") and not normal_at_full(r, a):
+            # „SOC mic” cu SOC-ul BMS-ului dovedit greșit: se spune, cu SOC-ul calculat de Amper
+            soc_note = ""
+            if info.get("mismatch") and any("soc" in p.lower() for p in r["protections"]):
+                soc_note = f" — SOC-ul din BMS pare greșit; după Amper are {info['soc']:.0f} %"
             out.append(Condition(f"bmsprot:{d}", "bms_protection", d, "critical",
-                                 f"{n}: PROTECȚIE BMS — " + "; ".join(r["protections"][:4]) + mos_note(r), hold=10))
+                                 f"{n}: PROTECȚIE BMS — " + "; ".join(r["protections"][:4]) + mos_note(r) + soc_note,
+                                 hold=10))
+        # --- SOC-ul din BMS nu se potrivește cu curentul / tensiunea (soc_est.py) ---
+        if info.get("mismatch") and info.get("soc_bms") is not None:
+            out.append(Condition(f"socbms:{d}", "soc_mismatch", d, "warning",
+                                 f"{n}: SOC-ul din BMS ({info['soc_bms']:.0f} %) nu se potrivește cu cel calculat de "
+                                 f"Amper ({info['soc']:.0f} %): {info['mismatch']}", hold=600))
         if r.get("alarms"):
             out.append(Condition(f"bms:{d}", "bms_alarm", d, "warning",
                                  f"{n}: avertisment BMS — " + "; ".join(r["alarms"][:4]), hold=30))

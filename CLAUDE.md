@@ -732,6 +732,34 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `gesturestart/gesturechange/dblclick` și a doua atingere rapidă (`touchend` < 350 ms) cu preventDefault pe `.cs-host`.
   `api._controls` expus pentru testul Playwright cu atingeri CDP (`Input.dispatchTouchEvent`).
 
+## SOC calculat de Amper + comparația modulelor + testul de capacitate (1.0.0-beta.27, cerute 2026-11-22)
+- Motiv: exportul din 22.11: daly3 (BLE) a coborât în BMS de la 99 % la 0 % între 11:28 și 17:00 cu ~0 A măsurat,
+  celulele la 3,30 V ca la celelalte; dimineața urcase 74 → 99,8 % cu doar ~10 Ah intrați. Alarma BMS „SOC mic
+  (nivel 2)” (MOSFET-uri pornite) și notificarea de prognoză de la 14:07 au venit din SOC-ul greșit. Repornirea BMS-ului
+  din Amper (20:17) a mers pe hardware (cicluri/capacitate identice), dar SOC-ul a rămas 0.
+- `amper/soc_est.py` `SocEstimator` (Engine.soc): `ah_out` = Ah net ieșiți de la plin, din curentul citit (pauze
+  > 120 s nu se adună, `gap`); plin = celula max ≥ 3,44 V (I > −1 A) sau media ≥ 3,40 V cu I ≤ 5 % C → `ah_out` 0,
+  `anchored`; jos: cot ≤ 2,95 V → 2 %, repaus ≤ 3,21 V → `capacity.ocv_soc`. Fără plin văzut: pornește din SOC-ul
+  BMS (`anchored` false → „~” pe card). `mismatch`: ΔSOC BMS vs ΔSOC Amper > 15 puncte în fereastra de 2 h, sau
+  BMS ≤ 5 % cu media ≥ 3,27 V / ≥ 97 % cu media ≤ 3,30 V în repaus; se șterge la diferență ≤ 8 sau după 6 h.
+  Stare în meta `soc_est` (la 5 min). Capacitatea: `capacity.learned` (measured / relative), altfel din BMS/config.
+- Engine: `soc_source` (meta `soc_source`, implicit „amper”), `set_soc_source`; `snapshot` pune `soc_info`,
+  `soc_bms`, iar cu „amper” înlocuiește `reading.soc`/`remaining_ah` (și `capacity_ah` dacă e învățată) → banca,
+  ecranele, prognoza și alertele folosesc SOC-ul ales. Raportul nopții/perioadei rămâne pe SOC-ul BMS (coloana `soc`).
+  `pack_samples`/`pack_5m` au coloana nouă `soc_amper` (ALTER la pornire); graficul „Încărcare module” o folosește
+  cu sursa „amper”. Alerta `soc_mismatch` (warning, hold 10 min, în IMPORTANT); `bms_protection` cu „soc” și
+  mismatch primește „SOC-ul din BMS pare greșit; după Amper are X %”.
+- `capacity.relative`: nopțile din ultimele 14 zile (`battery_report.nights_in`, `night_report.pack_stats`), toate
+  modulele cu ≥ 3 Ah și < 20 % citiri 0 A; `rel` = mediana (Ah/capacitatea din BMS) / media modulelor (≥ 3 nopți).
+  `learned`: măsurată (analyze) sau `cap_ref × rated·rel / (rated_ref·rel_ref)`.
+- Testul (`capacity.test_start/stop/tick`, meta `capacity_test`): pornit doar cu toate modulele `anchored` și plin
+  în ultimele 3 h; pragul 3,10/3,05/3,00/2,95 V; `test_tick` din tick-ul motorului: 3 citiri la rând cu celula min ≤
+  prag → `ah_out` + `ocv_soc` (max 8 %) → `capacity_events` method „test”, notificare 🔋 (url `/?v=capacity`);
+  anulat dacă bateria se încarcă din nou complet sau după 36 h. Amper NU comandă invertorul sau BMS-urile.
+- API: `GET /api/soc`, `POST /api/soc/source {source}`, `POST /api/capacity/test {action, threshold}`;
+  `GET /api/capacity` + `learned`, `full_ago`, `test`. UI: `#soc-src` (Bateriile), `socOther`/`socApprox` pe carduri,
+  `capRel`/`capTest` în view-capacity.
+
 ## Jurnalul pe card, copia de siguranță explicată, toate notificările (1.0.0-beta.21, cerut 2026-11-09)
 - Motiv: pe 09.11 clona (00:17, după ~17 min, prin 4G) a eșuat, iar jurnalul era doar în RAM (Raspberry Pi OS:
   `/usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf`, Storage=volatile; fără rsyslog) → cauza pierdută.

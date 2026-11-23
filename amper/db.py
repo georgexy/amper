@@ -10,7 +10,7 @@ from pathlib import Path
 from .models import InverterReading, PackReading
 
 PACK_COLS = ["voltage", "current", "power", "soc", "remaining_ah", "cell_min", "cell_max",
-             "cell_delta", "temp_max", "charge_mos", "discharge_mos"]
+             "cell_delta", "temp_max", "charge_mos", "discharge_mos", "soc_amper"]
 INV_COLS = ["pv_power", "load_power", "battery_power", "battery_voltage", "battery_soc",
             "ac_in_power", "pv_voltage", "inverter_temp", "status_code"]
 AGG_SECONDS = 300
@@ -106,11 +106,15 @@ class Database:
             # cell_events.meta (JSON: câte citiri, echilibrare, calitatea regresiei) — adăugată în 1.0.0-beta.16
             if "meta" not in {r[1] for r in self.conn.execute("PRAGMA table_info(cell_events)")}:
                 self.conn.execute("ALTER TABLE cell_events ADD COLUMN meta TEXT")
+            # SOC-ul calculat de Amper (soc_est.py) — adăugat în 1.0.0-beta.27
+            for t in ("pack_samples", "pack_5m"):
+                if "soc_amper" not in {r[1] for r in self.conn.execute(f"PRAGMA table_info({t})")}:
+                    self.conn.execute(f"ALTER TABLE {t} ADD COLUMN soc_amper REAL")
 
     # ---------- scriere ----------
-    def insert_pack(self, r: PackReading, ts: int | None = None) -> None:
+    def insert_pack(self, r: PackReading, ts: int | None = None, soc_amper: float | None = None) -> None:
         vals = [r.voltage, r.current, r.power, r.soc, r.remaining_ah, r.cell_min, r.cell_max,
-                r.cell_delta, r.temp_max, _b(r.charge_mos), _b(r.discharge_mos)]
+                r.cell_delta, r.temp_max, _b(r.charge_mos), _b(r.discharge_mos), soc_amper]
         with self.lock:
             self.conn.execute(
                 f"INSERT INTO pack_samples (ts, device, {', '.join(PACK_COLS)}, cells) "
