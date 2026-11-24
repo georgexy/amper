@@ -9,6 +9,8 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
   alertele pentru generator au glisorul lor, separat — cine are rețea, nu generator, nu are nevoie de ele. Fără
   alerte de generator, prognoza spune doar cât de jos coboară bateria. Oprită, prognoza nu mai cere vremea (nici
   pentru grafice și casa 3D). Pe Pi-urile care aveau deja localitatea aleasă, rămâne pornită ca până acum.
+- „Capacitatea reală” se calculează în fundal (în fiecare oră, imediat după un test de capacitate și după resetarea
+  rapoartelor) și se păstrează gata făcută, și peste o repornire: ecranul se deschide imediat, fără „Analizez…”.
 
 ## 1.0.0-beta.27 — 2026-11-23
 - SOC calculat de Amper, pe fiecare modul: numără Ah-ii ieșiți de la ultima încărcare completă (recunoscută după

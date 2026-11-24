@@ -84,3 +84,21 @@ def test_scan_saves_and_analyze_reports(tmp_path):
     assert m1["months"] and m2["count"] == 0 and "cap" not in m2
     prog = capacity.progress(db, packs, now)
     assert prog["p1"]["last_full"] and prog["p1"]["low"]["cell"] < 3.2 and prog["p2"]["last_full"] is None
+
+
+def test_report_is_kept_ready(tmp_path):
+    """Raportul se calculează în fundal și se citește din meta (și după o repornire)."""
+    db = Database(str(tmp_path / "a.db"))
+    now = time.time()
+    t0 = int(now - 3 * 86400) // 300 * 300
+    rows, _ = series(true_cap=95.0, start=t0, end_cell=3.17)
+    for r in rows:
+        db.conn.execute("INSERT INTO pack_5m (ts, device, current, soc, voltage, cell_min, cell_max) "
+                        "VALUES (:ts, 'p1', :current, :soc, :voltage, :cell_min, :cell_max)", r)
+    packs = {"p1": dict(name="Daly 1", rated=RATED, cells=16)}
+    assert capacity.cached_report(db) is None
+    rep = capacity.report(db, packs, now)
+    m = rep["modules"][0]
+    assert rep["at"] == int(now) and rep["packs"] == ["p1"]
+    assert m["cap"] == pytest.approx(95, rel=0.05) and "progress" in m and "learned" in m
+    assert capacity.cached_report(Database(str(tmp_path / "a.db"))) == rep

@@ -78,6 +78,7 @@ const EN = {
   "Pornește testul": "Start the test",
   "Oprește testul": "Stop the test",
   // ---------- Setări și rapoarte, prognoza pornită/oprită (1.0.0-beta.28)
+  "Calculat de Pi la {0}; se reface singur în fiecare oră.": "Calculated by the Pi on {0}; it refreshes itself every hour.",
   "Setări și rapoarte": "Settings and reports",
   "Prognoză, raport, capacitate, sănătatea celulelor": "Forecast, report, capacity, cell health",
   "Prognoză producție": "Production forecast",

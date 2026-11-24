@@ -1302,16 +1302,13 @@ def make_app(engine) -> web.Application:
         return _json(await asyncio.to_thread(forecast.sky_now, engine.db))
 
     async def capacity_get(request):
-        packs = engine.pack_info()
-        await asyncio.to_thread(capacity.scan, engine.db, packs)
-        res = await asyncio.to_thread(capacity.analyze, engine.db, packs)
-        prog = await asyncio.to_thread(capacity.progress, engine.db, packs)
-        learned = await asyncio.to_thread(capacity.learned, engine.db, packs)
-        engine.soc.set_caps(learned)
+        """Raportul calculat în fundal de motor (la oră); calculat acum doar dacă lipsește sau s-au schimbat modulele."""
+        rep = engine.capacity_report
+        if not rep or rep.get("packs") != sorted(engine.pack_info()):
+            rep = await engine.refresh_capacity() or {"modules": [], "rules": {}}
+        res = json.loads(json.dumps(rep))
         now = time.time()
         for m in res["modules"]:
-            m["progress"] = prog.get(m["id"])
-            m["learned"] = learned.get(m["id"])
             s = engine.soc.st.get(m["id"]) or {}
             m["full_ago"] = int(now - s["full_ts"]) if s.get("anchored") and s.get("full_ts") else None
         res["test"] = await asyncio.to_thread(capacity.test_state, engine.db)
@@ -1357,6 +1354,7 @@ def make_app(engine) -> web.Application:
             return err
         now = int(time.time())
         await asyncio.to_thread(engine.db.set_meta, night_report.SINCE, str(now))
+        asyncio.create_task(engine.refresh_capacity())
         log.warning("rapoartele bateriilor pornesc de acum (resetate din aplicație, de la %s)", client_ip(request))
         return _json({"ok": True, "since": now})
 

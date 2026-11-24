@@ -119,6 +119,33 @@ def scan(db, packs: dict[str, dict], now: float | None = None) -> int:
     return found
 
 
+REPORT_META = "capacity_report"   # raportul gata calculat (ecranul „Capacitatea reală” doar îl afișează)
+
+
+def report(db, packs: dict[str, dict], now: float | None = None) -> dict:
+    """Tot ce arată ecranul, calculat în fundal: datele noi analizate, măsurătorile, cât de aproape e de una,
+    comparația cu celelalte module. Salvat în meta, ca să fie gata și după o repornire."""
+    now = now or time.time()
+    scan(db, packs, now)
+    res = analyze(db, packs, now)
+    prog = progress(db, packs, now)
+    learn = learned(db, packs, now)
+    for m in res["modules"]:
+        m["progress"] = prog.get(m["id"])
+        m["learned"] = learn.get(m["id"])
+    res["at"] = int(now)
+    res["packs"] = sorted(packs)
+    db.set_meta(REPORT_META, json.dumps(res))
+    return res
+
+
+def cached_report(db) -> dict | None:
+    try:
+        return json.loads(db.get_meta(REPORT_META) or "null")
+    except ValueError:
+        return None
+
+
 def analyze(db, packs: dict[str, dict], now: float | None = None) -> dict:
     """Pe modul: ultima măsurătoare, media ultimelor 3, pe luni, procentul din capacitatea din BMS; plus cât de
     aproape a fost de o măsurătoare de la ultima încărcare completă (dacă n-are încă niciuna)."""

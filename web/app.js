@@ -1225,11 +1225,18 @@ $("#cap-body").addEventListener("click", (e) => {
   }
   if (e.target.id === "ct-stop") capTestPost({ action: "stop" });
 });
+let capLast = null;     // ultimul raport primit: ecranul apare imediat, apoi se împrospătează
 async function loadCapacity() {
   const box = $("#cap-body");
-  box.innerHTML = `<p class="note">${esc(t("Analizez…"))}</p>`;
+  if (capLast) renderCapacity(capLast);
+  else box.innerHTML = `<p class="note">${esc(t("Se încarcă…"))}</p>`;
   let r;
-  try { r = await api("/api/capacity"); } catch (e) { if (e.message !== "auth") box.innerHTML = `<div class="banner">${esc(e.message)}</div>`; return; }
+  try { r = await api("/api/capacity"); } catch (e) { if (e.message !== "auth" && !capLast) box.innerHTML = `<div class="banner">${esc(e.message)}</div>`; return; }
+  capLast = r;
+  renderCapacity(r);
+}
+function renderCapacity(r) {
+  const box = $("#cap-body");
   const date = (ts) => new Date(ts * 1000).toLocaleDateString(LOC, { day: "numeric", month: "short" });
   const v3 = (v) => num(v, 2);
   box.innerHTML = (r.modules.length ? "" : `<p class="note">${esc(t("Niciun modul legat."))}</p>`) + r.modules.map((m) => {
@@ -1251,7 +1258,8 @@ async function loadCapacity() {
       ${m.months.length > 1 ? `<div class="cap-months">${m.months.map((x) => `<div><span>${esc(new Date(x.month + "-15").toLocaleDateString(LOC, { month: "short", year: "2-digit" }))}</span>
         <i style="width:${Math.max(4, (x.cap / mx) * 100).toFixed(0)}%"></i><b>${num(x.cap, 0)}</b></div>`).join("")}</div>` : ""}${capRel(m)}</div>`;
   }).join("") + capTest(r) + `<p class="note">${esc(tf("Cum se măsoară: de la plin (celula cea mai încărcată peste {0} V) se adună curentul scos, până când modulul ajunge aproape de gol, recunoscut după tensiune (sub {1} V pe celulă în repaus sau sub {2} V sub sarcină). Descărcările mai mici de {3} % nu contează: între 20 și 90 % tensiunea LiFePO4 e aproape aceeași, deci de acolo nu se poate spune cât a mai rămas.",
-    v3(r.rules.full_cell), v3(r.rules.rest_max), v3(r.rules.knee), r.rules.min_depth))}</p>`;
+    v3(r.rules.full_cell), v3(r.rules.rest_max), v3(r.rules.knee), r.rules.min_depth))}</p>` +
+    (r.at ? `<p class="note">${esc(tf("Calculat de Pi la {0}; se reface singur în fiecare oră.", new Date(r.at * 1000).toLocaleString(LOC, { weekday: "short", hour: "2-digit", minute: "2-digit" })))}</p>` : "");
 }
 
 // cât de sigur e rezultatul (cell_health.confidence): după numărul de momente și cât de mult diferă între ele
