@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.29 — în pregătire
+## 1.0.0-beta.29 — 2026-11-25
 - Istoric: aplicația aduce graficele în fundal de la pornire (toate intervalele) și le ține la zi cât e deschisă, așa
   că ecranul Istoric le arată imediat, fără să mai aștepte Pi-ul.
 - Graficul „Putere”: linia „Preconizat” nu se vedea cu date reale (punctele ei, din oră în oră, erau luate drept
