@@ -2,7 +2,7 @@
 
 Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare în aplicație, la Setări → Actualizări.
 
-## 1.0.0-beta.28 — în pregătire
+## 1.0.0-beta.28 — 2026-11-24
 - Bateriile: tot ce era sub module (prognoza, raportul, capacitatea reală, sănătatea celulelor) e acum sub un singur
   rând, „Setări și rapoarte”.
 - „Prognoză și generator” devine „Prognoză producție”: se pornește dintr-un glisor („Prognoză producție solară”), iar
