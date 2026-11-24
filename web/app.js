@@ -124,6 +124,7 @@ async function boot() {
   $("#set-about-sub").textContent = `Amper ${isPro() ? "Pro" : "Lite"} ${state.info.version || ""} · actualizări, Pi-ul`;
   setInterval(tickConn, 1000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  setTimeout(() => histBackground(true), 1500);    // istoricul, adus în fundal: Istoric se deschide gata încărcat
 }
 
 function showLogin() {
@@ -2533,30 +2534,62 @@ $$("#range button").forEach((b) => (b.onclick = () => {
   loadHistory();
 }));
 
-async function loadHistory() {
+function histWhat(hours) {
   const devs = state.info.devices.filter((d) => connected(state.snap?.devices?.[d.id] || {}));
   const pk = devs.filter((d) => d.kind === "pack");
   const inv = devs.filter((d) => d.kind === "inverter");
   const pts = Math.min(400, Math.round(innerWidth * 1.2));
-  // toate graficele într-o singură cerere; până vin datele, „Se încarcă…”; o eroare nu lasă ecranul gol
-  const req = ++state.histReq;
   const ids = [...pk, ...inv].map((d) => encodeURIComponent(d.id)).join(",");
-  const key = `${state.hours}|${ids}`;
-  // ultima încărcare a aceluiași interval se desenează imediat (din memorie sau de pe telefon); cea nouă vine după
+  return { pk, inv, key: `${hours}|${ids}`, url: `/api/history/all?devices=${ids}&hours=${hours}&points=${pts}` };
+}
+const HIST_FRESH = { 6: 30e3, 24: 60e3, 168: 300e3, 720: 900e3 };   // cât e „proaspăt” (ca pe Pi, hist_ttl)
+const histBusy = new Map();
+// aduce un interval de pe Pi (gata calculat acolo) și îl ține în memorie și pe telefon; desenează dacă e cel afișat
+async function fetchHistory(hours) {
+  if (!state.info || !state.snap) return;
+  const w = histWhat(hours);
+  if (histBusy.get(w.key)) return histBusy.get(w.key);
+  const p = (async () => {
+    try {
+      const data = await api(w.url);
+      histCache.put(w.key, data);
+      if (state.view === "hist" && state.hours === hours) drawHistory(data, w.pk, w.inv);
+      return data;
+    } finally { histBusy.delete(w.key); }
+  })();
+  histBusy.set(w.key, p);
+  return p;
+}
+function histFresh(hours) {
+  const c = histCache.get(histWhat(hours).key);
+  return c && Date.now() - c.at < (HIST_FRESH[hours] || 60e3);
+}
+// în fundal: de la pornire toate intervalele, apoi cel ales la fiecare minut (cât aplicația e deschisă)
+async function histBackground(all) {
+  if (document.hidden || !state.info || !state.snap) return;
+  const order = [state.hours, ...[24, 6, 168, 720].filter((h) => h !== state.hours)];
+  for (const h of all ? order : [state.hours]) {
+    if (histFresh(h)) continue;
+    try { await fetchHistory(h); } catch {}
+  }
+}
+setInterval(() => histBackground(false), 60000);
+document.addEventListener("visibilitychange", () => histBackground(true));
+
+async function loadHistory() {
+  const { pk, inv, key } = histWhat(state.hours);
+  const req = ++state.histReq;
+  // ce e pe telefon se desenează imediat; dacă e mai vechi decât intervalul de reîmprospătare, se aduce altul
   const cached = histCache.get(key);
   if (cached) drawHistory(cached.data, pk, inv);
   else $$("#charts .when").forEach((el) => (el.textContent = "Se încarcă…"));
-  let data;
+  if (cached && histFresh(state.hours)) return;
   try {
-    data = await api(`/api/history/all?devices=${ids}&hours=${state.hours}&points=${pts}`);
+    await fetchHistory(state.hours);
   } catch (e) {
     if (e.message !== "auth" && req === state.histReq && !cached)
       $$("#charts .when").forEach((el) => (el.textContent = "Pi-ul nu a răspuns. Încearcă din nou."));
-    return;
   }
-  if (req !== state.histReq) return;                     // între timp s-a ales alt interval
-  histCache.put(key, data);
-  drawHistory(data, pk, inv);
 }
 
 /* graficele încărcate ultima dată, pe interval: în memorie și pe telefon (se deschid instant data viitoare) */
@@ -2587,7 +2620,7 @@ function drawHistory(data, pk, inv) {
     return histRows.get(s);
   };
   const ph = pk.map((d) => ({ rows: rowsOf(d) })), ih = inv.length ? { rows: sumRows(inv.map(rowsOf)) } : null;
-  const ser = (rows, key) => rows.map((r) => [r.t, r[key]]).filter((p) => p[1] != null);
+  const ser = (rows, key) => rows.map((r) => [r.t, r[key] ?? (key === "soc_amper" ? r.soc : null)]).filter((p) => p[1] != null);
   // SOC-ul ales în Bateriile: cel calculat de Amper (unde există în istoric) sau cel din BMS
   const socKey = (rows) => (socSrc() === "amper" && rows.some((r) => r.soc_amper != null) ? "soc_amper" : "soc");
   lineChart($("#ch-soc"), pk.map((d, i) => ({ name: d.name, color: SERIES[i % SERIES.length], data: ser(ph[i].rows, socKey(ph[i].rows)) })),
@@ -2769,10 +2802,14 @@ function lineChart(box, series, opt = {}) {
     const base = Y(opt.zero ? 0 : lo);
     // linia se rupe doar la o pauză reală: mult mai mare decât distanța obișnuită dintre puncte (pe 30 de zile
     // punctele sunt la ~1 h 45 min; cu doar 2 zile de date, pragul span/60 le rupea pe toate)
-    const diffs = series.flatMap((s) => s.data.slice(1).map((p, i) => p[0] - s.data[i][0])).sort((a, b) => a - b);
-    const typical = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 0;
-    const gapLimit = Math.max(900, span / 60, typical * 3);
+    // pragul se calculează pe fiecare serie: preconizarea are un punct pe oră, citirile câte unul la câteva minute
+    const gapOf = (s) => {
+      const diffs = s.data.slice(1).map((p, i) => p[0] - s.data[i][0]).sort((a, b) => a - b);
+      const typical = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 0;
+      return Math.max(900, span / 60, typical * 3);
+    };
     const segments = (s) => {
+      const gapLimit = gapOf(s);
       const out = [];
       let prev = null;
       for (const p of s.data) {
