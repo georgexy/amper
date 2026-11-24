@@ -940,3 +940,8 @@ body[data-look="casa"] nav.tabs { z-index: 6; }
 .cap-test .row-check { margin: 4px 0 10px; padding: 8px 0; background: none; }
 .cap-test .btn { margin: 0 0 10px; }
 .cap-test select { font: inherit; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
+
+/* Prognoză producție: glisoarele (1.0.0-beta.28) */
+.fc-switch { margin: 10px 0; border-radius: 14px; }
+#fc-content .fc-set { margin-top: 0; }
+#fc-gen-set .row-check { border-radius: 14px; margin: -2px 0 10px; }

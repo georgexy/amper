@@ -867,5 +867,8 @@
  "a trecut prea mult timp (# de ore)": "too much time passed (# hours)",
  "Testul de capacitate s-a terminat (celulele au ajuns la # V): {...}": "The capacity test is finished (the cells reached # V): {...}",
  "Pornește acum încărcarea (generatorul).": "Start charging now (the generator).",
- "Pornește acum încărcarea (generatorul)": "Start charging now (the generator)"
+ "Pornește acum încărcarea (generatorul)": "Start charging now (the generator)",
+ "În următoarele # de ore bateria coboară cel mai jos la # %, azi la #:#.": "Over the next # hours the battery goes lowest to # %, today at #:#.",
+ "În următoarele # de ore bateria coboară cel mai jos la # %, mâine la #:#.": "Over the next # hours the battery goes lowest to # %, tomorrow at #:#.",
+ "În următoarele # de ore bateria coboară cel mai jos la # %, poimâine la #:#.": "Over the next # hours the battery goes lowest to # %, the day after tomorrow at #:#."
 }

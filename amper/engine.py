@@ -101,6 +101,11 @@ class Engine:
         from .soc_est import SocEstimator
         self.soc = SocEstimator(self.db)         # SOC-ul calculat de Amper (Ah de la plin / capacitatea învățată)
         self.soc_source = self.db.get_meta("soc_source") or "amper"     # ce SOC se afișează: amper | bms
+        from . import capacity
+        self.capacity_report = capacity.cached_report(self.db)     # „Capacitatea reală”, calculată în fundal
+        self._cap_lock = asyncio.Lock()
+        if self.capacity_report:
+            self.soc.set_caps({m["id"]: m.get("learned") for m in self.capacity_report.get("modules", [])})
         self.subscribers: set[asyncio.Queue] = set()
         self._tasks: dict[str, asyncio.Task] = {}
         self._energy_t: dict[str, float] = {}
@@ -295,9 +300,11 @@ class Engine:
                 from . import capacity
                 packs = self.pack_info()
                 if packs:
-                    capacity.test_tick(self.db, self.soc, packs,
-                                       {d: self.devices[d].reading for d in packs if self.devices[d].reading},
-                                       self.notifier)
+                    t = capacity.test_tick(self.db, self.soc, packs,
+                                           {d: self.devices[d].reading for d in packs if self.devices[d].reading},
+                                           self.notifier)
+                    if t and t.get("state") != "running":      # testul s-a terminat: capacitățile noi, imediat
+                        asyncio.create_task(self.refresh_capacity())
             except Exception:
                 log.exception("SOC calculat / testul de capacitate")
             snap = self.snapshot()
@@ -387,6 +394,19 @@ class Engine:
                 self.db.insert_inverter(st.reading, ts=int(now))
         self._flush_energy()
 
+    async def refresh_capacity(self) -> dict | None:
+        """Recalculează „Capacitatea reală” (în fundal: la fiecare oră, după test, după resetarea rapoartelor)."""
+        from . import capacity
+        async with self._cap_lock:
+            try:
+                rep = await asyncio.to_thread(capacity.report, self.db, self.pack_info())
+            except Exception:
+                log.exception("eroare la măsurarea capacității")
+                return self.capacity_report
+            self.capacity_report = rep
+            self.soc.set_caps({m["id"]: m.get("learned") for m in rep["modules"]})
+            return rep
+
     async def maintenance_loop(self) -> None:
         while True:
             try:
@@ -403,12 +423,7 @@ class Engine:
                     await asyncio.to_thread(cell_health.weekly, self.db, self.notifier, self.device_names())
             except Exception:
                 log.exception("eroare la analiza săptămânală a celulelor")
-            try:
-                from . import capacity
-                await asyncio.to_thread(capacity.scan, self.db, self.pack_info())
-                self.soc.set_caps(await asyncio.to_thread(capacity.learned, self.db, self.pack_info()))
-            except Exception:
-                log.exception("eroare la măsurarea capacității")
+            await self.refresh_capacity()
             try:
                 from . import forecast
                 await asyncio.to_thread(forecast.check, self.db, self.notifier, self.bank())

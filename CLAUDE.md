@@ -760,6 +760,26 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   `GET /api/capacity` + `learned`, `full_ago`, `test`. UI: `#soc-src` (Bateriile), `socOther`/`socApprox` pe carduri,
   `capRel`/`capTest` în view-capacity.
 
+## Bateriile → „Setări și rapoarte”; prognoza pornită/oprită, alerte generator separate (1.0.0-beta.28, cerut 2026-11-23)
+- `view-batmore` (rândul `#bm-row` sub module) conține `#fc-row`, `#rep-row`, `#cap-row`, `#ch-row`; „înapoi” din
+  prognoză/raport/capacitate/celule duce la `batmore`; rândurile se încarcă la `show("batmore")`.
+- forecast `DEFAULTS`: `enabled` (glisorul „Prognoză producție solară”) și `notify` (= „Alerte generator”) ambele
+  false pe un Pi nou; meta veche fără `enabled` dar cu localitate → enabled true, notify cum era. Oprită: `build`
+  → `disabled`, `check`/`pv_model`/`sky_now` nu fac nimic (nici vremea pentru grafice/casă). `advice(..., generator)`:
+  fără alerte → `level` „info”, „În următoarele 48 de ore bateria coboară cel mai jos la X %, …”; pragul pe grafic
+  și roșul din tabel doar cu alertele. UI: `#fc-on`, `#fc-content`, `#fc-gen`, `#fc-gen-set` (pragul).
+- Capacitatea în fundal (cerut 2026-11-24): `capacity.report` (scan + analyze + progress + learned, `at`, `packs`) în
+  meta `capacity_report`; `Engine.refresh_capacity` (lock) din maintenance_loop (la oră), după `test_tick` terminat
+  și după `/api/reports/reset`; la pornire `Engine.capacity_report` din meta (+ `soc.set_caps`). `/api/capacity`
+  dă raportul păstrat (calcul doar dacă lipsește sau s-au schimbat modulele) + câmpurile vii (`full_ago`, `test`).
+  app.js: `capLast` + `renderCapacity` (desenat imediat, apoi împrospătat), nota „Calculat de Pi la …".
+- Istoricul (cerut 2026-11-24, „se încarcă foarte greu”): cauza = ~0,7–1 MB JSON necomprimat pe interval (toate
+  coloanele, float-uri întregi), calculul e < 0,1 s. Acum `/api/history/all` dă `series[id] = {kind, cols, data:
+  [[t, …]]}` doar cu `HIST_COLS` (pack: soc, soc_amper, current; invertor: pv/load/ac_in), `_rnd` (2 zecimale, întregi
+  ≥ 100); `_json` comprimă (gzip) răspunsurile > 2 KB. `hist_cache` (cheia dispozitive/ore/puncte) + `hist_refresher`
+  (la 10 s reface ce s-a cerut în ultimele 2 zile, `hist_ttl` 30 s/1/5/15 min după interval). app.js: `rowsOf`
+  desface `cols`/`data` (`histRows` WeakMap); datele vechi din `histCache` (cu `rows`) merg în continuare.
+
 ## Jurnalul pe card, copia de siguranță explicată, toate notificările (1.0.0-beta.21, cerut 2026-11-09)
 - Motiv: pe 09.11 clona (00:17, după ~17 min, prin 4G) a eșuat, iar jurnalul era doar în RAM (Raspberry Pi OS:
   `/usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf`, Storage=volatile; fără rsyslog) → cauza pierdută.

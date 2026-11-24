@@ -37,7 +37,9 @@ FULL_SOC = 95                       # peste atât, PV-ul poate fi tăiat de inve
 MIN_CAL_HOURS = 12                  # sub atâtea ore bune, nu avem încă o estimare a panourilor
 INV_EFF = 0.92                      # consumul casei, văzut din baterie (pierderile invertorului)
 CHG_EFF = 0.97
-DEFAULTS = {"place": None, "lat": None, "lon": None, "min_soc": 20, "notify": True}
+# enabled = „Prognoză producție solară” pornită; notify = „Alerte generator” (cerute 2026-11-23: nu toată lumea are
+# generator; cine are rețea nu are nevoie de ele). Ambele oprite pe un Pi nou.
+DEFAULTS = {"enabled": False, "place": None, "lat": None, "lon": None, "min_soc": 20, "notify": False}
 
 
 def _fetch(url: str, timeout: float = 20) -> dict:
@@ -55,7 +57,11 @@ def settings(db) -> dict:
         s = json.loads(db.get_meta(META) or "{}")
     except ValueError:
         s = {}
-    return {**DEFAULTS, **{k: v for k, v in s.items() if k in DEFAULTS}}
+    out = {**DEFAULTS, **{k: v for k, v in s.items() if k in DEFAULTS}}
+    if "enabled" not in s and s.get("lat") is not None:      # configurată înainte de 1.0.0-beta.28: rămâne cum era
+        out["enabled"] = True
+        out["notify"] = bool(s.get("notify", True))
+    return out
 
 
 def save_settings(db, upd: dict) -> dict:
@@ -72,6 +78,8 @@ def save_settings(db, upd: dict) -> dict:
         s["min_soc"] = v
     if "notify" in upd:
         s["notify"] = bool(upd["notify"])
+    if "enabled" in upd:
+        s["enabled"] = bool(upd["enabled"])
     db.set_meta(META, json.dumps(s))
     return s
 
@@ -233,8 +241,14 @@ def _kwh(v: float) -> str:
     return f"{v:.1f}".replace(".", ",")
 
 
-def advice(sm: dict, min_soc: float, now: float, pts: list[dict]) -> dict:
+def advice(sm: dict, min_soc: float, now: float, pts: list[dict], generator: bool = True) -> dict:
     low, lowest = sm["low"], sm["lowest"]
+    if not generator:                         # fără generator (rețea / nimic): doar unde ajunge bateria
+        if lowest:
+            w, hm = _when(lowest["ts"], now)
+            return dict(level="info", at=lowest["ts"], text=f"În următoarele 48 de ore bateria coboară cel mai jos "
+                                                            f"la {lowest['soc']:.0f} %, {w} la {hm}.")
+        return dict(level="none", text="Nu sunt date despre baterie.", at=None)
     if low and low is pts[0]:
         return dict(level="need", at=low["ts"], text=f"Bateria e sub {min_soc:.0f} % acum. Pornește generatorul: ca să "
                                                      f"rămână peste prag îi lipsesc cam {_kwh(sm['need_kwh'])} kWh.")
@@ -257,6 +271,9 @@ def build(db, bank: dict, fetch=_fetch, now: float | None = None) -> dict:
     now = now or time.time()
     s = settings(db)
     out = dict(settings=s, ready=False)
+    if not s["enabled"]:
+        out["disabled"] = True
+        return out
     if s["lat"] is None:
         out["missing"] = "location"
         return out
@@ -281,7 +298,7 @@ def build(db, bank: dict, fetch=_fetch, now: float | None = None) -> dict:
     pts = project(now, bank["kwh"], bank["capacity_kwh"], cal, prof, rad)
     sm = summarize(now, pts, s["min_soc"], bank["capacity_kwh"])
     out.update(ready=True, learning=cal["k"] is None or cal["approx"], no_pv=cal["k"] is None, points=pts, days=sm["days"],
-               advice=advice(sm, s["min_soc"], now, pts), need_kwh=sm["need_kwh"],
+               advice=advice(sm, s["min_soc"], now, pts, s["notify"]), need_kwh=sm["need_kwh"],
                soc_now=bank.get("soc"), capacity_kwh=bank["capacity_kwh"])
     return out
 
@@ -291,7 +308,7 @@ def check(db, notifier, bank: dict, fetch=_fetch, now: float | None = None) -> d
     pe zi dacă bateria ar coborî sub prag în următoarele 24 de ore."""
     now = now or time.time()
     s = settings(db)
-    if s["lat"] is None:
+    if not s["enabled"] or s["lat"] is None:
         return None
     try:
         weather(db, s, fetch, now)
@@ -318,7 +335,7 @@ def pv_model(db, now: float | None = None) -> tuple[dict, dict] | None:
     """(calibrarea, radiația pe ore) din prognoza salvată; ținută în memorie cât nu se schimbă ora sau prognoza."""
     now = now or time.time()
     s = settings(db)
-    if s["lat"] is None:
+    if not s["enabled"] or s["lat"] is None:
         return None
     try:
         w = weather(db, s, now=now, allow_fetch=False)
@@ -385,7 +402,7 @@ def sky_now(db, now: float | None = None) -> dict:
     0–1 (după mm/h sau cm/h), zăpada depusă (cm). Fără localitate sau prognoză: {}."""
     now = now or time.time()
     s = settings(db)
-    if s["lat"] is None:
+    if not s["enabled"] or s["lat"] is None:
         return {}
     try:
         w = weather(db, s, now=now, allow_fetch=False)

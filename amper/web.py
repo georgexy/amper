@@ -39,7 +39,29 @@ def _texts(data, depth=0):
 def _json(data, status=200):
     if i18n.lang() != "ro":
         _texts(data)
-    return web.json_response(data, status=status, dumps=lambda o: json.dumps(o, ensure_ascii=False, default=str))
+    resp = web.json_response(data, status=status, dumps=lambda o: json.dumps(o, ensure_ascii=False, default=str))
+    if len(resp.body or b"") > 2048:          # prin 4G contează: graficele, rapoartele (gzip doar dacă telefonul îl acceptă)
+        resp.enable_compression()
+    return resp
+
+
+# Istoric: doar coloanele desenate în grafice, valorile rotunjite, rânduri ca liste (cheile o singură dată)
+HIST_COLS = {"pack": ("soc", "soc_amper", "current"), "inverter": ("pv_power", "load_power", "ac_in_power")}
+
+
+def _rnd(v):
+    if v is None:
+        return None
+    return round(v, 2) if abs(v) < 100 else round(v)
+
+
+def compact_rows(rows: list[dict], cols: tuple) -> list[list]:
+    return [[r["t"], *(_rnd(r.get(c)) for c in cols)] for r in rows]
+
+
+def hist_ttl(hours: float) -> int:
+    """Cât timp e bun un istoric calculat în fundal (un punct din grafic durează hours × 9 s la 400 de puncte)."""
+    return 30 if hours <= 6 else 60 if hours <= 24 else 300 if hours <= 168 else 900
 
 
 LANGS = ("ro", "en")
@@ -269,25 +291,30 @@ def make_app(engine) -> web.Application:
                                        int(request.query.get("points", 300)), cfg["raw_retention_days"])
         return _json(dict(device=device, kind=kind, start=start, end=end, rows=rows))
 
-    async def history_many(request):
-        """Toate graficele din Istoric într-o singură cerere (prin internet contează numărul de cereri)."""
-        ids = [d for d in request.query.get("devices", "").split(",") if d in engine.devices][:20]
-        hours = min(float(request.query.get("hours", 24)), 24 * 400)
-        points = min(int(request.query.get("points", 300)), 1000)
+    # Istoricul calculat în fundal: intervalele cerute în ultimele 2 zile se refac singure (hist_ttl), iar cererea
+    # din aplicație primește rezultatul gata făcut. Cheia = (dispozitive, ore, puncte).
+    hist_cache: dict[tuple, dict] = {}
+    hist_task: list = []
+
+    async def hist_compute(key):
+        ids, hours, points = key
         end = int(time.time())
         start = end - int(hours * 3600)
-
         t0 = time.monotonic()
 
         def read():
             out = {}
             for d in ids:
+                if d not in engine.devices:
+                    continue
                 kind = engine.devices[d].driver.kind
+                cols = HIST_COLS.get(kind)
                 try:
-                    out[d] = dict(kind=kind, rows=engine.db.history(kind, d, start, end, points, cfg["raw_retention_days"]))
+                    rows = engine.db.history(kind, d, start, end, points, cfg["raw_retention_days"], cols)
+                    out[d] = dict(kind=kind, cols=list(cols), data=compact_rows(rows, cols))
                 except Exception as e:                       # un dispozitiv cu probleme nu strică restul
                     log.warning("istoric %s: %s", d, e)
-                    out[d] = dict(kind=kind, rows=[], error=str(e))
+                    out[d] = dict(kind=kind, cols=list(cols or ()), data=[], error=str(e))
             return out
         series = await asyncio.to_thread(read)
         # producția preconizată (prognoza meteo × panourile învățate), cu o bucată în viitor pe intervalele scurte
@@ -301,7 +328,45 @@ def make_app(engine) -> web.Application:
         ms = int((time.monotonic() - t0) * 1000)
         if ms > 1500:
             log.warning("istoricul (%s h, %d dispozitive) a durat %.1f s", hours, len(ids), ms / 1000)
-        return _json(dict(start=start, end=end, series=series, ms=ms, pv_forecast=pv_fc))
+        res = dict(start=start, end=end, series=series, ms=ms, pv_forecast=pv_fc)
+        old = hist_cache.get(key) or {}
+        hist_cache[key] = dict(at=time.time(), asked=old.get("asked", time.time()), res=res)
+        return res
+
+    async def hist_refresher():
+        """Reface în fundal istoricul cerut recent, înainte să se învechească."""
+        while True:
+            await asyncio.sleep(10)
+            now = time.time()
+            for key, c in list(hist_cache.items()):
+                if now - c["asked"] > 2 * 86400:
+                    hist_cache.pop(key, None)
+                elif now - c["at"] >= hist_ttl(key[1]) * 0.8:
+                    try:
+                        await hist_compute(key)
+                    except Exception:
+                        log.exception("istoricul în fundal")
+
+    async def hist_start(app):
+        hist_task.append(asyncio.create_task(hist_refresher()))
+
+    async def hist_stop(app):
+        for t in hist_task:
+            t.cancel()
+
+    async def history_many(request):
+        """Toate graficele din Istoric într-o singură cerere (prin internet contează numărul de cereri)."""
+        ids = tuple(d for d in request.query.get("devices", "").split(",") if d in engine.devices)[:20]
+        hours = min(float(request.query.get("hours", 24)), 24 * 400)
+        points = min(int(request.query.get("points", 300)), 1000)
+        key = (ids, hours, points)
+        c = hist_cache.get(key)
+        if c and time.time() - c["at"] <= hist_ttl(hours):
+            c["asked"] = time.time()
+            return _json(c["res"])
+        res = await hist_compute(key)
+        hist_cache[key]["asked"] = time.time()
+        return _json(res)
 
     async def energy(request):
         inv = [k for k, v in engine.devices.items() if v.driver.kind == "inverter"]
@@ -1292,7 +1357,7 @@ def make_app(engine) -> web.Application:
         body = await request.json()
         try:
             s = await asyncio.to_thread(forecast.save_settings, engine.db,
-                                        {k: body[k] for k in ("lat", "lon", "place", "min_soc", "notify") if k in body})
+                                        {k: body[k] for k in ("enabled", "lat", "lon", "place", "min_soc", "notify") if k in body})
         except (TypeError, ValueError) as e:
             return _json({"error": str(e) or "valoare greșită"}, 400)
         return _json({"ok": True, "settings": s})
@@ -1302,16 +1367,13 @@ def make_app(engine) -> web.Application:
         return _json(await asyncio.to_thread(forecast.sky_now, engine.db))
 
     async def capacity_get(request):
-        packs = engine.pack_info()
-        await asyncio.to_thread(capacity.scan, engine.db, packs)
-        res = await asyncio.to_thread(capacity.analyze, engine.db, packs)
-        prog = await asyncio.to_thread(capacity.progress, engine.db, packs)
-        learned = await asyncio.to_thread(capacity.learned, engine.db, packs)
-        engine.soc.set_caps(learned)
+        """Raportul calculat în fundal de motor (la oră); calculat acum doar dacă lipsește sau s-au schimbat modulele."""
+        rep = engine.capacity_report
+        if not rep or rep.get("packs") != sorted(engine.pack_info()):
+            rep = await engine.refresh_capacity() or {"modules": [], "rules": {}}
+        res = json.loads(json.dumps(rep))
         now = time.time()
         for m in res["modules"]:
-            m["progress"] = prog.get(m["id"])
-            m["learned"] = learned.get(m["id"])
             s = engine.soc.st.get(m["id"]) or {}
             m["full_ago"] = int(now - s["full_ts"]) if s.get("anchored") and s.get("full_ts") else None
         res["test"] = await asyncio.to_thread(capacity.test_state, engine.db)
@@ -1357,6 +1419,7 @@ def make_app(engine) -> web.Application:
             return err
         now = int(time.time())
         await asyncio.to_thread(engine.db.set_meta, night_report.SINCE, str(now))
+        asyncio.create_task(engine.refresh_capacity())
         log.warning("rapoartele bateriilor pornesc de acum (resetate din aplicație, de la %s)", client_ip(request))
         return _json({"ok": True, "since": now})
 
@@ -1497,4 +1560,6 @@ def make_app(engine) -> web.Application:
     app.router.add_post("/api/push/unsubscribe", push_unsubscribe)
     app.router.add_get("/api/ws", ws)
     app.router.add_static("/", STATIC, show_index=False)
+    app.on_startup.append(hist_start)
+    app.on_cleanup.append(hist_stop)
     return app
