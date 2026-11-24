@@ -773,6 +773,12 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   și după `/api/reports/reset`; la pornire `Engine.capacity_report` din meta (+ `soc.set_caps`). `/api/capacity`
   dă raportul păstrat (calcul doar dacă lipsește sau s-au schimbat modulele) + câmpurile vii (`full_ago`, `test`).
   app.js: `capLast` + `renderCapacity` (desenat imediat, apoi împrospătat), nota „Calculat de Pi la …".
+- Istoricul (cerut 2026-11-24, „se încarcă foarte greu”): cauza = ~0,7–1 MB JSON necomprimat pe interval (toate
+  coloanele, float-uri întregi), calculul e < 0,1 s. Acum `/api/history/all` dă `series[id] = {kind, cols, data:
+  [[t, …]]}` doar cu `HIST_COLS` (pack: soc, soc_amper, current; invertor: pv/load/ac_in), `_rnd` (2 zecimale, întregi
+  ≥ 100); `_json` comprimă (gzip) răspunsurile > 2 KB. `hist_cache` (cheia dispozitive/ore/puncte) + `hist_refresher`
+  (la 10 s reface ce s-a cerut în ultimele 2 zile, `hist_ttl` 30 s/1/5/15 min după interval). app.js: `rowsOf`
+  desface `cols`/`data` (`histRows` WeakMap); datele vechi din `histCache` (cu `rows`) merg în continuare.
 
 ## Jurnalul pe card, copia de siguranță explicată, toate notificările (1.0.0-beta.21, cerut 2026-11-09)
 - Motiv: pe 09.11 clona (00:17, după ~17 min, prin 4G) a eșuat, iar jurnalul era doar în RAM (Raspberry Pi OS:

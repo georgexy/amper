@@ -330,8 +330,8 @@ class Database:
     RAW_MAX_SPAN = 6 * 3600     # peste atât, graficele folosesc mediile la 5 minute (mult mai puțin de citit de pe card)
 
     def history(self, kind: str, device: str, start: int, end: int, points: int = 300,
-                raw_retention_days: int = 14) -> list[dict]:
-        cols = PACK_COLS if kind == "pack" else INV_COLS
+                raw_retention_days: int = 14, cols: tuple | None = None) -> list[dict]:
+        cols = cols or (PACK_COLS if kind == "pack" else INV_COLS)
         table_raw = "pack_samples" if kind == "pack" else "inverter_samples"
         table_agg = "pack_5m" if kind == "pack" else "inverter_5m"
         span = max(end - start, 1)

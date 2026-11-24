@@ -2576,8 +2576,16 @@ const histCache = {
   },
 };
 
+const histRows = new WeakMap();      // istoricul compact (coloane + liste) desfăcut în obiecte, o singură dată
 function drawHistory(data, pk, inv) {
-  const S = data.series || {}, rowsOf = (d) => S[d.id]?.rows || [];
+  const S = data.series || {};
+  const rowsOf = (d) => {
+    const s = S[d.id];
+    if (!s) return [];
+    if (!s.cols) return s.rows || [];
+    if (!histRows.has(s)) histRows.set(s, (s.data || []).map((a) => { const o = { t: a[0] }; s.cols.forEach((c, i) => (o[c] = a[i + 1])); return o; }));
+    return histRows.get(s);
+  };
   const ph = pk.map((d) => ({ rows: rowsOf(d) })), ih = inv.length ? { rows: sumRows(inv.map(rowsOf)) } : null;
   const ser = (rows, key) => rows.map((r) => [r.t, r[key]]).filter((p) => p[1] != null);
   // SOC-ul ales în Bateriile: cel calculat de Amper (unde există în istoric) sau cel din BMS

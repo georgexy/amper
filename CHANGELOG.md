@@ -11,6 +11,8 @@ Fiecare versiune are o secțiune `## <versiune> — <dată>`; textul ei apare î
   pentru grafice și casa 3D). Pe Pi-urile care aveau deja localitatea aleasă, rămâne pornită ca până acum.
 - „Capacitatea reală” se calculează în fundal (în fiecare oră, imediat după un test de capacitate și după resetarea
   rapoartelor) și se păstrează gata făcută, și peste o repornire: ecranul se deschide imediat, fără „Analizez…”.
+- Istoric mai rapid, mai ales prin 4G: Pi-ul trimite doar ce se desenează, comprimat (de ~30–50 de ori mai puține
+  date: 24 de ore ≈ 15 KB în loc de ~740 KB), și ține graficele cerute recent gata calculate, refăcute singur în fundal.
 
 ## 1.0.0-beta.27 — 2026-11-23
 - SOC calculat de Amper, pe fiecare modul: numără Ah-ii ieșiți de la ultima încărcare completă (recunoscută după
