@@ -779,6 +779,11 @@ repornire le închidea și le retrimitea pe telefon — utilizatorul a primit ac
   ≥ 100); `_json` comprimă (gzip) răspunsurile > 2 KB. `hist_cache` (cheia dispozitive/ore/puncte) + `hist_refresher`
   (la 10 s reface ce s-a cerut în ultimele 2 zile, `hist_ttl` 30 s/1/5/15 min după interval). app.js: `rowsOf`
   desface `cols`/`data` (`histRows` WeakMap); datele vechi din `histCache` (cu `rows`) merg în continuare.
+- 1.0.0-beta.29 (cerut 2026-11-25, „să se încarce mereu în Pi, Amper doar să-l afișeze, instant”): app.js
+  `histWhat/fetchHistory/histBackground`: la `boot` (după 1,5 s) toate intervalele (cel ales primul), apoi la 60 s cel
+  ales și la `visibilitychange`; `loadHistory` desenează din `histCache` și cere doar dacă e mai vechi decât
+  `HIST_FRESH` (ca `hist_ttl`). `lineChart`: pragul de rupere a liniei e pe serie (`gapOf`) — cu cel comun,
+  preconizarea (un punct pe oră) se rupea la fiecare punct pe 24 h și nu se vedea. `ser`: `soc_amper ?? soc`.
 
 ## Jurnalul pe card, copia de siguranță explicată, toate notificările (1.0.0-beta.21, cerut 2026-11-09)
 - Motiv: pe 09.11 clona (00:17, după ~17 min, prin 4G) a eșuat, iar jurnalul era doar în RAM (Raspberry Pi OS:
